@@ -1,0 +1,13 @@
+{
+  "id": "example_mod",
+  "name": "Example Mod",
+  "version": "0.1.0",
+  "author": "pvz-portable",
+  "description": "Example mod to validate the mod pipeline",
+  "priority": 100,
+  "dependencies": ["base"],
+  "entry": "scripts/main.lua",
+  "data": {
+    "strings": ["data/strings.json"]
+  }
+}
