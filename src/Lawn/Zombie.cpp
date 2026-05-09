@@ -38,6 +38,7 @@
 #include "../Sexy.TodLib/Reanimator.h"
 #include "../Sexy.TodLib/Attachment.h"
 #include "../Sexy.TodLib/TodParticle.h"
+#include "../Mod/ModLua.h"
 
 #include <climits>
 
@@ -7307,6 +7308,9 @@ void Zombie::BungeeDie()
 
 void Zombie::DieNoLoot()
 {
+    if (!mDead)
+        gModLua.CallOnZombieDie(static_cast<int>(mZombieType));
+
     StopZombieSound();
     AttachmentDie(mAttachmentID);
     mApp->RemoveReanimation(mBodyReanimID);

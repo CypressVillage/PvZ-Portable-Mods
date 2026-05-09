@@ -207,7 +207,15 @@ PFILE* PakInterface::FOpen(const char* theFileName, const char* anAccess)
 	FILE* aFP = nullptr;
 	if (!aResourceBase.empty() && !Sexy::IsPathRooted(theFileName))
 	{
-		aFP = fcaseopenat(aResourceBase.c_str(), theFileName, anAccess);
+		const std::vector<std::string>& aRoots = Sexy::GetResourceRoots();
+		for (auto it = aRoots.rbegin(); it != aRoots.rend(); ++it)
+		{
+			aFP = fcaseopenat(it->c_str(), theFileName, anAccess);
+			if (aFP != nullptr)
+				break;
+		}
+		if (aFP == nullptr)
+			aFP = fcaseopenat(aResourceBase.c_str(), theFileName, anAccess);
 	}
 	else
 	{

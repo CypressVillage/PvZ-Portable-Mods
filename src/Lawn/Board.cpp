@@ -50,6 +50,7 @@
 #include "widget/ButtonWidget.h"
 #include "widget/WidgetManager.h"
 #include "sound/SoundInstance.h"
+#include "../Mod/ModLua.h"
 
 //#define SEXY_PERF_ENABLED
 #include "misc/PerfTimer.h"
@@ -2714,11 +2715,14 @@ Zombie* Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
 	bool aVariant = !Rand(5);
 	Zombie* aZombie = mZombies.DataArrayAlloc();
 	aZombie->ZombieInitialize(theRow, theZombieType, aVariant, nullptr, theFromWave);
+	gModLua.CallOnZombieSpawn(static_cast<int>(theZombieType), theRow);
 	if (theZombieType == ZombieType::ZOMBIE_BOBSLED && aZombie->IsOnBoard())
 	{
 		for (int _i = 0; _i < 3; _i++)
 		{
-			mZombies.DataArrayAlloc()->ZombieInitialize(theRow, ZombieType::ZOMBIE_BOBSLED, false, aZombie, theFromWave);
+			Zombie* aFollower = mZombies.DataArrayAlloc();
+			aFollower->ZombieInitialize(theRow, ZombieType::ZOMBIE_BOBSLED, false, aZombie, theFromWave);
+			gModLua.CallOnZombieSpawn(static_cast<int>(ZombieType::ZOMBIE_BOBSLED), theRow);
 		}
 	}
 	return aZombie;

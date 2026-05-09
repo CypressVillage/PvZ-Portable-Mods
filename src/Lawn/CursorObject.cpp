@@ -41,6 +41,17 @@ CursorObject::CursorObject()
     mCobCannonPlantID = PlantID::PLANTID_NULL;
     mGlovePlantID = PlantID::PLANTID_NULL;
     mReanimCursorID = ReanimationID::REANIMATIONID_NULL;
+    
+    if (mApp->IsWhackAZombieLevel())
+    {
+        ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_HAMMER, true);
+        Reanimation* aHammerReanim = mApp->AddReanimation(-25.0f, 16.0f, 0, ReanimationType::REANIM_HAMMER);
+        aHammerReanim->mIsAttachment = true;
+        aHammerReanim->PlayReanim("anim_whack_zombie", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 24.0f);
+        aHammerReanim->mAnimTime = 1.0f;
+        mReanimCursorID = mApp->ReanimationGetID(aHammerReanim);
+    }
+
     mWidth = 80;
     mHeight = 80;
 }
@@ -73,7 +84,6 @@ void CursorObject::Update()
 void CursorObject::Die()
 {
     mApp->RemoveReanimation(mReanimCursorID);
-    mReanimCursorID = ReanimationID::REANIMATIONID_NULL;
 }
 
 void CursorObject::Draw(Graphics* g)

@@ -49,6 +49,7 @@ namespace Sexy
 	std::filesystem::path gAppDataFolder;
 	std::filesystem::path gResourceFolder;
 	std::string gResourceFolderStr; // Cached string to avoid repeated conversions
+	std::vector<std::string> gResourceRoots;
 }
 
 static inline char ToLowerAscii(char c)
@@ -123,6 +124,23 @@ void Sexy::SetResourceFolder(const std::string& thePath)
 std::string Sexy::GetResourcePath(const std::string& theRelativePath)
 {
 	return PathToU8(Sexy::gResourceFolder / PathFromU8(theRelativePath));
+}
+
+const std::vector<std::string>& Sexy::GetResourceRoots()
+{
+	return Sexy::gResourceRoots;
+}
+
+void Sexy::ClearResourceRoots()
+{
+	Sexy::gResourceRoots.clear();
+}
+
+void Sexy::AddResourceRoot(const std::string& thePath)
+{
+	std::string normalized = RemoveTrailingSlash(thePath);
+	if (!normalized.empty())
+		Sexy::gResourceRoots.push_back(normalized);
 }
 
 std::string Sexy::StringToUpper(const std::string& theString)

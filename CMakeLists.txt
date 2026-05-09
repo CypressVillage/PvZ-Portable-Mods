@@ -32,6 +32,7 @@ endif()
 
 file(GLOB SOURCES
 	src/*.cpp
+	src/Mod/*.cpp
 	src/SexyAppFramework/*.cpp
 	src/SexyAppFramework/graphics/*.cpp
 	src/SexyAppFramework/imagelib/*.cpp
@@ -132,6 +133,7 @@ option(PVZ_DEBUG "Enable _PVZ_DEBUG macro to enable cheats, hidden features, etc
 option(LIMBO_PAGE "Enable limbo page to access hidden levels" ON)
 option(CONSOLE "Show console on Windows" ${WIN_CONSOLE_DEFAULT})
 option(DO_FIX_BUGS "Define DO_FIX_BUGS macro (Community fixes for original game bugs of 1.2.0.1073 GOTY Edition)" OFF)
+option(PVZ_ENABLE_LUA "Enable Lua mod scripting" OFF)
 
 if(EMSCRIPTEN)
 	list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
@@ -205,6 +207,7 @@ target_compile_definitions(pvz-portable PRIVATE
 	$<$<BOOL:${PVZ_DEBUG}>:_PVZ_DEBUG>
 	$<$<BOOL:${LIMBO_PAGE}>:_PVZ_LIMBO_PAGE>
 	$<$<BOOL:${DO_FIX_BUGS}>:DO_FIX_BUGS>
+	$<$<BOOL:${PVZ_ENABLE_LUA}>:PVZ_ENABLE_LUA>
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
 
@@ -253,6 +256,11 @@ else()
 		${SDL2_LINK_TARGET}
 		Threads::Threads
 	)
+	if (PVZ_ENABLE_LUA)
+		find_package(Lua REQUIRED)
+		target_include_directories(pvz-portable PRIVATE ${LUA_INCLUDE_DIR})
+		target_link_libraries(pvz-portable PRIVATE ${LUA_LIBRARIES})
+	endif()
 endif()
 
 if (WIN32)

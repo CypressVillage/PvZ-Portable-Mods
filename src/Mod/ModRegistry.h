@@ -1,0 +1,67 @@
+/*
+ * Copyright (C) 2026 Zhou Qiankang <wszqkzqk@qq.com>
+ *
+ * SPDX-License-Identifier: LGPL-3.0-or-later
+ */
+
+#ifndef __MODREGISTRY_H__
+#define __MODREGISTRY_H__
+
+#include <map>
+#include <string>
+#include <vector>
+
+struct ModPlantDef
+{
+	std::string id;
+	int seedType = -1;
+};
+
+struct ModZombieDef
+{
+	std::string id;
+	int zombieType = -1;
+};
+
+struct ModModeDef
+{
+	std::string id;
+	int baseMode = -1;
+};
+
+struct ModProjectileDef
+{
+	std::string id;
+	int damage = 0;
+};
+
+class ModRegistry
+{
+public:
+	void Reset();
+
+	bool RegisterPlant(const ModPlantDef& def, std::string* outError);
+	bool RegisterZombie(const ModZombieDef& def, std::string* outError);
+	bool RegisterMode(const ModModeDef& def, std::string* outError);
+	bool RegisterProjectile(const ModProjectileDef& def, std::string* outError);
+
+	const ModPlantDef* FindPlant(const std::string& id) const;
+	const ModZombieDef* FindZombie(const std::string& id) const;
+	const ModModeDef* FindMode(const std::string& id) const;
+	const ModProjectileDef* FindProjectile(const std::string& id) const;
+
+	const std::vector<std::string>& GetErrors() const;
+
+private:
+	bool ValidateId(const std::string& id, std::string* outError) const;
+
+	std::map<std::string, ModPlantDef> mPlants;
+	std::map<std::string, ModZombieDef> mZombies;
+	std::map<std::string, ModModeDef> mModes;
+	std::map<std::string, ModProjectileDef> mProjectiles;
+	std::vector<std::string> mErrors;
+};
+
+extern ModRegistry gModRegistry;
+
+#endif
