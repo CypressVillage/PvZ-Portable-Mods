@@ -61,6 +61,8 @@
 
 bool gShownMoreSunTutorial = false;
 
+#include "../Mod/ModLua.h"
+
 // GOTY @Patoke: 0x40A3C0
 Board::Board(LawnApp* theApp)
 {
@@ -2182,6 +2184,10 @@ Plant* Board::AddPlant(int theGridX, int theGridY, SeedType theSeedType, SeedTyp
 		mMushroomsUsed = true;
 	}
 
+#if defined(PVZ_ENABLE_LUA)
+	gModLua.CallOnPlantSpawn(aPlant);
+#endif
+
 	return aPlant;
 }
 
@@ -2715,14 +2721,18 @@ Zombie* Board::AddZombieInRow(ZombieType theZombieType, int theRow, int theFromW
 	bool aVariant = !Rand(5);
 	Zombie* aZombie = mZombies.DataArrayAlloc();
 	aZombie->ZombieInitialize(theRow, theZombieType, aVariant, nullptr, theFromWave);
-	gModLua.CallOnZombieSpawn(static_cast<int>(theZombieType), theRow);
+#if defined(PVZ_ENABLE_LUA)
+	gModLua.CallOnZombieSpawn(aZombie);
+#endif
 	if (theZombieType == ZombieType::ZOMBIE_BOBSLED && aZombie->IsOnBoard())
 	{
 		for (int _i = 0; _i < 3; _i++)
 		{
 			Zombie* aFollower = mZombies.DataArrayAlloc();
 			aFollower->ZombieInitialize(theRow, ZombieType::ZOMBIE_BOBSLED, false, aZombie, theFromWave);
-			gModLua.CallOnZombieSpawn(static_cast<int>(ZombieType::ZOMBIE_BOBSLED), theRow);
+#if defined(PVZ_ENABLE_LUA)
+			gModLua.CallOnZombieSpawn(aFollower);
+#endif
 		}
 	}
 	return aZombie;

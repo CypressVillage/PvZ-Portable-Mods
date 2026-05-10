@@ -23,6 +23,8 @@
 #include "Plant.h"
 #include "Board.h"
 #include "Zombie.h"
+#include "../Mod/ModLua.h"
+#include "../Mod/ModRegistry.h"
 #include "Cutscene.h"
 #include "GridItem.h"
 #include "ZenGarden.h"
@@ -4463,6 +4465,10 @@ void Plant::CobCannonFire(int theTargetX, int theTargetY)
 
 void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon)
 {
+#if defined(PVZ_ENABLE_LUA)
+    gModLua.CallOnPlantAttack(this, theTargetZombie);
+#endif
+
     if (mSeedType == SeedType::SEED_FUMESHROOM)
     {
         DoRowAreaDamage(20, 2U);

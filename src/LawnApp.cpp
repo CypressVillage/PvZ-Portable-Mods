@@ -331,6 +331,14 @@ void LawnApp::Shutdown()
 // GOTY @Patoke : 0x452640
 void LawnApp::KillBoard()
 {
+#if defined(PVZ_ENABLE_LUA)
+	extern class ModLua gModLua;
+	if (mBoardResult == BoardResult::BOARDRESULT_WON)
+		gModLua.CallOnLevelEnd(true);
+	else if (mBoardResult == BoardResult::BOARDRESULT_LOST)
+		gModLua.CallOnLevelEnd(false);
+#endif
+
 	FinishModelessDialogs();
 	KillSeedChooserScreen();
 	if (mBoard)

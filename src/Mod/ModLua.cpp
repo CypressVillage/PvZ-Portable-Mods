@@ -7,6 +7,7 @@
 #include "ModLua.h"
 #include "ModSave.h"
 #include "ModRegistry.h"
+#include "LuaProxyDialog.h"
 #include "../LawnApp.h"
 #include "../Lawn/Board.h"
 #include "../Lawn/Plant.h"
@@ -216,6 +217,184 @@ namespace
 		return 1;
 	}
 
+	struct LuaDialogUD
+	{
+		LuaProxyDialog* dialog;
+		int selfRef;
+	};
+
+	int Lua_DialogIndex(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		const char* key = luaL_checkstring(L, 2);
+
+		if (!ud->dialog || ud->dialog->mDestroyed)
+		{
+			lua_pushnil(L);
+			return 1;
+		}
+
+		if (strcmp(key, "AddButton") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, "AddButton");
+			return 1;
+		}
+		if (strcmp(key, "Close") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, "Close");
+			return 1;
+		}
+		if (strcmp(key, "SetTitle") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, "SetTitle");
+			return 1;
+		}
+		if (strcmp(key, "SetBody") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, "SetBody");
+			return 1;
+		}
+
+		lua_pushnil(L);
+		return 1;
+	}
+
+	int Lua_DialogGC(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (ud->selfRef != LUA_NOREF)
+		{
+			luaL_unref(L, LUA_REGISTRYINDEX, ud->selfRef);
+			ud->selfRef = LUA_NOREF;
+		}
+		return 0;
+	}
+
+	int Lua_DialogAddButton(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (!ud->dialog || ud->dialog->mDestroyed)
+			return 0;
+
+		const char* text = luaL_checkstring(L, 2);
+		if (lua_isfunction(L, 3))
+		{
+			lua_pushvalue(L, 3);
+			int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+			ud->dialog->AddLuaButton(text, ref);
+		}
+		return 0;
+	}
+
+	int Lua_DialogClose(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (!ud->dialog || ud->dialog->mDestroyed)
+			return 0;
+
+		int dialogId = ud->dialog->mId;
+		ud->dialog = nullptr;
+		gLawnApp->KillDialog(dialogId);
+		return 0;
+	}
+
+	int Lua_DialogSetTitle(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (!ud->dialog || ud->dialog->mDestroyed)
+			return 0;
+		const char* text = luaL_checkstring(L, 2);
+		ud->dialog->mDialogHeader = text;
+		return 0;
+	}
+
+	int Lua_DialogSetBody(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (!ud->dialog || ud->dialog->mDestroyed)
+			return 0;
+		const char* text = luaL_checkstring(L, 2);
+		ud->dialog->mDialogLines = text;
+		return 0;
+	}
+
+	void PushDialogUD(lua_State* L, LuaProxyDialog* dialog)
+	{
+		if (!dialog) { lua_pushnil(L); return; }
+		LuaDialogUD* ud = (LuaDialogUD*)lua_newuserdata(L, sizeof(LuaDialogUD));
+		ud->dialog = dialog;
+		ud->selfRef = LUA_NOREF;
+		luaL_getmetatable(L, "Game.Dialog");
+		lua_setmetatable(L, -2);
+		lua_pushvalue(L, -1);
+		ud->selfRef = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+
+	int Lua_UICreateDialog(lua_State* L)
+	{
+		if (!gLawnApp) return 0;
+
+		std::string title = "Mod Dialog";
+		std::string body;
+		bool modal = true;
+
+		if (lua_istable(L, 1))
+		{
+			lua_getfield(L, 1, "title");
+			if (lua_isstring(L, -1)) title = lua_tostring(L, -1);
+			lua_pop(L, 1);
+
+			lua_getfield(L, 1, "body");
+			if (lua_isstring(L, -1)) body = lua_tostring(L, -1);
+			lua_pop(L, 1);
+
+			lua_getfield(L, 1, "modal");
+			if (lua_isboolean(L, -1)) modal = lua_toboolean(L, -1);
+			lua_pop(L, 1);
+		}
+
+		LuaProxyDialog* dialog = new LuaProxyDialog(gLawnApp, title, body, modal);
+		dialog->SetLuaState(L);
+
+		gLawnApp->KillDialog(dialog->mId);
+		gLawnApp->CenterDialog(dialog, dialog->mWidth, dialog->mHeight);
+		gLawnApp->AddDialog(dialog->mId, dialog);
+
+		PushDialogUD(L, dialog);
+		return 1;
+	}
+
+	int Lua_NoopCallback(lua_State* L)
+	{
+		return 0;
+	}
+
+	int Lua_UIShowMessage(lua_State* L)
+	{
+		if (!gLawnApp) return 0;
+
+		const char* title = luaL_checkstring(L, 1);
+		const char* body = luaL_optstring(L, 2, "");
+
+		LuaProxyDialog* dialog = new LuaProxyDialog(gLawnApp, title, body, true);
+		dialog->SetLuaState(L);
+
+		lua_pushcfunction(L, Lua_NoopCallback);
+		int ref = luaL_ref(L, LUA_REGISTRYINDEX);
+		dialog->AddLuaButton("[DIALOG_BUTTON_OK]", ref);
+
+		gLawnApp->KillDialog(dialog->mId);
+		gLawnApp->CenterDialog(dialog, dialog->mWidth, dialog->mHeight);
+		gLawnApp->AddDialog(dialog->mId, dialog);
+
+		PushDialogUD(L, dialog);
+		return 1;
+	}
+
 	void Lua_RegisterGameTable(lua_State* L)
 	{
 		lua_newtable(L);
@@ -244,6 +423,30 @@ namespace
 		lua_pushcfunction(L, Lua_EntityDamage);
 		lua_setfield(L, -2, "Damage");
 		lua_pop(L, 1);
+
+		// Dialog metatable
+		luaL_newmetatable(L, "Game.Dialog");
+		lua_pushcfunction(L, Lua_DialogIndex);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, Lua_DialogGC);
+		lua_setfield(L, -2, "__gc");
+		lua_pushcfunction(L, Lua_DialogAddButton);
+		lua_setfield(L, -2, "AddButton");
+		lua_pushcfunction(L, Lua_DialogClose);
+		lua_setfield(L, -2, "Close");
+		lua_pushcfunction(L, Lua_DialogSetTitle);
+		lua_setfield(L, -2, "SetTitle");
+		lua_pushcfunction(L, Lua_DialogSetBody);
+		lua_setfield(L, -2, "SetBody");
+		lua_pop(L, 1);
+
+		// UI table
+		lua_newtable(L);
+		lua_pushcfunction(L, Lua_UICreateDialog);
+		lua_setfield(L, -2, "CreateDialog");
+		lua_pushcfunction(L, Lua_UIShowMessage);
+		lua_setfield(L, -2, "ShowMessage");
+		lua_setglobal(L, "UI");
 	}
 
 	void Lua_CallGlobal(lua_State* L, const char* name, int argc)
@@ -365,30 +568,69 @@ void ModLua::CallOnLevelStart(int gameMode)
 #endif
 }
 
-void ModLua::CallOnZombieSpawn(int zombieType, int row)
+void ModLua::CallOnZombieSpawn(Zombie* zombie)
 {
 #if defined(PVZ_ENABLE_LUA)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr)
 		return;
-	lua_pushinteger(L, zombieType);
-	lua_pushinteger(L, row);
-	Lua_CallGlobal(L, "OnZombieSpawn", 2);
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnZombieSpawn", 1);
 #else
-	(void)zombieType;
-	(void)row;
+	(void)zombie;
 #endif
 }
 
-void ModLua::CallOnZombieDie(int zombieType)
+void ModLua::CallOnZombieDie(Zombie* zombie)
 {
 #if defined(PVZ_ENABLE_LUA)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr)
 		return;
-	lua_pushinteger(L, zombieType);
+	PushEntity(L, zombie);
 	Lua_CallGlobal(L, "OnZombieDie", 1);
 #else
-	(void)zombieType;
+	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnPlantSpawn(Plant* plant)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, plant);
+	Lua_CallGlobal(L, "OnPlantSpawn", 1);
+#else
+	(void)plant;
+#endif
+}
+
+void ModLua::CallOnPlantAttack(Plant* plant, Zombie* target)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, plant);
+	PushEntity(L, target);
+	Lua_CallGlobal(L, "OnPlantAttack", 2);
+#else
+	(void)plant;
+	(void)target;
+#endif
+}
+
+void ModLua::CallOnLevelEnd(bool isWin)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	lua_pushboolean(L, isWin);
+	Lua_CallGlobal(L, "OnLevelEnd", 1);
+#else
+	(void)isWin;
 #endif
 }

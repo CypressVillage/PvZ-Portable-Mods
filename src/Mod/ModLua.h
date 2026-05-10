@@ -16,8 +16,11 @@ public:
 	void Shutdown();
 	void RunEntries(const std::vector<ModManifest>& manifests);
 	void CallOnLevelStart(int gameMode);
-	void CallOnZombieSpawn(int zombieType, int row);
-	void CallOnZombieDie(int zombieType);
+	void CallOnZombieSpawn(class Zombie* zombie);
+	void CallOnZombieDie(class Zombie* zombie);
+	void CallOnPlantSpawn(class Plant* plant);
+	void CallOnPlantAttack(class Plant* plant, class Zombie* target);
+	void CallOnLevelEnd(bool isWin);
 
 private:
 	void* mState = nullptr;

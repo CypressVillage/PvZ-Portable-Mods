@@ -45,13 +45,13 @@
 **目标**：在引擎关键路径抛出事件给 Lua 侧接管。捕获 Lua 异常以防崩溃。
 
 - [x] **OnGameStart**：在 `LawnApp::Start()` 完成，进入标题画面时触发。
-- [x] **OnLevelStart(mode_id)**：在 `LawnApp::PreNewGame()` 或 `LawnApp::StartPlaying()` 关卡初始化时触发。
+- [x] **OnLevelStart(mode_id)**：在 `LawnApp::PreNewNewGame()` 或 `LawnApp::StartPlaying()` 关卡初始化时触发。
 - [x] **OnWaveStart(wave_index)**：在 `src/Lawn/Board.cpp` 波次推进逻辑中触发。
-- [ ] **OnPlantSpawn(plant)**：在 `src/Lawn/Plant.cpp` 植物成功放置时触发。
-- [ ] **OnZombieSpawn(zombie)**：在 `src/Lawn/Zombie.cpp` 僵尸实例化成功时触发。
-- [ ] **OnPlantAttack(plant, target)**：在植物发射投射物或造成伤害时触发。
-- [ ] **OnZombieDie(zombie)**：在僵尸血量归零/死亡时触发。
-- [ ] **OnLevelEnd(result)**：在关卡胜利/失败结算时触发。
+- [x] **OnPlantSpawn(plant)**：在 `src/Lawn/Board.cpp` `Board::AddPlant()` 植物成功放置时触发，通过 `PushEntity` 传递 `Plant*` 实体对象。
+- [x] **OnZombieSpawn(zombie)**：在 `src/Lawn/Board.cpp` `Board::AddZombieInRow()` 僵尸实例化成功时触发，通过 `PushEntity` 传递 `Zombie*` 实体对象。
+- [x] **OnPlantAttack(plant, target)**：在 `src/Lawn/Plant.cpp` `Plant::Fire()` 植物发射投射物时触发，传递攻击者 `Plant*` 与目标 `Zombie*` 实体。
+- [x] **OnZombieDie(zombie)**：在 `src/Lawn/Zombie.cpp` `Zombie::DieNoLoot()` 僵尸死亡时触发，通过 `PushEntity` 传递 `Zombie*` 实体对象。
+- [x] **OnLevelEnd(result)**：在 `src/LawnApp.cpp` `LawnApp::KillBoard()` 关卡结算时触发，传递 `boolean isWin`（`BOARDRESULT_WON` / `BOARDRESULT_LOST`）。
 
 ## 阶段六：Mod 独立存档与热重载 (Save & Dev Mode)
 **目标**：保证玩家数据的隔离，同时提供便利的开发者工具。
@@ -71,6 +71,32 @@
 - [ ] **UI 界面解绑硬编码**：重构选卡界面 (`SeedChooserScreen`) 与图鉴 (`AlmanacDialog`)，移除对 `NUM_SEED_TYPES` 的遍历限制，支持动态植物数量的翻页或滚动。
 - [ ] **深度行为逻辑钩子**：在源码的帧更新、索敌、攻击等环节增加事件抛出（如 `OnPlantUpdate`），使得 Lua 能够彻底接管新植物特有逻辑，避开原版的 `switch (mSeedType)` 硬编码。
 
+## 阶段八：Mod 自定义 UI 对话框系统 (Mod UI & Dialogs)
+**目标**：为 Mod 提供 Lua 侧创建自定义对话框、按钮、文本标签等 UI 元素的能力，使 Mod 可以在游戏内展示自定义界面并接收用户交互。
+
+- [x] **LuaProxyDialog 代理对话框类**：新建 `src/Mod/LuaProxyDialog.h/.cpp`，继承 `LawnDialog`，作为 Lua 创建 UI 的 C++ 宿主。
+  - [x] 构造函数接收标题、正文、模态标记等参数，使用动态 Dialog ID（`DIALOG_MOD_BASE = 1000` 起自增）。
+  - [x] 内部维护 `std::vector<ButtonEntry>` 列表，记录每个按钮的 ID 与 `luaL_ref` 回调引用。
+  - [x] 重写 `ButtonDepress(int theId)`：根据 `theId` 查找对应的 `luaL_ref`，通过 `lua_rawgeti` 取出 Lua 闭包并 `lua_pcall` 调用，调用后自动 `KillDialog` 关闭对话框。
+  - [x] 重写 `AddedToManager / RemovedFromManager`：注册/注销动态添加的子控件（按钮），支持对话框已显示后动态添加按钮（`mInManager` 标记）。
+  - [x] 重写 `Resize`：自动布局所有动态子控件（垂直排列按钮、居中等）。
+  - [x] 析构时调用 `ReleaseRefs()` 释放所有 Lua 函数引用。
+  - [x] 在 `RemovedFromManager` 中标记 `mDestroyed = true`，防止 Lua 侧悬空引用。
+- [x] **动态 Dialog ID 分配**：在 `LuaProxyDialog` 中使用静态自增计数器 `sNextDialogId`（起始 `DIALOG_MOD_BASE = 1000`），替代固定 `Dialogs` 枚举值。确保 `SexyAppBase::AddDialog/KillDialog` 的 `mDialogMap` 查找逻辑兼容 int 键。
+- [x] **Lua `UI` 全局表注册**：在 `ModLua.cpp` 的 `Lua_RegisterGameTable()` 中新增 `UI` 表：
+  - [x] `UI.CreateDialog(opts)` — 创建并显示对话框，`opts` 为 table（`title`, `body`, `modal`），返回 Dialog userdata。
+  - [x] `UI.ShowMessage(title, body)` — 快捷创建单按钮模态提示框。
+- [x] **Lua Dialog userdata 绑定**：
+  - [x] 定义 `LuaDialogUD` 结构（持有 `LuaProxyDialog*` 指针与 `luaL_ref` 自引用防止 GC）。
+  - [x] 注册 `"Game.Dialog"` metatable，`__index` 分发方法调用。
+  - [x] `dialog:AddButton(text, onClick)` — 向对话框添加按钮，`onClick` 为 Lua 函数闭包，通过 `luaL_ref` 存储。
+  - [ ] `dialog:AddLabel(text)` — 向对话框添加静态文本标签。
+  - [x] `dialog:Close()` — 关闭并销毁对话框。
+  - [x] `dialog:SetTitle(text)` / `dialog:SetBody(text)` — 动态修改标题/正文。
+  - [x] 在 dialog 销毁时（`RemovedFromManager`）将 userdata 中通过 `mDestroyed` 标记防止悬空引用，后续操作安全返回 `nil`。
+- [x] **Lua 闭包回调存储**：在 `LuaProxyDialog` 中使用 `luaL_ref(L, LUA_REGISTRYINDEX)` 将 Lua 函数闭包存入注册表，按钮点击时通过 `lua_rawgeti` 取出并调用。对话框析构时统一 `luaL_unref` 释放。
+- [x] **集成测试**：编写 `mods/ui_test_mod` 示例 Mod 脚本验证完整链路（创建对话框 → 添加按钮 → 点击回调 → 关闭对话框）。
+
 ---
 
-*注：本 TODO 计划旨在实现最小可用版本（MVP），后续可在此基础上迭代“自定义 UI 面板”、“事件过滤器”和“Mod 打包工具”等高级特性。*
+*注：本 TODO 计划旨在实现最小可用版本（MVP），后续可在此基础上迭代"自定义 UI 面板"、"事件过滤器"和"Mod 打包工具"等高级特性。*

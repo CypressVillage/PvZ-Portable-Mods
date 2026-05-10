@@ -7322,7 +7322,11 @@ void Zombie::BungeeDie()
 void Zombie::DieNoLoot()
 {
     if (!mDead)
-        gModLua.CallOnZombieDie(static_cast<int>(mZombieType));
+    {
+#if defined(PVZ_ENABLE_LUA)
+        gModLua.CallOnZombieDie(this);
+#endif
+    }
 
     StopZombieSound();
     AttachmentDie(mAttachmentID);
