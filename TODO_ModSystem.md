@@ -36,9 +36,9 @@
   - [x] `Game.Log(text)`
   - [x] `Game.RegisterPlant(def)`, `Game.RegisterZombie(def)`, `Game.RegisterMode(def)`, `Game.RegisterProjectile(def)` (结合阶段三的 Registry)
   - [x] `Game.GetMode()`
-- [ ] **实体与场景绑定 (Board & Entity)**：
-  - [ ] `Board.SpawnZombie(zombie_id, row)`, `Board.SpawnPlant(plant_id, row, col)`, `Board.GetWave()`
-  - [ ] `Entity` 属性只读访问 (`id`, `type`, `hp`) 及方法暴露 (`Entity:Damage(amount)`)。
+- [x] **实体与场景绑定 (Board & Entity)**：
+  - [x] `Board.SpawnZombie(zombie_id, row)`, `Board.SpawnPlant(plant_id, row, col)`, `Board.GetWave()`
+  - [x] `Entity` 属性只读访问 (`id`, `type`, `hp`) 及方法暴露 (`Entity:Damage(amount)`)。
 - [x] **脚本执行入口**：在 Mod 数据表加载完成后，执行每个 Mod 的 `entry` 脚本，并调用 `OnModInit()` 回调。
 
 ## 阶段五：游戏生命周期与事件触发钩子 (Event Hooks)
@@ -62,6 +62,14 @@
   - [ ] 支持命令行参数 `-moddev` 启动。
   - [ ] 实现数据表、Lua 脚本、资源索引的重新加载热键或控制台命令。
   - [ ] 添加状态校验（限制在主菜单或非战斗状态进行重载）。
+
+## 阶段七：实体定义与深度适配 (Entity Extension & UI)
+**目标**：彻底打通从数据到表现层的链路，使完整定义并表现一个全新植物/僵尸成为可能。
+
+- [ ] **扩展数据表字段映射**：完善 `ModPlantDef` 等结构，解析阳光花费、冷却时间、发射间隔等数值，并对齐映射至引擎内部 Definition 对象。
+- [ ] **动态动画与资源注册**：为 Mod 添加的新实体动态分配注册 `ReanimationType` 及贴图指针，确保资源句柄正确挂载以解决隐形或渲染崩溃问题。
+- [ ] **UI 界面解绑硬编码**：重构选卡界面 (`SeedChooserScreen`) 与图鉴 (`AlmanacDialog`)，移除对 `NUM_SEED_TYPES` 的遍历限制，支持动态植物数量的翻页或滚动。
+- [ ] **深度行为逻辑钩子**：在源码的帧更新、索敌、攻击等环节增加事件抛出（如 `OnPlantUpdate`），使得 Lua 能够彻底接管新植物特有逻辑，避开原版的 `switch (mSeedType)` 硬编码。
 
 ---
 
