@@ -4951,8 +4951,21 @@ void Plant::Die()
     }
 }
 
+#include "../Mod/ModRegistry.h"
+
 PlantDefinition& GetPlantDefinition(SeedType theSeedType)
 {
+    if (static_cast<int>(theSeedType) >= 2000)
+    {
+        static std::map<int, PlantDefinition> sModPlantDefs;
+        if (sModPlantDefs.find(static_cast<int>(theSeedType)) == sModPlantDefs.end())
+        {
+            PlantDefinition def = { theSeedType, nullptr, ReanimationType::REANIM_NONE, 0, 50, 750, PlantSubClass::SUBCLASS_NORMAL, 0, "ModPlant" };
+            sModPlantDefs[static_cast<int>(theSeedType)] = def;
+        }
+        return sModPlantDefs[static_cast<int>(theSeedType)];
+    }
+
     TOD_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
     TOD_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::NUM_SEED_TYPES));
     

@@ -50,6 +50,11 @@ public:
 	const ModModeDef* FindMode(const std::string& id) const;
 	const ModProjectileDef* FindProjectile(const std::string& id) const;
 
+	const ModPlantDef* FindPlantByRuntimeId(int seedType) const;
+	const ModZombieDef* FindZombieByRuntimeId(int zombieType) const;
+	const ModModeDef* FindModeByRuntimeId(int baseMode) const;
+	const ModProjectileDef* FindProjectileByRuntimeId(int damage) const;
+
 	const std::vector<std::string>& GetErrors() const;
 
 private:
@@ -59,6 +64,11 @@ private:
 	std::map<std::string, ModZombieDef> mZombies;
 	std::map<std::string, ModModeDef> mModes;
 	std::map<std::string, ModProjectileDef> mProjectiles;
+
+	std::map<int, ModPlantDef> mRuntimePlants;
+	std::map<int, ModZombieDef> mRuntimeZombies;
+	std::map<int, ModModeDef> mRuntimeModes;
+	std::map<int, ModProjectileDef> mRuntimeProjectiles;
 	std::vector<std::string> mErrors;
 };
 

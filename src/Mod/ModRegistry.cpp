@@ -14,6 +14,10 @@ void ModRegistry::Reset()
 	mZombies.clear();
 	mModes.clear();
 	mProjectiles.clear();
+	mRuntimePlants.clear();
+	mRuntimeZombies.clear();
+	mRuntimeModes.clear();
+	mRuntimeProjectiles.clear();
 	mErrors.clear();
 }
 
@@ -29,6 +33,7 @@ bool ModRegistry::RegisterPlant(const ModPlantDef& def, std::string* outError)
 		return false;
 	}
 	mPlants[def.id] = def;
+	mRuntimePlants[def.seedType] = def;
 	return true;
 }
 
@@ -44,6 +49,7 @@ bool ModRegistry::RegisterZombie(const ModZombieDef& def, std::string* outError)
 		return false;
 	}
 	mZombies[def.id] = def;
+	mRuntimeZombies[def.zombieType] = def;
 	return true;
 }
 
@@ -59,6 +65,7 @@ bool ModRegistry::RegisterMode(const ModModeDef& def, std::string* outError)
 		return false;
 	}
 	mModes[def.id] = def;
+	mRuntimeModes[def.baseMode] = def;
 	return true;
 }
 
@@ -74,6 +81,7 @@ bool ModRegistry::RegisterProjectile(const ModProjectileDef& def, std::string* o
 		return false;
 	}
 	mProjectiles[def.id] = def;
+	mRuntimeProjectiles[def.damage] = def;
 	return true;
 }
 
@@ -99,6 +107,30 @@ const ModProjectileDef* ModRegistry::FindProjectile(const std::string& id) const
 {
 	auto it = mProjectiles.find(id);
 	return it == mProjectiles.end() ? nullptr : &it->second;
+}
+
+const ModPlantDef* ModRegistry::FindPlantByRuntimeId(int seedType) const
+{
+	auto it = mRuntimePlants.find(seedType);
+	return it == mRuntimePlants.end() ? nullptr : &it->second;
+}
+
+const ModZombieDef* ModRegistry::FindZombieByRuntimeId(int zombieType) const
+{
+	auto it = mRuntimeZombies.find(zombieType);
+	return it == mRuntimeZombies.end() ? nullptr : &it->second;
+}
+
+const ModModeDef* ModRegistry::FindModeByRuntimeId(int baseMode) const
+{
+	auto it = mRuntimeModes.find(baseMode);
+	return it == mRuntimeModes.end() ? nullptr : &it->second;
+}
+
+const ModProjectileDef* ModRegistry::FindProjectileByRuntimeId(int damage) const
+{
+	auto it = mRuntimeProjectiles.find(damage);
+	return it == mRuntimeProjectiles.end() ? nullptr : &it->second;
 }
 
 const std::vector<std::string>& ModRegistry::GetErrors() const

@@ -1225,10 +1225,26 @@ void Projectile::ConvertToPea(int theGridX)
 	mApp->PlayFoley(FoleyType::FOLEY_THROW);
 }
 
+#include "../Mod/ModRegistry.h"
+
 ProjectileDefinition& Projectile::GetProjectileDef()
 {
-	ProjectileDefinition& aProjectileDef = gProjectileDefinition[mProjectileType];
-	TOD_ASSERT(aProjectileDef.mProjectileType == mProjectileType);
+	if (static_cast<int>(mProjectileType) >= 4000)
+	{
+		static std::map<int, ProjectileDefinition> sModProjectileDefs;
+		if (sModProjectileDefs.find(static_cast<int>(mProjectileType)) == sModProjectileDefs.end())
+		{
+			ProjectileDefinition def = { mProjectileType, 0, 20 }; // damage defaults to 20
+			const ModProjectileDef* modDef = gModRegistry.FindProjectileByRuntimeId(static_cast<int>(mProjectileType));
+			if (modDef)
+			{
+				def.mDamage = modDef->damage;
+			}
+			sModProjectileDefs[static_cast<int>(mProjectileType)] = def;
+		}
+		return sModProjectileDefs[static_cast<int>(mProjectileType)];
+	}
 
+	ProjectileDefinition& aProjectileDef = gProjectileDefinition[mProjectileType];
 	return aProjectileDef;
 }

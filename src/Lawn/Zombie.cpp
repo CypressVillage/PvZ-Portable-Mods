@@ -93,8 +93,21 @@ static ZombieType gBossZombieList[] = {
     ZombieType::ZOMBIE_GARGANTUAR
 };
 
+#include "../Mod/ModRegistry.h"
+
 ZombieDefinition& GetZombieDefinition(ZombieType theZombieType)
 {
+    if (static_cast<int>(theZombieType) >= 3000)
+    {
+        static std::map<int, ZombieDefinition> sModZombieDefs;
+        if (sModZombieDefs.find(static_cast<int>(theZombieType)) == sModZombieDefs.end())
+        {
+            ZombieDefinition def = { theZombieType, ReanimationType::REANIM_NONE, 1, 1, 1, 10, "ModZombie" };
+            sModZombieDefs[static_cast<int>(theZombieType)] = def;
+        }
+        return sModZombieDefs[static_cast<int>(theZombieType)];
+    }
+
     TOD_ASSERT(theZombieType >= 0 && theZombieType < NUM_ZOMBIE_TYPES);
     TOD_ASSERT(gZombieDefs[theZombieType].mZombieType == theZombieType);
 
