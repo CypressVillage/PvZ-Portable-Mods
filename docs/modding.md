@@ -221,43 +221,65 @@ Recommended paths inside `resources/`:
 ### 7.1 Global Objects
 
 `Game`:
-- `Game.Log(text)`
-- `Game.RegisterPlant(def)`
-- `Game.RegisterZombie(def)`
-- `Game.RegisterMode(def)`
-- `Game.RegisterProjectile(def)`
-- `Game.GetMode()`
-- `Game.SaveModData(key, value)`
-- `Game.LoadModData(key)`
+- `Game.Log(text)` — Log a message
+- `Game.RegisterPlant(def)` — Register a custom plant
+- `Game.RegisterZombie(def)` — Register a custom zombie
+- `Game.RegisterMode(def)` — Register a custom game mode
+- `Game.RegisterProjectile(def)` — Register a custom projectile
+- `Game.GetMode()` — Get the current game mode ID
+- `Game.SaveModData(key, value)` — Persist a string key-value pair for this mod
+- `Game.LoadModData(key)` — Load a saved value; returns `nil` if not found
 
 `Board`:
-- `Board.SpawnZombie(zombie_id, row)`
-- `Board.SpawnPlant(plant_id, row, col)`
-- `Board.GetWave()`
+- `Board.SpawnZombie(zombie_id, row)` — Spawn a zombie in the given row. `zombie_id` can be a string (mod registration ID) or integer (runtime type). Returns Entity or nil.
+- `Board.SpawnPlant(plant_id, row, col)` — Plant at row/col. `plant_id` can be a string or integer. Returns Entity or nil.
+- `Board.GetWave()` — Current wave index
 
-`Entity` (simplified):
-- `entity.id`, `entity.type`, `entity.hp`
-- `entity:Damage(amount)`
+`Entity` (wrapper for a plant or zombie):
+- `entity.id` — Entity ID (placeholder, always 0)
+- `entity.type` — Entity type as integer (`SeedType` or `ZombieType`)
+- `entity.hp` — Current health (`mPlantHealth` or `mBodyHealth`)
+- `entity:Damage(amount)` — Deal damage; auto-triggers death at zero HP
+
+`UI` (custom dialog system):
+- `UI.CreateDialog(opts)` — Create and show a custom dialog. `opts` is a table: `{ title=..., body=..., modal=... }`. Returns a Dialog userdata.
+- `UI.ShowMessage(title, body)` — Convenience: create a modal message box with a single OK button. Returns a Dialog userdata.
+
+`Dialog` (userdata returned by `UI.CreateDialog` / `UI.ShowMessage`):
+- `dialog:AddButton(text, callback)` — Add a button with a Lua closure callback. When clicked, the callback runs and the dialog is automatically closed.
+- `dialog:Close()` — Manually close and destroy the dialog.
+- `dialog:SetTitle(text)` — Change the dialog title.
+- `dialog:SetBody(text)` — Change the dialog body text.
 
 ### 7.2 Lua Callbacks
+
+All callbacks are optional. If a callback is not defined, it is silently skipped. The `plant`/`zombie` parameters are Entity objects.
 
 ```lua
 function OnModInit() end
 function OnGameStart() end
 function OnLevelStart(mode_id) end
 function OnWaveStart(wave_index) end
-function OnZombieSpawn(zombie) end
 function OnPlantSpawn(plant) end
+function OnZombieSpawn(zombie) end
 function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
-function OnLevelEnd(result) end
+function OnLevelEnd(is_win) end
 ```
+
+Callback parameters:
+- `mode_id`: integer, current game mode
+- `wave_index`: integer, wave number
+- `plant` / `zombie` / `target`: Entity objects with `.type`, `.hp` and `:Damage()` method
+- `is_win`: boolean, `true` if level won, `false` if lost
 
 Notes:
 - Callbacks are optional.
-- Errors must be caught and logged without crashing the game.
+- Errors are caught and logged without crashing the game.
 
-## 8. Example Lua Entry (scripts/main.lua)
+## 8. Example Lua Entry
+
+### 8.1 Basic Example
 
 ```lua
 function OnModInit()
@@ -268,6 +290,30 @@ function OnLevelStart(mode_id)
   if mode_id == "rush_mode" then
     Game.Log("Rush Mode start")
   end
+end
+```
+
+### 8.2 Custom Dialog Example
+
+```lua
+function OnLevelStart(mode_id)
+  local dlg = UI.CreateDialog({
+    title = "Level Hint",
+    body = "This dialog was created by a Lua mod.",
+    modal = true
+  })
+
+  dlg:AddButton("Spawn Zombie", function()
+    Board.SpawnZombie(0, 2)
+  end)
+
+  dlg:AddButton("Close", function()
+    Game.Log("Dialog closed")
+  end)
+end
+
+function OnZombieSpawn(zombie)
+  Game.Log("Zombie spawned, HP: " .. tostring(zombie.hp))
 end
 ```
 
@@ -310,7 +356,7 @@ The loader should warn if a mod uses a newer schema.
 
 ## 13. Future Extensions (Non-Blocking)
 
-- Custom UI panels for mods
+- ~~Custom UI panels for mods~~ (partially implemented: `UI.CreateDialog` / `UI.ShowMessage` with buttons and Lua closure callbacks; TODO: text labels, input fields)
 - Modular event filters and priorities
 - Network-safe mod validation for competitive modes
 - Dependency version ranges

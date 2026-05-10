@@ -209,39 +209,61 @@ mods/
 ### 7.1 全局对象
 
 `Game`:
-- `Game.Log(text)`
-- `Game.RegisterPlant(def)`
-- `Game.RegisterZombie(def)`
-- `Game.RegisterMode(def)`
-- `Game.RegisterProjectile(def)`
-- `Game.GetMode()`
-- `Game.SaveModData(key, value)`
-- `Game.LoadModData(key)`
+- `Game.Log(text)` — 输出日志
+- `Game.RegisterPlant(def)` — 注册自定义植物
+- `Game.RegisterZombie(def)` — 注册自定义僵尸
+- `Game.RegisterMode(def)` — 注册自定义模式
+- `Game.RegisterProjectile(def)` — 注册自定义投射物
+- `Game.GetMode()` — 获取当前游戏模式 ID
+- `Game.SaveModData(key, value)` — 保存 Mod 数据（字符串键值对）
+- `Game.LoadModData(key)` — 读取 Mod 数据，不存在返回 `nil`
 
 `Board`:
-- `Board.SpawnZombie(zombie_id, row)`
-- `Board.SpawnPlant(plant_id, row, col)`
-- `Board.GetWave()`
+- `Board.SpawnZombie(zombie_id, row)` — 在指定行生成僵尸，`zombie_id` 可为字符串（Mod 注册 ID）或整数（运行时类型），返回 Entity 或 nil
+- `Board.SpawnPlant(plant_id, row, col)` — 在指定行列种植植物，`plant_id` 可为字符串或整数，返回 Entity 或 nil
+- `Board.GetWave()` — 获取当前波次编号
 
-`Entity`:
-- `entity.id`, `entity.type`, `entity.hp`
-- `entity:Damage(amount)`
+`Entity`（植物或僵尸的包装对象）:
+- `entity.id` — 实体 ID（当前为占位，始终为 0）
+- `entity.type` — 实体类型（`SeedType` 或 `ZombieType` 的整数值）
+- `entity.hp` — 当前血量（`mPlantHealth` 或 `mBodyHealth`）
+- `entity:Damage(amount)` — 对实体造成伤害，血量归零时自动触发死亡
+
+`UI`（自定义对话框系统）:
+- `UI.CreateDialog(opts)` — 创建并显示自定义对话框
+- `UI.ShowMessage(title, body)` — 快捷创建单按钮模态提示框
+
+`Dialog`（对话框 userdata，由 `UI.CreateDialog` 或 `UI.ShowMessage` 返回）:
+- `dialog:AddButton(text, callback)` — 添加按钮，`callback` 为 Lua 函数闭包，按钮被点击时调用，调用后对话框自动关闭
+- `dialog:Close()` — 手动关闭并销毁对话框
+- `dialog:SetTitle(text)` — 动态修改对话框标题
+- `dialog:SetBody(text)` — 动态修改对话框正文
 
 ### 7.2 回调列表
+
+所有回调为可选，未定义时安全跳过。回调参数中的 `plant`/`zombie` 均为 Entity 对象。
 
 ```lua
 function OnModInit() end
 function OnGameStart() end
 function OnLevelStart(mode_id) end
 function OnWaveStart(wave_index) end
-function OnZombieSpawn(zombie) end
 function OnPlantSpawn(plant) end
+function OnZombieSpawn(zombie) end
 function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
-function OnLevelEnd(result) end
+function OnLevelEnd(is_win) end
 ```
 
+回调参数说明：
+- `mode_id`：整数，当前游戏模式
+- `wave_index`：整数，波次编号
+- `plant` / `zombie` / `target`：Entity 对象，支持 `.type`、`.hp` 属性和 `:Damage()` 方法
+- `is_win`：布尔值，`true` 表示关卡胜利，`false` 表示失败
+
 ## 8. 示例脚本
+
+### 8.1 基础示例
 
 ```lua
 function OnModInit()
@@ -252,6 +274,30 @@ function OnLevelStart(mode_id)
   if mode_id == "rush_mode" then
     Game.Log("Rush Mode start")
   end
+end
+```
+
+### 8.2 自定义对话框示例
+
+```lua
+function OnLevelStart(mode_id)
+  local dlg = UI.CreateDialog({
+    title = "关卡提示",
+    body = "这是一个由 Lua Mod 创建的对话框。",
+    modal = true
+  })
+
+  dlg:AddButton("生成僵尸", function()
+    Board.SpawnZombie(0, 2)
+  end)
+
+  dlg:AddButton("关闭", function()
+    Game.Log("对话框已关闭")
+  end)
+end
+
+function OnZombieSpawn(zombie)
+  Game.Log("僵尸生成，血量: " .. tostring(zombie.hp))
 end
 ```
 
@@ -293,7 +339,7 @@ API：
 
 ## 13. 后续可扩展项
 
-- 自定义 UI 面板
+- ~~自定义 UI 面板~~（已部分实现：`UI.CreateDialog` / `UI.ShowMessage`，支持按钮与 Lua 闭包回调；待扩展：文本标签、输入框等控件）
 - 事件优先级与过滤器
 - Mod 依赖版本范围
 - 关卡编辑器与离线打包工具
