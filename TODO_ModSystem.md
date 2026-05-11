@@ -38,7 +38,7 @@
   - [x] `Game.GetMode()`
 - [x] **实体与场景绑定 (Board & Entity)**：
   - [x] `Board.SpawnZombie(zombie_id, row)`, `Board.SpawnPlant(plant_id, row, col)`, `Board.GetWave()`
-  - [x] `Entity` 属性只读访问 (`id`, `type`, `hp`) 及方法暴露 (`Entity:Damage(amount)`)。
+  - [x] `Entity` 属性只读访问 (`id`, `type`, `hp`) 及方法暴露 (`Entity:Damage(amount)`, `Entity:IsSun()`, `Entity:Collect()`)。
 - [x] **脚本执行入口**：在 Mod 数据表加载完成后，执行每个 Mod 的 `entry` 脚本，并调用 `OnModInit()` 回调。
 
 ## 阶段五：游戏生命周期与事件触发钩子 (Event Hooks)
@@ -52,6 +52,7 @@
 - [x] **OnPlantAttack(plant, target)**：在 `src/Lawn/Plant.cpp` `Plant::Fire()` 植物发射投射物时触发，传递攻击者 `Plant*` 与目标 `Zombie*` 实体。
 - [x] **OnZombieDie(zombie)**：在 `src/Lawn/Zombie.cpp` `Zombie::DieNoLoot()` 僵尸死亡时触发，通过 `PushEntity` 传递 `Zombie*` 实体对象。
 - [x] **OnLevelEnd(result)**：在 `src/LawnApp.cpp` `LawnApp::KillBoard()` 关卡结算时触发，传递 `boolean isWin`（`BOARDRESULT_WON` / `BOARDRESULT_LOST`）。
+- [x] **OnCoinSpawn(coin)**：在 `src/Lawn/Board.cpp` `Board::AddCoin()` 掉落物成功实例化时触发，通过 `PushEntity` 传递 `Coin*` 实体对象。
 
 ## 阶段六：Mod 独立存档与热重载 (Save & Dev Mode)
 **目标**：保证玩家数据的隔离，同时提供便利的开发者工具。

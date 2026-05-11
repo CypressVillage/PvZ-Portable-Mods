@@ -228,6 +228,8 @@ mods/
 - `entity.type` — 实体类型（`SeedType` 或 `ZombieType` 的整数值）
 - `entity.hp` — 当前血量（`mPlantHealth` 或 `mBodyHealth`）
 - `entity:Damage(amount)` — 对实体造成伤害，血量归零时自动触发死亡
+- `entity:IsSun()` — 仅对掉落物（Coin）有效，判断是否为阳光
+- `entity:Collect()` — 仅对掉落物（Coin）有效，触发收集（伴随音效）
 
 `UI`（自定义对话框系统）:
 - `UI.CreateDialog(opts)` — 创建并显示自定义对话框
@@ -253,12 +255,13 @@ function OnZombieSpawn(zombie) end
 function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
 function OnLevelEnd(is_win) end
+function OnCoinSpawn(coin) end
 ```
 
 回调参数说明：
 - `mode_id`：整数，当前游戏模式
 - `wave_index`：整数，波次编号
-- `plant` / `zombie` / `target`：Entity 对象，支持 `.type`、`.hp` 属性和 `:Damage()` 方法
+- `plant` / `zombie` / `target` / `coin`：Entity 对象，支持 `.type`、`.hp` 属性和相关方法
 - `is_win`：布尔值，`true` 表示关卡胜利，`false` 表示失败
 
 ## 8. 示例脚本
@@ -412,6 +415,7 @@ API：
 - `OnPlantAttack`：植物发射投射物或攻击时触发。
 - `OnZombieDie`：僵尸死亡时触发。
 - `OnLevelEnd`：结算时触发。
+- `OnCoinSpawn`：掉落物（阳光/金币/其他）生成时触发。
 
 涉及文件：
 - [src/LawnApp.cpp](src/LawnApp.cpp)

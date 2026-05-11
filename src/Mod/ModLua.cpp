@@ -12,6 +12,7 @@
 #include "../Lawn/Board.h"
 #include "../Lawn/Plant.h"
 #include "../Lawn/Zombie.h"
+#include "../Lawn/Coin.h"
 #include "../Lawn/Widget/GameButton.h"
 #include "Sexy.TodLib/TodDebug.h"
 #include "SexyAppFramework/Common.h"
@@ -99,10 +100,11 @@ namespace
 
 	// Entity wrapper
 	struct LuaEntity {
-		int type; // 0 = plant, 1 = zombie
+		int type; // 0 = plant, 1 = zombie, 2 = coin
 		union {
 			Plant* plant;
 			Zombie* zombie;
+			Coin* coin;
 		} ptr;
 	};
 
@@ -111,9 +113,9 @@ namespace
 		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
 		const char* key = luaL_checkstring(L, 2);
 
-		if (strcmp(key, "Damage") == 0) {
+		if (strcmp(key, "Damage") == 0 || strcmp(key, "IsSun") == 0 || strcmp(key, "Collect") == 0) {
 			lua_getmetatable(L, 1);
-			lua_getfield(L, -1, "Damage");
+			lua_getfield(L, -1, key);
 			return 1;
 		}
 
@@ -125,6 +127,10 @@ namespace
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mZombieType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mBodyHealth); return 1; }
 			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; } // No direct ID equivalent
+		} else if (ent->type == 2 && ent->ptr.coin) {
+			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.coin->mType)); return 1; }
+			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 0); return 1; }
+			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; }
 		}
 		
 		lua_pushnil(L);
@@ -147,6 +153,27 @@ namespace
 		return 0;
 	}
 
+	int Lua_EntityIsSun(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 2 && ent->ptr.coin) {
+			lua_pushboolean(L, ent->ptr.coin->IsSun() ? 1 : 0);
+		} else {
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_EntityCollect(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 2 && ent->ptr.coin && !ent->ptr.coin->mIsBeingCollected && !ent->ptr.coin->mDead) {
+			ent->ptr.coin->PlayCollectSound();
+			ent->ptr.coin->Collect();
+		}
+		return 0;
+	}
+
 	void PushEntity(lua_State* L, Plant* plant) {
 		if (!plant) { lua_pushnil(L); return; }
 		LuaEntity* ent = (LuaEntity*)lua_newuserdata(L, sizeof(LuaEntity));
@@ -161,6 +188,15 @@ namespace
 		LuaEntity* ent = (LuaEntity*)lua_newuserdata(L, sizeof(LuaEntity));
 		ent->type = 1;
 		ent->ptr.zombie = zombie;
+		luaL_getmetatable(L, "Game.Entity");
+		lua_setmetatable(L, -2);
+	}
+
+	void PushEntity(lua_State* L, Coin* coin) {
+		if (!coin) { lua_pushnil(L); return; }
+		LuaEntity* ent = (LuaEntity*)lua_newuserdata(L, sizeof(LuaEntity));
+		ent->type = 2;
+		ent->ptr.coin = coin;
 		luaL_getmetatable(L, "Game.Entity");
 		lua_setmetatable(L, -2);
 	}
@@ -542,6 +578,10 @@ namespace
 		lua_setfield(L, -2, "__index");
 		lua_pushcfunction(L, Lua_EntityDamage);
 		lua_setfield(L, -2, "Damage");
+		lua_pushcfunction(L, Lua_EntityIsSun);
+		lua_setfield(L, -2, "IsSun");
+		lua_pushcfunction(L, Lua_EntityCollect);
+		lua_setfield(L, -2, "Collect");
 		lua_pop(L, 1);
 
 		// Dialog metatable
@@ -748,10 +788,23 @@ void ModLua::CallOnLevelEnd(bool isWin)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr)
 		return;
-	lua_pushboolean(L, isWin);
+	lua_pushboolean(L, isWin ? 1 : 0);
 	Lua_CallGlobal(L, "OnLevelEnd", 1);
 #else
 	(void)isWin;
+#endif
+}
+
+void ModLua::CallOnCoinSpawn(Coin* coin)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, coin);
+	Lua_CallGlobal(L, "OnCoinSpawn", 1);
+#else
+	(void)coin;
 #endif
 }
 

@@ -2037,6 +2037,12 @@ Coin* Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoi
 	{
 		DisplayAdvice("[ADVICE_CLICK_ON_SUN]", MessageStyle::MESSAGE_STYLE_TUTORIAL_LEVEL1_STAY, AdviceType::ADVICE_CLICK_ON_SUN);
 	}
+	
+#if defined(PVZ_ENABLE_LUA)
+	extern ModLua gModLua;
+	gModLua.CallOnCoinSpawn(aCoin);
+#endif
+
 	return aCoin;
 }
 

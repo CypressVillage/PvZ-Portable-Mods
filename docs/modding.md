@@ -235,11 +235,13 @@ Recommended paths inside `resources/`:
 - `Board.SpawnPlant(plant_id, row, col)` — Plant at row/col. `plant_id` can be a string or integer. Returns Entity or nil.
 - `Board.GetWave()` — Current wave index
 
-`Entity` (wrapper for a plant or zombie):
+`Entity` (wrapper for a plant, zombie, or coin):
 - `entity.id` — Entity ID (placeholder, always 0)
-- `entity.type` — Entity type as integer (`SeedType` or `ZombieType`)
+- `entity.type` — Entity type as integer (`SeedType` or `ZombieType` or `CoinType`)
 - `entity.hp` — Current health (`mPlantHealth` or `mBodyHealth`)
 - `entity:Damage(amount)` — Deal damage; auto-triggers death at zero HP
+- `entity:IsSun()` — Returns true if the coin is a sun
+- `entity:Collect()` — Triggers collection of the coin (plays sound and moves to bank)
 
 `UI` (custom dialog system):
 - `UI.CreateDialog(opts)` — Create and show a custom dialog. `opts` is a table: `{ title=..., body=..., modal=... }`. Returns a Dialog userdata.
@@ -265,12 +267,13 @@ function OnZombieSpawn(zombie) end
 function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
 function OnLevelEnd(is_win) end
+function OnCoinSpawn(coin) end
 ```
 
 Callback parameters:
 - `mode_id`: integer, current game mode
 - `wave_index`: integer, wave number
-- `plant` / `zombie` / `target`: Entity objects with `.type`, `.hp` and `:Damage()` method
+- `plant` / `zombie` / `target` / `coin`: Entity objects
 - `is_win`: boolean, `true` if level won, `false` if lost
 
 Notes:
