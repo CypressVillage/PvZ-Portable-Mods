@@ -232,6 +232,8 @@ public:
 	virtual void					ShowResourceError(bool doExit = false);
 	void							ToggleSlowMo();
 	void							ToggleFastMo();
+	void							SetGameSpeed(int multiplier);
+	int								GetGameSpeed();
 	void							PlayFoley(FoleyType theFoleyType);
 	void							PlayFoleyPitch(FoleyType theFoleyType, float thePitch);
 	void							PlaySample(intptr_t theSoundNum);
@@ -347,6 +349,7 @@ extern bool gFastMo;
 extern bool gSlowMo;
 extern LawnApp* gLawnApp;
 extern int gSlowMoCounter;
+extern int gGameSpeedOverride;
 
 
 #endif	// __LAWNAPP_H__

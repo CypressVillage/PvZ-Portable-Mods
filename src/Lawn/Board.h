@@ -58,6 +58,14 @@ class CutScene;
 class Challenge;
 class Reanimation;
 class DataSync;
+
+struct LuaBoardButton
+{
+	int id;
+	int x, y, w, h;
+	std::string label;
+	bool visible;
+};
 class TodParticleSystem;
 namespace Sexy
 {
@@ -139,6 +147,7 @@ public:
 	SeedBank*						mSeedBank;
 	GameButton*						mMenuButton;
 	GameButton*						mStoreButton;
+	std::vector<LuaBoardButton>	mLuaButtons;
 	bool							mIgnoreMouseUp;
 	ToolTipWidget*					mToolTip;
 	//_Font*							mDebugFont;

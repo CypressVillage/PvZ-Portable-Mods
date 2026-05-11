@@ -4771,6 +4771,17 @@ void Board::MouseUp(int x, int y, int theClickCount)
 				mApp->DoBackToMain();
 			}
 		}
+		else
+		{
+			for (auto& btn : mLuaButtons)
+			{
+				if (btn.visible && x >= btn.x && x < btn.x + btn.w && y >= btn.y && y < btn.y + btn.h)
+				{
+					gModLua.CallOnBoardButtonClick(btn.id);
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -7342,6 +7353,20 @@ void Board::DrawTopRightUI(Graphics* g)
 		}
 		mStoreButton->Draw(g);
 		g->SetColorizeImages(false);
+	}
+
+	for (auto& btn : mLuaButtons)
+	{
+		if (btn.visible)
+		{
+			bool isDown = false;
+			bool isHighlighted = false;
+			int mx, my;
+			SDL_GetMouseState(&mx, &my);
+			if (mx >= btn.x && mx < btn.x + btn.w && my >= btn.y && my < btn.y + btn.h)
+				isHighlighted = true;
+			DrawStoneButton(g, btn.x, btn.y, btn.w, btn.h, isDown, isHighlighted, btn.label);
+		}
 	}
 }
 

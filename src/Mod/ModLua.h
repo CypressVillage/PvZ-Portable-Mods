@@ -21,6 +21,7 @@ public:
 	void CallOnPlantSpawn(class Plant* plant);
 	void CallOnPlantAttack(class Plant* plant, class Zombie* target);
 	void CallOnLevelEnd(bool isWin);
+	void CallOnBoardButtonClick(int buttonId);
 
 private:
 	void* mState = nullptr;

@@ -12,11 +12,13 @@
 #include "../Lawn/Board.h"
 #include "../Lawn/Plant.h"
 #include "../Lawn/Zombie.h"
+#include "../Lawn/Widget/GameButton.h"
 #include "Sexy.TodLib/TodDebug.h"
 #include "SexyAppFramework/Common.h"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 #if defined(PVZ_ENABLE_LUA)
 #include <lua.hpp>
@@ -395,6 +397,110 @@ namespace
 		return 1;
 	}
 
+	int Lua_GameSetSpeed(lua_State* L)
+	{
+		int multiplier = luaL_checkinteger(L, 1);
+		if (gLawnApp)
+			gLawnApp->SetGameSpeed(multiplier);
+		return 0;
+	}
+
+	int Lua_GameGetSpeed(lua_State* L)
+	{
+		if (gLawnApp)
+			lua_pushinteger(L, gLawnApp->GetGameSpeed());
+		else
+			lua_pushinteger(L, 1);
+		return 1;
+	}
+
+	int Lua_GameGetMenuButtonRect(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard || !gLawnApp->mBoard->mMenuButton)
+		{
+			lua_pushinteger(L, 0);
+			lua_pushinteger(L, 0);
+			lua_pushinteger(L, 0);
+			lua_pushinteger(L, 0);
+			return 4;
+		}
+		GameButton* btn = gLawnApp->mBoard->mMenuButton;
+		lua_pushinteger(L, btn->mX);
+		lua_pushinteger(L, btn->mY);
+		lua_pushinteger(L, btn->mWidth);
+		lua_pushinteger(L, btn->mHeight);
+		return 4;
+	}
+
+	int Lua_BoardAddButton(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int id = luaL_checkinteger(L, 1);
+		int x = luaL_checkinteger(L, 2);
+		int y = luaL_checkinteger(L, 3);
+		int w = luaL_checkinteger(L, 4);
+		int h = luaL_checkinteger(L, 5);
+		const char* label = luaL_checkstring(L, 6);
+
+		for (auto& existing : gLawnApp->mBoard->mLuaButtons)
+		{
+			if (existing.id == id)
+			{
+				existing.x = x;
+				existing.y = y;
+				existing.w = w;
+				existing.h = h;
+				existing.label = label;
+				existing.visible = true;
+				return 0;
+			}
+		}
+
+		gLawnApp->mBoard->mLuaButtons.push_back({id, x, y, w, h, std::string(label), true});
+		return 0;
+	}
+
+	int Lua_BoardRemoveButton(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int id = luaL_checkinteger(L, 1);
+		auto& btns = gLawnApp->mBoard->mLuaButtons;
+		btns.erase(std::remove_if(btns.begin(), btns.end(), [id](const LuaBoardButton& b) { return b.id == id; }), btns.end());
+		return 0;
+	}
+
+	int Lua_BoardSetButtonVisible(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int id = luaL_checkinteger(L, 1);
+		bool visible = lua_toboolean(L, 2) != 0;
+		for (auto& btn : gLawnApp->mBoard->mLuaButtons)
+		{
+			if (btn.id == id)
+			{
+				btn.visible = visible;
+				break;
+			}
+		}
+		return 0;
+	}
+
+	int Lua_BoardSetButtonLabel(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int id = luaL_checkinteger(L, 1);
+		const char* label = luaL_checkstring(L, 2);
+		for (auto& btn : gLawnApp->mBoard->mLuaButtons)
+		{
+			if (btn.id == id)
+			{
+				btn.label = label;
+				break;
+			}
+		}
+		return 0;
+	}
+
 	void Lua_RegisterGameTable(lua_State* L)
 	{
 		lua_newtable(L);
@@ -404,6 +510,12 @@ namespace
 		lua_setfield(L, -2, "SaveModData");
 		lua_pushcfunction(L, Lua_GameLoadModData);
 		lua_setfield(L, -2, "LoadModData");
+		lua_pushcfunction(L, Lua_GameSetSpeed);
+		lua_setfield(L, -2, "SetSpeed");
+		lua_pushcfunction(L, Lua_GameGetSpeed);
+		lua_setfield(L, -2, "GetSpeed");
+		lua_pushcfunction(L, Lua_GameGetMenuButtonRect);
+		lua_setfield(L, -2, "GetMenuButtonRect");
 		lua_setglobal(L, "Game");
 
 		// Board
@@ -414,6 +526,14 @@ namespace
 		lua_setfield(L, -2, "SpawnPlant");
 		lua_pushcfunction(L, Lua_BoardGetWave);
 		lua_setfield(L, -2, "GetWave");
+		lua_pushcfunction(L, Lua_BoardAddButton);
+		lua_setfield(L, -2, "AddButton");
+		lua_pushcfunction(L, Lua_BoardRemoveButton);
+		lua_setfield(L, -2, "RemoveButton");
+		lua_pushcfunction(L, Lua_BoardSetButtonVisible);
+		lua_setfield(L, -2, "SetButtonVisible");
+		lua_pushcfunction(L, Lua_BoardSetButtonLabel);
+		lua_setfield(L, -2, "SetButtonLabel");
 		lua_setglobal(L, "Board");
 
 		// Entity metatable
@@ -632,5 +752,18 @@ void ModLua::CallOnLevelEnd(bool isWin)
 	Lua_CallGlobal(L, "OnLevelEnd", 1);
 #else
 	(void)isWin;
+#endif
+}
+
+void ModLua::CallOnBoardButtonClick(int buttonId)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	lua_pushinteger(L, buttonId);
+	Lua_CallGlobal(L, "OnBoardButtonClick", 1);
+#else
+	(void)buttonId;
 #endif
 }

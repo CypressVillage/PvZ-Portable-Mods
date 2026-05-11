@@ -75,6 +75,7 @@ bool gSlowMo = false;
 bool gFastMo = false;
 LawnApp* gLawnApp = nullptr;
 int gSlowMoCounter = 0;
+int gGameSpeedOverride = 0;
 
 static bool HasUnshownAchievements(PlayerInfo* thePlayerInfo)
 {
@@ -1687,7 +1688,11 @@ void LawnApp::UpdateFrames()
 #endif
 
 	int aUpdateCount = 1;
-	if (gSlowMo)
+	if (gGameSpeedOverride > 0)
+	{
+		aUpdateCount = gGameSpeedOverride;
+	}
+	else if (gSlowMo)
 	{
 		++gSlowMoCounter;
 		if (gSlowMoCounter < 4)
@@ -1736,6 +1741,25 @@ void LawnApp::ToggleFastMo()
 {
 	gSlowMo = false;
 	gFastMo = !gFastMo;
+	gGameSpeedOverride = 0;
+}
+
+void LawnApp::SetGameSpeed(int multiplier)
+{
+	gGameSpeedOverride = (multiplier > 0) ? multiplier : 0;
+	if (multiplier > 0)
+	{
+		gSlowMo = false;
+		gFastMo = false;
+	}
+}
+
+int LawnApp::GetGameSpeed()
+{
+	if (gGameSpeedOverride > 0) return gGameSpeedOverride;
+	if (gFastMo) return 20;
+	if (gSlowMo) return 0;
+	return 1;
 }
 
 void LawnApp::LoadGroup(const char* theGroupName, int theGroupAveMsToLoad)

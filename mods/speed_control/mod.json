@@ -1,0 +1,10 @@
+{
+  "id": "speed_control",
+  "name": "Speed Control",
+  "version": "0.1.0",
+  "author": "pvz-portable",
+  "description": "Add a speed button below the menu button to adjust game speed",
+  "priority": 100,
+  "dependencies": [],
+  "entry": "scripts/main.lua"
+}
