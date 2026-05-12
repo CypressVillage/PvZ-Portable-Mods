@@ -15,6 +15,14 @@ struct ModPlantDef
 {
 	std::string id;
 	int seedType = -1;
+	int seedCost = 50;
+	int refreshTime = 750;
+	int packetIndex = 0;
+	int subClass = 0;
+	int launchRate = 0;
+	int projectileType = 0;
+	std::string plantName;
+	std::string reanimationName;
 };
 
 struct ModZombieDef
@@ -57,6 +65,13 @@ public:
 
 	const std::vector<std::string>& GetErrors() const;
 
+	int GetTotalAlmanacPlants() const;
+	int GetAlmanacPlantAt(int index) const;
+	int ResolveReanimationType(const std::string& reanimName) const;
+
+	void BuildReanimNameMap();
+	unsigned int RegisterDynamicReanim(const std::string& reanimFilePath);
+
 private:
 	bool ValidateId(const std::string& id, std::string* outError) const;
 
@@ -69,6 +84,7 @@ private:
 	std::map<int, ModZombieDef> mRuntimeZombies;
 	std::map<int, ModModeDef> mRuntimeModes;
 	std::map<int, ModProjectileDef> mRuntimeProjectiles;
+	std::map<std::string, int> mReanimNameMap;
 	std::vector<std::string> mErrors;
 };
 

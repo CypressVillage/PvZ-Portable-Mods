@@ -45,7 +45,7 @@
 #include "../Sexy.TodLib/TodStringFile.h"
 #include "Widget/AchievementsScreen.h"
 
-PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES] = {
+PlantDefinition gPlantDefs[SeedType::MAX_SEED_TYPES] = {
     { SeedType::SEED_PEASHOOTER,        nullptr, ReanimationType::REANIM_PEASHOOTER,    0,  100,    750,    PlantSubClass::SUBCLASS_SHOOTER,    150,    "PEASHOOTER" },
     { SeedType::SEED_SUNFLOWER,         nullptr, ReanimationType::REANIM_SUNFLOWER,     1,  50,     750,    PlantSubClass::SUBCLASS_NORMAL,     2500,   "SUNFLOWER" },
     { SeedType::SEED_CHERRYBOMB,        nullptr, ReanimationType::REANIM_CHERRYBOMB,    3,  150,    5000,   PlantSubClass::SUBCLASS_NORMAL,     0,      "CHERRY_BOMB" },
@@ -4163,6 +4163,10 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
             }
 
             Image* aPlantImage = Plant::GetImage(aSeedType);
+            if (aPlantImage == nullptr)
+            {
+                return;
+            }
             if (aPlantImage->mNumCols <= 2)
             {
                 aCelCol = aPlantImage->mNumCols - 1;
@@ -4525,6 +4529,15 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
         aProjectileType = ProjectileType::PROJECTILE_COBBIG;
         break;
     default:
+        if (static_cast<int>(mSeedType) >= 2000)
+        {
+            const ModPlantDef* modDef = gModRegistry.FindPlantByRuntimeId(static_cast<int>(mSeedType));
+            if (modDef)
+            {
+                aProjectileType = static_cast<ProjectileType>(modDef->projectileType);
+                break;
+            }
+        }
         TOD_ASSERT(false);
         break;
     }
@@ -4964,16 +4977,48 @@ PlantDefinition& GetPlantDefinition(SeedType theSeedType)
     if (static_cast<int>(theSeedType) >= 2000)
     {
         static std::map<int, PlantDefinition> sModPlantDefs;
-        if (sModPlantDefs.find(static_cast<int>(theSeedType)) == sModPlantDefs.end())
+        int key = static_cast<int>(theSeedType);
+        if (sModPlantDefs.find(key) == sModPlantDefs.end())
         {
-            PlantDefinition def = { theSeedType, nullptr, ReanimationType::REANIM_NONE, 0, 50, 750, PlantSubClass::SUBCLASS_NORMAL, 0, "ModPlant" };
-            sModPlantDefs[static_cast<int>(theSeedType)] = def;
+            PlantDefinition def;
+            def.mSeedType = theSeedType;
+            def.mPlantImage = nullptr;
+            def.mReanimationType = ReanimationType::REANIM_NONE;
+            def.mPacketIndex = 0;
+            def.mSeedCost = 50;
+            def.mRefreshTime = 750;
+            def.mSubClass = PlantSubClass::SUBCLASS_NORMAL;
+            def.mLaunchRate = 0;
+            def.mPlantName = "ModPlant";
+
+            const ModPlantDef* modDef = gModRegistry.FindPlantByRuntimeId(key);
+            if (modDef)
+            {
+                def.mSeedCost = modDef->seedCost;
+                def.mRefreshTime = modDef->refreshTime;
+                def.mPacketIndex = modDef->packetIndex;
+                def.mSubClass = static_cast<PlantSubClass>(modDef->subClass);
+                def.mLaunchRate = modDef->launchRate;
+                if (!modDef->reanimationName.empty())
+                {
+                    def.mReanimationType = static_cast<ReanimationType>(
+                        gModRegistry.ResolveReanimationType(modDef->reanimationName));
+                }
+                if (!modDef->plantName.empty())
+                {
+                    static std::map<int, std::string> sModPlantNames;
+                    sModPlantNames[key] = modDef->plantName;
+                    def.mPlantName = sModPlantNames[key].c_str();
+                }
+            }
+
+            sModPlantDefs[key] = def;
         }
-        return sModPlantDefs[static_cast<int>(theSeedType)];
+        return sModPlantDefs[key];
     }
 
     TOD_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
-    TOD_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::NUM_SEED_TYPES));
+    TOD_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::MAX_SEED_TYPES));
     
     return gPlantDefs[theSeedType];
 }

@@ -5,6 +5,7 @@
  */
 
 #include "ModLoader.h"
+#include "ModRegistry.h"
 #include "SexyAppFramework/Common.h"
 #include "SexyAppFramework/SexyAppBase.h"
 #include "Sexy.TodLib/TodDebug.h"
@@ -548,5 +549,79 @@ bool ModLoader::LoadManifestFromFile(const std::string& manifestPath, const std:
 	}
 
 	mManifests.push_back(std::move(manifest));
+	return true;
+}
+
+bool ModLoader::LoadPlantDefs()
+{
+	int nextSeedType = 2000;
+
+	for (const ModManifest& manifest : mManifests)
+	{
+		auto it = manifest.dataFiles.find("plants");
+		if (it == manifest.dataFiles.end())
+			continue;
+
+		for (const std::string& relativePath : it->second)
+		{
+			std::filesystem::path filePath = PathFromU8(manifest.rootPath) / PathFromU8(relativePath);
+			std::string jsonText;
+			if (!ReadFileToString(PathToU8(filePath), jsonText))
+			{
+				mErrors.push_back("Failed to read plant file: " + PathToU8(filePath));
+				continue;
+			}
+
+			JsonParser parser(jsonText);
+			JsonValue root;
+			std::string error;
+			if (!parser.Parse(root, error))
+			{
+				mErrors.push_back("Parse error in " + PathToU8(filePath) + ": " + error);
+				continue;
+			}
+			if (root.type != JsonType::Object)
+			{
+				mErrors.push_back("Plant file root must be object: " + PathToU8(filePath));
+				continue;
+			}
+
+			ModPlantDef plantDef;
+			plantDef.seedType = nextSeedType;
+
+			if (!GetObjectString(root, "id", plantDef.id, true, error))
+			{
+				mErrors.push_back(PathToU8(filePath) + ": " + error);
+				continue;
+			}
+
+			GetObjectInt(root, "cost", plantDef.seedCost, false, error);
+			GetObjectInt(root, "cooldown", plantDef.refreshTime, false, error);
+			GetObjectInt(root, "packetIndex", plantDef.packetIndex, false, error);
+			GetObjectInt(root, "subClass", plantDef.subClass, false, error);
+			GetObjectInt(root, "launchRate", plantDef.launchRate, false, error);
+			GetObjectInt(root, "projectileType", plantDef.projectileType, false, error);
+			GetObjectString(root, "name", plantDef.plantName, false, error);
+			GetObjectString(root, "reanimation", plantDef.reanimationName, false, error);
+
+			std::string reanimFile;
+			if (GetObjectString(root, "reanimFile", reanimFile, false, error) && !reanimFile.empty())
+			{
+				std::filesystem::path absReanimPath = PathFromU8(manifest.rootPath) / PathFromU8(reanimFile);
+				plantDef.reanimationName = PathToU8(absReanimPath);
+				gModRegistry.RegisterDynamicReanim(plantDef.reanimationName);
+			}
+
+			std::string outError;
+			if (!gModRegistry.RegisterPlant(plantDef, &outError))
+			{
+				mErrors.push_back("Plant registration failed: " + outError);
+				continue;
+			}
+
+			nextSeedType++;
+		}
+	}
+
 	return true;
 }

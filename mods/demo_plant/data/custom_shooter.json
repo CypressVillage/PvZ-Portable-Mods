@@ -1,0 +1,11 @@
+{
+  "id": "demo_custom_shooter",
+  "name": "Custom Shooter",
+  "cost": 125,
+  "cooldown": 500,
+  "packetIndex": 0,
+  "subClass": 1,
+  "launchRate": 85,
+  "projectileType": 0,
+  "reanimFile": "resources/reanim/custom_pea.xml"
+}
