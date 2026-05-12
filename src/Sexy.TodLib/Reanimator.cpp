@@ -37,6 +37,10 @@ ReanimatorDefinition* gReanimatorDefArray;
 unsigned int gReanimationParamArraySize;
 ReanimationParams* gReanimationParamArray;
 
+static std::vector<ReanimationParams> sDynamicReanimParams;
+static std::vector<ReanimatorDefinition> sDynamicReanimDefs;
+static bool sParamsArrayWasDynamic = false;
+
 ReanimationParams gLawnReanimationArray[ReanimationType::NUM_REANIMS] = {
 	{ ReanimationType::REANIM_LOADBAR_SPROUT,                       "reanim/LoadBar_sprout.reanim",                    1 },
 	{ ReanimationType::REANIM_LOADBAR_ZOMBIEHEAD,                   "reanim/LoadBar_Zombiehead.reanim",                1 },
@@ -1219,8 +1223,11 @@ void ReanimatorFreeDefinitions()
 	delete[] gReanimatorDefArray;
 	gReanimatorDefArray = nullptr;
 	gReanimatorDefCount = 0;
+	if (sParamsArrayWasDynamic)
+		delete[] gReanimationParamArray;
 	gReanimationParamArray = nullptr;
 	gReanimationParamArraySize = 0;
+	sParamsArrayWasDynamic = false;
 }
 
 float Reanimation::GetTrackVelocity(const char* theTrackName)
@@ -1498,4 +1505,64 @@ Reanimation* Reanimation::FindSubReanim(ReanimationType theReanimType)
 	}
 
 	return nullptr;
+}
+
+unsigned int ReanimatorRegisterDynamic(const char* theReanimFileName, int theFlags)
+{
+	unsigned int dynamicIndex = (unsigned int)sDynamicReanimParams.size();
+
+	ReanimationParams params;
+	params.mReanimationType = static_cast<ReanimationType>(ReanimationType::NUM_REANIMS + dynamicIndex);
+	params.mReanimFileName = theReanimFileName;
+	params.mReanimParamFlags = theFlags;
+	sDynamicReanimParams.push_back(params);
+
+	ReanimatorDefinition def;
+	sDynamicReanimDefs.push_back(def);
+
+	unsigned int newCount = ReanimationType::NUM_REANIMS + (unsigned int)sDynamicReanimParams.size();
+
+	ReanimationParams* newParamArray = new ReanimationParams[newCount];
+	ReanimatorDefinition* newDefArray = new ReanimatorDefinition[newCount];
+
+	memcpy(newParamArray, gReanimationParamArray, sizeof(ReanimationParams) * gReanimationParamArraySize);
+	memcpy(newDefArray, gReanimatorDefArray, sizeof(ReanimatorDefinition) * gReanimatorDefCount);
+
+	if (sParamsArrayWasDynamic)
+		delete[] gReanimationParamArray;
+	sParamsArrayWasDynamic = true;
+	delete[] gReanimatorDefArray;
+
+	memcpy(&newParamArray[gReanimationParamArraySize], &sDynamicReanimParams[0], sizeof(ReanimationParams) * sDynamicReanimParams.size());
+	memcpy(&newDefArray[gReanimatorDefCount], &sDynamicReanimDefs[0], sizeof(ReanimatorDefinition) * sDynamicReanimDefs.size());
+
+	gReanimationParamArray = newParamArray;
+	gReanimatorDefArray = newDefArray;
+	gReanimationParamArraySize = newCount;
+	gReanimatorDefCount = newCount;
+
+	return ReanimationType::NUM_REANIMS + dynamicIndex;
+}
+
+bool ReanimatorEnsureDynamicDefinitionLoaded(unsigned int theDynamicIndex)
+{
+	if (theDynamicIndex >= gReanimatorDefCount)
+		return false;
+
+	ReanimatorDefinition* aReanimDef = &gReanimatorDefArray[theDynamicIndex];
+	if (aReanimDef->mTracks.tracks != nullptr)
+		return true;
+
+	ReanimationParams* aReanimParams = &gReanimationParamArray[theDynamicIndex];
+	TodTrace("'%s'\n", aReanimParams->mReanimFileName);
+
+	PerfTimer aTimer;
+	aTimer.Start();
+	if (!ReanimationLoadDefinition(aReanimParams->mReanimFileName, aReanimDef))
+	{
+		TodTrace("Failed to load dynamic reanim '%s'\n", aReanimParams->mReanimFileName);
+		return false;
+	}
+	TodTrace("Loaded dynamic reanim '%s' %d ms\n", aReanimParams->mReanimFileName, (int)aTimer.GetDuration());
+	return true;
 }

@@ -5,6 +5,17 @@
  */
 
 #include "ModRegistry.h"
+#include "../Sexy.TodLib/Reanimator.h"
+
+static bool HasFileExtension(const std::string& path)
+{
+	auto dot = path.rfind('.');
+	if (dot == std::string::npos) return false;
+	auto slash = path.rfind('/');
+	auto bslash = path.rfind('\\');
+	size_t lastSep = (slash != std::string::npos && bslash != std::string::npos) ? std::max(slash, bslash) : (slash != std::string::npos ? slash : bslash);
+	return lastSep == std::string::npos || dot > lastSep;
+}
 
 ModRegistry gModRegistry;
 
@@ -138,6 +149,25 @@ const std::vector<std::string>& ModRegistry::GetErrors() const
 	return mErrors;
 }
 
+int ModRegistry::GetTotalAlmanacPlants() const
+{
+	return 49 + mRuntimePlants.size();
+}
+
+int ModRegistry::GetAlmanacPlantAt(int index) const
+{
+	if (index < 49)
+		return index; // Vanilla seed types 0-48
+
+	int modIndex = index - 49;
+	auto it = mRuntimePlants.begin();
+	std::advance(it, modIndex);
+	if (it != mRuntimePlants.end())
+		return it->second.seedType;
+
+	return 0; // Fallback
+}
+
 bool ModRegistry::ValidateId(const std::string& id, std::string* outError) const
 {
 	if (id.empty())
@@ -147,4 +177,49 @@ bool ModRegistry::ValidateId(const std::string& id, std::string* outError) const
 		return false;
 	}
 	return true;
+}
+
+void ModRegistry::BuildReanimNameMap()
+{
+	extern ReanimationParams gLawnReanimationArray[];
+	mReanimNameMap.clear();
+	for (int i = 0; i < ReanimationType::NUM_REANIMS; i++)
+	{
+		mReanimNameMap[gLawnReanimationArray[i].mReanimFileName] = i;
+	}
+}
+
+int ModRegistry::ResolveReanimationType(const std::string& reanimName) const
+{
+	if (reanimName.empty())
+		return ReanimationType::REANIM_NONE;
+
+	auto it = mReanimNameMap.find(reanimName);
+	if (it != mReanimNameMap.end())
+		return it->second;
+
+	std::string withPrefix = reanimName;
+	if (withPrefix.find("reanim/") != 0 && withPrefix.find("reanim\\") != 0)
+	{
+		withPrefix = "reanim/" + withPrefix;
+		if (!HasFileExtension(withPrefix))
+			withPrefix += ".reanim";
+	}
+	it = mReanimNameMap.find(withPrefix);
+	if (it != mReanimNameMap.end())
+		return it->second;
+
+	return static_cast<int>(ReanimationType::REANIM_NONE);
+}
+
+unsigned int ModRegistry::RegisterDynamicReanim(const std::string& reanimFilePath)
+{
+	auto it = mReanimNameMap.find(reanimFilePath);
+	if (it != mReanimNameMap.end())
+		return it->second;
+
+	unsigned int dynamicIndex = ReanimatorRegisterDynamic(reanimFilePath.c_str(), 0);
+	mReanimNameMap[reanimFilePath] = dynamicIndex;
+	ReanimatorEnsureDynamicDefinitionLoaded(dynamicIndex);
+	return dynamicIndex;
 }

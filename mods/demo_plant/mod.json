@@ -1,0 +1,15 @@
+{
+  "id": "demo_plant",
+  "name": "Demo Plant Mod",
+  "version": "0.1.0",
+  "author": "pvz-portable",
+  "description": "Demonstrates how to add a custom plant via the mod system",
+  "priority": 200,
+  "data": {
+    "plants": [
+      "data/fire_pea.json",
+      "data/ice_melon.json",
+      "data/custom_shooter.json"
+    ]
+  }
+}

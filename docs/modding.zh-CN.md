@@ -83,38 +83,38 @@ mods/
 
 ### 5.1 plants.json
 
+每个文件定义一株植物。可在 `mod.json` 的 `data.plants` 中列出多个植物定义文件。
+
 ```json
-[
-  {
-    "id": "pea_shooter_plus",
-    "seed_type": 2001,
-    "name_key": "PEA_SHOOTER_PLUS_NAME",
-    "desc_key": "PEA_SHOOTER_PLUS_DESC",
-    "cost": 125,
-    "cooldown": 7.5,
-    "hp": 300,
-    "attack": {
-      "type": "projectile",
-      "damage": 20,
-      "rate": 1.5,
-      "projectile_id": "pea_plus"
-    },
-    "animation": {
-      "reanim": "REANIM_PEA_SHOOTER",
-      "atlas": "reanim/peashooter_plus.atlas"
-    },
-    "ui": {
-      "seedpacket_image": "IMAGE_SEEDPACKET_PEA_PLUS",
-      "icon_image": "IMAGE_ICON_PEA_PLUS"
-    }
-  }
-]
+{
+  "id": "fire_pea",
+  "name": "Fire Pea",
+  "cost": 200,
+  "cooldown": 750,
+  "subClass": 1,
+  "launchRate": 90,
+  "reanimation": "reanim/FirePea.reanim"
+}
 ```
 
-必填字段：`id`、`seed_type`、`cost`、`cooldown`
+必填字段：
+- `id`：植物唯一标识符
 
-建议保留范围：
-- `seed_type` >= 2000 为 Mod 专用
+可选字段：
+- `name`：显示名称（默认 `"ModPlant"`）
+- `cost`：阳光花费（默认 `50`）
+- `cooldown`：冷却帧数（默认 `750`）
+- `subClass`：`0`=普通，`1`=射手（默认 `0`）
+- `launchRate`：发射间隔帧数（默认 `0`）
+- `reanimation`：复用的原版动画路径，如 `"reanim/FirePea.reanim"`
+- `reanimFile`：外部 reanim XML 路径（相对于 mod 根目录），如 `"resources/reanim/custom.xml"`
+
+动画说明：
+- `reanimFile` 优先于 `reanimation`；同时设置时使用外部文件。
+- 自定义 reanim XML 格式详见 `docs/custom-plants.md`。
+
+保留范围：
+- Mod 植物的 SeedType ID 从 `2000` 起自动分配。
 
 ### 5.2 zombies.json
 

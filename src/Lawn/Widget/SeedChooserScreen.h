@@ -67,7 +67,9 @@ private:
         SeedChooserScreen_Almanac = 103,
         SeedChooserScreen_Menu = 104,
         SeedChooserScreen_Store = 105,
-        SeedChooserScreen_Imitater = 106
+        SeedChooserScreen_Imitater = 106,
+        SeedChooserScreen_NextPage = 107,
+        SeedChooserScreen_PrevPage = 108
     };
 
 public:
@@ -78,7 +80,10 @@ public:
     GameButton*             mAlmanacButton;
     GameButton*             mMenuButton;
     GameButton*             mImitaterButton;
-    ChosenSeed              mChosenSeeds[NUM_SEED_TYPES];
+    GameButton*             mNextPageButton;
+    GameButton*             mPrevPageButton;
+    int                     mPlantPage;
+    ChosenSeed              mChosenSeeds[SeedType::MAX_SEED_TYPES];
     LawnApp*                mApp;
     Board*                  mBoard;
     int                     mNumSeedsToChoose;
@@ -100,6 +105,7 @@ public:
     void                    CrazyDavePickSeeds();
     bool                    Has7Rows();
     void                    GetSeedPositionInChooser(int theIndex, int& x, int& y);
+    int                     GetAlmanacIndex(SeedType theSeedType);
     /*inline*/ void         GetSeedPositionInBank(int theIndex, int& x, int& y);
     /*inline*/ unsigned int SeedNotRecommendedToPick(SeedType theSeedType);
     /*inline*/ bool         SeedNotAllowedToPick(SeedType theSeedType);

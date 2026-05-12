@@ -34,6 +34,7 @@
 #include "../System/ReanimationLawn.h"
 #include "../../Sexy.TodLib/TodStringFile.h"
 #include "widget/WidgetManager.h"
+#include "../../Mod/ModRegistry.h"
 
 bool gZombieDefeated[NUM_ZOMBIE_TYPES] = { false };
 
@@ -100,6 +101,30 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mZombieButton->mDrawStoneButton = true;
 	mZombieButton->mParentWidget = this;
 
+	mPlantPage = 0;
+	
+	mNextPlantPageButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_NEXT_PLANT_PAGE);
+	mNextPlantPageButton->SetLabel(">");
+	mNextPlantPageButton->mButtonImage = Sexy::IMAGE_ALMANAC_INDEXBUTTON;
+	mNextPlantPageButton->mOverImage = Sexy::IMAGE_ALMANAC_INDEXBUTTONHIGHLIGHT;
+	mNextPlantPageButton->mDownImage = nullptr;
+	mNextPlantPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
+	mNextPlantPageButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
+	mNextPlantPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
+	mNextPlantPageButton->Resize(710, 567, 40, 26);
+	mNextPlantPageButton->mParentWidget = this;
+	
+	mPrevPlantPageButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_PREV_PLANT_PAGE);
+	mPrevPlantPageButton->SetLabel("<");
+	mPrevPlantPageButton->mButtonImage = Sexy::IMAGE_ALMANAC_INDEXBUTTON;
+	mPrevPlantPageButton->mOverImage = Sexy::IMAGE_ALMANAC_INDEXBUTTONHIGHLIGHT;
+	mPrevPlantPageButton->mDownImage = nullptr;
+	mPrevPlantPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
+	mPrevPlantPageButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
+	mPrevPlantPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
+	mPrevPlantPageButton->Resize(670, 567, 40, 26);
+	mPrevPlantPageButton->mParentWidget = this;
+
 	SetPage(ALMANAC_PAGE_INDEX);
 	if (!mApp->mBoard || !mApp->mBoard->mPaused)
 		mApp->mMusic->MakeSureMusicIsPlaying(MUSIC_TUNE_CHOOSE_YOUR_SEEDS);
@@ -111,6 +136,8 @@ AlmanacDialog::~AlmanacDialog()
 	if (mIndexButton)	delete mIndexButton;
 	if (mPlantButton)	delete mPlantButton;
 	if (mZombieButton)	delete mZombieButton;
+	if (mNextPlantPageButton) delete mNextPlantPageButton;
+	if (mPrevPlantPageButton) delete mPrevPlantPageButton;
 
 	ClearPlantsAndZombies();
 }
@@ -202,13 +229,23 @@ void AlmanacDialog::SetPage(AlmanacPage thePage)
 		mIndexButton->mBtnNoDraw = true;
 		mPlantButton->mBtnNoDraw = false;
 		mZombieButton->mBtnNoDraw = false;
+		mNextPlantPageButton->mBtnNoDraw = true;
+		mPrevPlantPageButton->mBtnNoDraw = true;
 	}
 	else
 	{
 		if (mOpenPage == AlmanacPage::ALMANAC_PAGE_PLANTS)
+		{
 			SetupPlant();
+			mNextPlantPageButton->mBtnNoDraw = false;
+			mPrevPlantPageButton->mBtnNoDraw = false;
+		}
 		else if (mOpenPage == AlmanacPage::ALMANAC_PAGE_ZOMBIES)
+		{
 			SetupZombie();
+			mNextPlantPageButton->mBtnNoDraw = true;
+			mPrevPlantPageButton->mBtnNoDraw = true;
+		}
 		else return;
 
 		mIndexButton->mBtnNoDraw = false;
@@ -235,6 +272,19 @@ void AlmanacDialog::Update()
 	mIndexButton->Update();
 	mPlantButton->Update();
 	mZombieButton->Update();
+	
+	mNextPlantPageButton->Update();
+	mPrevPlantPageButton->Update();
+
+	if (mOpenPage == AlmanacPage::ALMANAC_PAGE_PLANTS)
+	{
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		int maxPage = (maxPlants - 1) / 49;
+		if (maxPage < 0) maxPage = 0;
+		mNextPlantPageButton->mDisabled = (mPlantPage >= maxPage);
+		mPrevPlantPageButton->mDisabled = (mPlantPage <= 0);
+	}
+
 	if (mPlant) mPlant->Update();
 	if (mZombie) mZombie->Update();
 	for (Zombie* aZombie : mZombiePerfTest)
@@ -291,13 +341,20 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 	TodDrawString(g, "[SUBURBAN_ALMANAC_PLANTS]", BOARD_WIDTH / 2, 48, Sexy::FONT_HOUSEOFTERROR20, Color(213, 159, 43), DrawStringJustification::DS_ALIGN_CENTER);
 
 	SeedType aSeedMouseOn = SeedHitTest(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY);
-	for (SeedType aSeedType = SeedType::SEED_PEASHOOTER; aSeedType < NUM_ALMANAC_SEEDS; aSeedType = (SeedType)(aSeedType + 1))
+	
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	int startIdx = mPlantPage * 49;
+	int endIdx = startIdx + 49;
+	if (endIdx > maxPlants) endIdx = maxPlants;
+
+	for (int i = startIdx; i < endIdx; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		int aPosX, aPosY;
-		GetSeedPosition(aSeedType, aPosX, aPosY);
+		GetSeedPosition((SeedType)i, aPosX, aPosY); // Pass index to GetSeedPosition to format layout properly
 		if (mApp->HasSeedType(aSeedType))
 		{
-			if (aSeedType == SeedType::SEED_IMITATER)
+			if ((i % 49) == (int)SeedType::SEED_IMITATER)
 			{
 				if (aSeedType == aSeedMouseOn)
 					g->DrawImage(Sexy::IMAGE_ALMANAC_IMITATER, aPosX, aPosY);
@@ -531,16 +588,19 @@ void AlmanacDialog::Draw(Graphics* g)
 	mIndexButton->Draw(g);
 	mPlantButton->Draw(g);
 	mZombieButton->Draw(g);
+	mNextPlantPageButton->Draw(g);
+	mPrevPlantPageButton->Draw(g);
 }
 
 void AlmanacDialog::GetSeedPosition(SeedType theSeedType, int& x, int& y)
 {
-	if (theSeedType == SeedType::SEED_IMITATER)
+	int aIndex = (int)theSeedType % 49;
+	if (aIndex == (int)SeedType::SEED_IMITATER)
 		x = 20, y = 23;
 	else
 	{
-		x = theSeedType % 8 * 52 + 26;
-		y = theSeedType / 8 * 78 + 92;
+		x = aIndex % 8 * 52 + 26;
+		y = aIndex / 8 * 78 + 92;
 	}
 }
 
@@ -548,13 +608,19 @@ SeedType AlmanacDialog::SeedHitTest(int x, int y)
 {
 	if (mMouseVisible && mOpenPage == AlmanacPage::ALMANAC_PAGE_PLANTS)
 	{
-		for (SeedType aSeedType = SeedType::SEED_PEASHOOTER; aSeedType < NUM_ALMANAC_SEEDS; aSeedType = (SeedType)(aSeedType + 1))
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		int startIdx = mPlantPage * 49;
+		int endIdx = startIdx + 49;
+		if (endIdx > maxPlants) endIdx = maxPlants;
+
+		for (int i = startIdx; i < endIdx; i++)
 		{
+			SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 			if (mApp->HasSeedType(aSeedType))
 			{
 				int aSeedX, aSeedY;
-				GetSeedPosition(aSeedType, aSeedX, aSeedY);
-				Rect aSeedRect = aSeedType == SeedType::SEED_IMITATER ? Rect(aSeedX, aSeedY, 34, 46) : Rect(aSeedX, aSeedY, SEED_PACKET_WIDTH, SEED_PACKET_HEIGHT);
+				GetSeedPosition((SeedType)i, aSeedX, aSeedY); // Position depends on the index within page
+				Rect aSeedRect = (i % 49) == (int)SeedType::SEED_IMITATER ? Rect(aSeedX, aSeedY, 34, 46) : Rect(aSeedX, aSeedY, SEED_PACKET_WIDTH, SEED_PACKET_HEIGHT);
 				if (aSeedRect.Contains(x, y)) return aSeedType;
 			}
 		}
@@ -665,13 +731,25 @@ void AlmanacDialog::MouseUp(int x, int y, int theClickCount)
 	else if (mZombieButton->IsMouseOver())	SetPage(ALMANAC_PAGE_ZOMBIES);
 	else if (mCloseButton->IsMouseOver())	mApp->KillAlmanacDialog();
 	else if (mIndexButton->IsMouseOver())	SetPage(ALMANAC_PAGE_INDEX);
+	else if (mNextPlantPageButton->IsMouseOver() && !mNextPlantPageButton->mDisabled && !mNextPlantPageButton->mBtnNoDraw)
+	{
+		mPlantPage++;
+		SetupPlant();
+	}
+	else if (mPrevPlantPageButton->IsMouseOver() && !mPrevPlantPageButton->mDisabled && !mPrevPlantPageButton->mBtnNoDraw)
+	{
+		mPlantPage--;
+		SetupPlant();
+	}
 }
 
 // GOTY @Patoke: 0x404F10
 void AlmanacDialog::MouseDown(int x, int y, int theClickCount)
 {
 	(void)theClickCount;
-	if (mPlantButton->IsMouseOver() || mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver())
+	if (mPlantButton->IsMouseOver() || mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver() || 
+		(!mNextPlantPageButton->mBtnNoDraw && mNextPlantPageButton->IsMouseOver()) || 
+		(!mPrevPlantPageButton->mBtnNoDraw && mPrevPlantPageButton->IsMouseOver()))
 		mApp->PlaySample(Sexy::SOUND_TAP);
 	if (mZombieButton->IsMouseOver())
 		mApp->PlaySample(Sexy::SOUND_GRAVEBUTTON);

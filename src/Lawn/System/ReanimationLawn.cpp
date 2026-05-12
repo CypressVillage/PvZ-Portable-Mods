@@ -335,7 +335,7 @@ MemoryImage* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 void ReanimatorCache::ReanimatorCacheInitialize()
 {
 	mApp = (LawnApp*)gSexyAppBase;
-	for (int i = 0; i < SeedType::NUM_SEED_TYPES; i++)
+	for (int i = 0; i < SeedType::MAX_SEED_TYPES; i++)
 		mPlantImages[i] = nullptr;
 	for (int i = 0; i < LawnMowerType::NUM_MOWER_TYPES; i++)
 		mLawnMowers[i] = nullptr;
@@ -345,7 +345,7 @@ void ReanimatorCache::ReanimatorCacheInitialize()
 
 void ReanimatorCache::ReanimatorCacheDispose()
 {
-	for (int i = 0; i < SeedType::NUM_SEED_TYPES; i++)
+	for (int i = 0; i < SeedType::MAX_SEED_TYPES; i++)
 		delete mPlantImages[i];
 	while (mImageVariationList.mSize != 0)
 	{
@@ -362,7 +362,7 @@ void ReanimatorCache::ReanimatorCacheDispose()
 
 void ReanimatorCache::DrawCachedPlant(Graphics* g, float thePosX, float thePosY, SeedType theSeedType, DrawVariation theDrawVariation)
 {
-	TOD_ASSERT(theSeedType >= 0 && theSeedType < SeedType::NUM_SEED_TYPES);
+	TOD_ASSERT(theSeedType >= 0 && theSeedType < SeedType::MAX_SEED_TYPES);
 
 	MemoryImage* aImage = nullptr;
 	if (theDrawVariation != DrawVariation::VARIATION_NORMAL)

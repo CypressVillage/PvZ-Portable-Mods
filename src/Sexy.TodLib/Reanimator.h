@@ -111,6 +111,9 @@ public:
 extern unsigned int gReanimationParamArraySize;
 extern ReanimationParams* gReanimationParamArray;
 
+unsigned int ReanimatorRegisterDynamic(const char* theReanimFileName, int theFlags);
+bool ReanimatorEnsureDynamicDefinitionLoaded(unsigned int theDynamicIndex);
+
 inline void                         ReanimationFillInMissingData(float& thePrev, float& theValue);
 inline void                         ReanimationFillInMissingData(void*& thePrev, void*& theValue);
 bool                                ReanimationLoadDefinition(const std::string& theFileName, ReanimatorDefinition* theDefinition);

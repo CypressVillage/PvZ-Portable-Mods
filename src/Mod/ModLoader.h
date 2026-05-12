@@ -38,6 +38,8 @@ public:
 	const std::vector<std::string>& GetErrors() const;
 	void ApplyStringOverrides(Sexy::SexyAppBase* app) const;
 
+	bool LoadPlantDefs();
+
 private:
 	bool LoadManifestFromFile(const std::string& manifestPath, const std::string& rootPath);
 

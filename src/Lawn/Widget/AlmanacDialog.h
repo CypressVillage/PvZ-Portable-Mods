@@ -49,7 +49,9 @@ private:
 		ALMANAC_BUTTON_CLOSE = 0,
 		ALMANAC_BUTTON_PLANT = 1,
 		ALMANAC_BUTTON_ZOMBIE = 2,
-		ALMANAC_BUTTON_INDEX = 3
+		ALMANAC_BUTTON_INDEX = 3,
+		ALMANAC_BUTTON_NEXT_PLANT_PAGE = 4,
+		ALMANAC_BUTTON_PREV_PLANT_PAGE = 5
 	};
 
 public:
@@ -58,7 +60,10 @@ public:
 	GameButton*					mIndexButton;
 	GameButton*					mPlantButton;
 	GameButton*					mZombieButton;
+	GameButton*					mNextPlantPageButton;
+	GameButton*					mPrevPlantPageButton;
 	AlmanacPage					mOpenPage;
+	int							mPlantPage;
 	Reanimation*				mReanim[4];
 	SeedType					mSelectedSeed;
 	ZombieType					mSelectedZombie;

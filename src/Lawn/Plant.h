@@ -334,6 +334,6 @@ public:
     int                     mLaunchRate;
     const char*         mPlantName;
 };
-extern PlantDefinition gPlantDefs[SeedType::NUM_SEED_TYPES];
+extern PlantDefinition gPlantDefs[SeedType::MAX_SEED_TYPES];
 
 /*inline*/ PlantDefinition& GetPlantDefinition(SeedType theSeedType);

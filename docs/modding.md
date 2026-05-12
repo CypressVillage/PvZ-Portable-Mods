@@ -91,39 +91,40 @@ All tables are arrays of objects. Unknown fields are ignored.
 
 ### 5.1 Plants (data/plants.json)
 
+Each file defines one plant. Multiple plant files can be listed in `mod.json` under `data.plants`.
+
 ```json
-[
-  {
-    "id": "pea_shooter_plus",
-    "seed_type": 2001,
-    "name_key": "PEA_SHOOTER_PLUS_NAME",
-    "desc_key": "PEA_SHOOTER_PLUS_DESC",
-    "cost": 125,
-    "cooldown": 7.5,
-    "hp": 300,
-    "attack": {
-      "type": "projectile",
-      "damage": 20,
-      "rate": 1.5,
-      "projectile_id": "pea_plus"
-    },
-    "animation": {
-      "reanim": "REANIM_PEA_SHOOTER",
-      "atlas": "reanim/peashooter_plus.atlas"
-    },
-    "ui": {
-      "seedpacket_image": "IMAGE_SEEDPACKET_PEA_PLUS",
-      "icon_image": "IMAGE_ICON_PEA_PLUS"
-    }
-  }
-]
+{
+  "id": "fire_pea",
+  "name": "Fire Pea",
+  "cost": 200,
+  "cooldown": 750,
+  "subClass": 1,
+  "launchRate": 90,
+  "reanimation": "reanim/FirePea.reanim"
+}
 ```
 
 Required fields:
-- `id`, `seed_type`, `cost`, `cooldown`
+- `id`: unique identifier for the plant
+
+Optional fields:
+- `name`: display name (default: `"ModPlant"`)
+- `cost`: sun cost (default: `50`)
+- `cooldown`: cooldown in frames (default: `750`)
+- `subClass`: `0` = normal, `1` = shooter (default: `0`)
+- `launchRate`: frames between shots (default: `0`)
+- `reanimation`: vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"`
+- `reanimFile`: external reanim XML path relative to mod root, e.g. `"resources/reanim/custom.xml"`
+
+Animation:
+- If `reanimFile` is set, the external file is loaded and registered dynamically.
+- If only `reanimation` is set, an existing vanilla animation is reused.
+- If neither is set, the plant has no body animation.
+- For the custom reanim XML format, see `docs/custom-plants.md`.
 
 Reserved ranges:
-- `seed_type` >= 2000 for mods
+- Mod plant SeedType IDs are automatically assigned starting from `2000`.
 
 ### 5.2 Zombies (data/zombies.json)
 

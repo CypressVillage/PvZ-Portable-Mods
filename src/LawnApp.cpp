@@ -64,6 +64,7 @@
 #include "misc/ResourceManager.h"
 #include "Mod/ModLoader.h"
 #include "Mod/ModLua.h"
+#include "Mod/ModRegistry.h"
 #include "SexyAppFramework/Common.h"
 
 #include "widget/Checkbox.h"
@@ -1374,6 +1375,8 @@ void LawnApp::Init()
 	mTimer.Start();
 
 	ReanimatorLoadDefinitions(gLawnReanimationArray, ReanimationType::NUM_REANIMS);
+	gModRegistry.BuildReanimNameMap();
+	gModLoader.LoadPlantDefs();
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_SPROUT, true);
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_ZOMBIEHEAD, true);
 
@@ -2475,6 +2478,7 @@ bool LawnApp::HasSeedType(SeedType theSeedType)
 	case SeedType::SEED_IMITATER:
 		return mPlayerInfo->mPurchases[StoreItem::STORE_ITEM_PLANT_IMITATER] > 0;
 	default:
+		if ((int)theSeedType >= 2000) return true; // Modded plants are always available for now
 		return theSeedType < GetSeedsAvailable();
 	}
 }

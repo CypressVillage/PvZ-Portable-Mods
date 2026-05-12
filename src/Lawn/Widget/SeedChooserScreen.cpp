@@ -34,6 +34,7 @@
 #include "../ToolTipWidget.h"
 #include "SeedChooserScreen.h"
 #include "../../GameConstants.h"
+#include "../../Mod/ModRegistry.h"
 #include "../System/PlayerInfo.h"
 #include "misc/Debug.h"
 #include "widget/Dialog.h"
@@ -145,6 +146,30 @@ SeedChooserScreen::SeedChooserScreen()
 	mImitaterButton->Resize(464, 515, Sexy::IMAGE_IMITATERSEED->mWidth, Sexy::IMAGE_IMITATERSEED->mHeight);
 	mImitaterButton->mParentWidget = this;
 
+	mPlantPage = 0;
+
+	mNextPageButton = new GameButton(SeedChooserScreen::SeedChooserScreen_NextPage);
+	mNextPageButton->SetLabel(">");
+	mNextPageButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2;
+	mNextPageButton->mOverImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2_GLOW;
+	mNextPageButton->mDownImage = nullptr;
+	mNextPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
+	mNextPageButton->mColors[ButtonWidget::COLOR_LABEL] = aBtnColor;
+	mNextPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aBtnColor;
+	mNextPageButton->Resize(420, 547, 40, 26);
+	mNextPageButton->mParentWidget = this;
+
+	mPrevPageButton = new GameButton(SeedChooserScreen::SeedChooserScreen_PrevPage);
+	mPrevPageButton->SetLabel("<");
+	mPrevPageButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2;
+	mPrevPageButton->mOverImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON2_GLOW;
+	mPrevPageButton->mDownImage = nullptr;
+	mPrevPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
+	mPrevPageButton->mColors[ButtonWidget::COLOR_LABEL] = aBtnColor;
+	mPrevPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aBtnColor;
+	mPrevPageButton->Resize(370, 547, 40, 26);
+	mPrevPageButton->mParentWidget = this;
+
 	if (!mApp->CanShowAlmanac())
 	{
 		mAlmanacButton->mBtnNoDraw = true;
@@ -158,11 +183,13 @@ SeedChooserScreen::SeedChooserScreen()
 
 	DBG_ASSERT(mApp->GetSeedsAvailable() < NUM_SEED_TYPES);
 	memset(mChosenSeeds, 0, sizeof(mChosenSeeds));
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		aChosenSeed.mSeedType = aSeedType;
-		GetSeedPositionInChooser(aSeedType, aChosenSeed.mX, aChosenSeed.mY);
+		GetSeedPositionInChooser(i, aChosenSeed.mX, aChosenSeed.mY);
 		aChosenSeed.mTimeStartMotion = 0;
 		aChosenSeed.mTimeEndMotion = 0;
 		aChosenSeed.mStartX = aChosenSeed.mX;
@@ -223,7 +250,7 @@ int SeedChooserScreen::PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArra
 
 void SeedChooserScreen::CrazyDavePickSeeds()
 {
-	TodWeightedArray aSeedArray[NUM_SEED_TYPES];
+	TodWeightedArray aSeedArray[SeedType::MAX_SEED_TYPES];
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
 	{
 		aSeedArray[aSeedType].mItem = aSeedType;
@@ -282,17 +309,29 @@ bool SeedChooserScreen::Has7Rows()
 	return false;
 }
 
+int SeedChooserScreen::GetAlmanacIndex(SeedType theSeedType)
+{
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
+	{
+		if ((SeedType)gModRegistry.GetAlmanacPlantAt(i) == theSeedType)
+			return i;
+	}
+	return 0;
+}
+
 void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 {
-	if (theIndex == SEED_IMITATER)
+	if ((theIndex % 49) == SEED_IMITATER)
 	{
 		x = mImitaterButton->mX;
 		y = mImitaterButton->mY;
 	}
 	else
 	{
-		int aRow = theIndex / 8;
-		int aCol = theIndex % 8;
+		int idx = theIndex % 49;
+		int aRow = idx / 8;
+		int aCol = idx % 8;
 
 		x = aCol * 53 + 22;
 		if (Has7Rows())
@@ -322,6 +361,8 @@ SeedChooserScreen::~SeedChooserScreen()
 	if (mStoreButton) delete mStoreButton;
 	if (mToolTip) delete mToolTip;
 	if (mMenuButton) delete mMenuButton;
+	if (mNextPageButton) delete mNextPageButton;
+	if (mPrevPageButton) delete mPrevPageButton;
 }
 
 unsigned int SeedChooserScreen::SeedNotRecommendedToPick(SeedType theSeedType)
@@ -360,12 +401,17 @@ void SeedChooserScreen::Draw(Graphics* g)
 	// @Patoke: wrong local name
 	TodDrawString(g, "[CHOOSE_YOUR_PLANTS]", 229, 110, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 
-	int aNumSeeds = Has7Rows() ? 48 : 40;
-	for (SeedType aSeedShadow = SEED_PEASHOOTER; aSeedShadow < aNumSeeds; aSeedShadow = (SeedType)(aSeedShadow + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	int startIdx = mPlantPage * 49;
+	int endIdx = startIdx + (Has7Rows() ? 48 : 40);
+	if (endIdx > maxPlants) endIdx = maxPlants;
+
+	for (int i = startIdx; i < endIdx; i++)
 	{
+		SeedType aSeedShadow = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		int x, y;
-		GetSeedPositionInChooser(aSeedShadow, x, y);
-		if (aSeedShadow == SEED_IMITATER)
+		GetSeedPositionInChooser(i, x, y);
+		if ((i % 49) == SEED_IMITATER)
 		{
 			continue;
 		}
@@ -395,32 +441,49 @@ void SeedChooserScreen::Draw(Graphics* g)
 		}
 	}
 
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
 	{
-		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
-		ChosenSeedState aSeedState = aChosenSeed.mSeedState;
-		if (mApp->HasSeedType(aSeedType) && aSeedState != SEED_FLYING_TO_BANK && aSeedState != SEED_FLYING_TO_CHOOSER && 
-			aSeedState != SEED_PACKET_HIDDEN && (aSeedState == SEED_IN_CHOOSER || mBoard->mCutScene->mSeedChoosing))
+		int pageStart = mPlantPage * 49;
+		int pageEnd = pageStart + (Has7Rows() ? 48 : 40);
+		for (int i = 0; i < maxPlants; i++)
 		{
+			SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
+			ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
+			ChosenSeedState aSeedState = aChosenSeed.mSeedState;
+			if (!mApp->HasSeedType(aSeedType) || aSeedState == SEED_FLYING_TO_BANK || aSeedState == SEED_FLYING_TO_CHOOSER ||
+				aSeedState == SEED_PACKET_HIDDEN)
+				continue;
+			if (aSeedState != SEED_IN_CHOOSER && !mBoard->mCutScene->mSeedChoosing)
+				continue;
+
+			int aPosX, aPosY;
+			if (aSeedState == SEED_IN_BANK)
+			{
+				aPosX = aChosenSeed.mX - mX;
+				aPosY = aChosenSeed.mY - mY;
+			}
+			else if (i >= pageStart && i < pageEnd)
+			{
+				GetSeedPositionInChooser(i, aPosX, aPosY);
+			}
+			else
+			{
+				continue;
+			}
+
 			bool aGrayed = false;
 			if (((SeedNotRecommendedToPick(aSeedType) || SeedNotAllowedToPick(aSeedType)) && aSeedState == SEED_IN_CHOOSER) ||
 				SeedNotAllowedDuringTrial(aSeedType))
 				aGrayed = true;
-			
-			int aPosX = aChosenSeed.mX;
-			int aPosY = aChosenSeed.mY;
-			if (aSeedState == SEED_IN_BANK)
-			{
-				aPosX -= mX;
-				aPosY -= mY;
-			}
 			DrawSeedPacket(g, aPosX, aPosY, aChosenSeed.mSeedType, aChosenSeed.mImitaterType, 0, aGrayed ? 115 : 255, true, false);
 		}
 	}
 
 	mImitaterButton->Draw(g);
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	mNextPageButton->Draw(g);
+	mPrevPageButton->Draw(g);
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		ChosenSeedState aSeedState = aChosenSeed.mSeedState;
 		if (mApp->HasSeedType(aSeedType) && (aSeedState == SEED_FLYING_TO_BANK || aSeedState == SEED_FLYING_TO_CHOOSER))
@@ -531,8 +594,10 @@ void SeedChooserScreen::Update()
 	mSeedChooserAge++;
 	mToolTip->Update();
 
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		if (mApp->HasSeedType(aSeedType))
 		{
 			ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
@@ -549,6 +614,15 @@ void SeedChooserScreen::Update()
 			}
 		}
 	}
+
+	mNextPageButton->Update();
+	mPrevPageButton->Update();
+
+	maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	int maxPage = (maxPlants - 1) / (Has7Rows() ? 48 : 40);
+	if (maxPage < 0) maxPage = 0;
+	mNextPageButton->mDisabled = (mPlantPage >= maxPage);
+	mPrevPageButton->mDisabled = (mPlantPage <= 0);
 
 	ShowToolTip();
 	mStartButton->Update();
@@ -724,8 +798,12 @@ void SeedChooserScreen::PickRandomSeeds()
 		aChosenSeed.mSeedIndexInBank = anIndex;
 		mSeedsInBank++;
 	}
-	for (SeedType aSeedFlying = SEED_PEASHOOTER; aSeedFlying < NUM_SEEDS_IN_CHOOSER; aSeedFlying = (SeedType)(aSeedFlying + 1))
-		LandFlyingSeed(mChosenSeeds[aSeedFlying]);
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
+	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
+		LandFlyingSeed(mChosenSeeds[aSeedType]);
+	}
 	CloseSeedChooser();
 }
 
@@ -764,6 +842,14 @@ void SeedChooserScreen::ButtonDepress(int theId)
 		UpdateCursor();
 		mApp->DoNewOptions(false);
 	}
+	else if (theId == SeedChooserScreen::SeedChooserScreen_NextPage)
+	{
+		mPlantPage++;
+	}
+	else if (theId == SeedChooserScreen::SeedChooserScreen_PrevPage)
+	{
+		mPlantPage--;
+	}
 	else if (mApp->GetSeedsAvailable() >= mBoard->mSeedBank->mNumPackets)
 	{
 		if (theId == SeedChooserScreen::SeedChooserScreen_Start)
@@ -777,10 +863,19 @@ SeedType SeedChooserScreen::SeedHitTest(int x, int y)
 {
 	if (mMouseVisible)
 	{
-		for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		int startIdx = mPlantPage * 49;
+		int endIdx = startIdx + (Has7Rows() ? 48 : 40);
+		if (endIdx > maxPlants) endIdx = maxPlants;
+
+		for (int i = 0; i < maxPlants; i++)
 		{
+			SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 			ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 			if (!mApp->HasSeedType(aSeedType) || aChosenSeed.mSeedState == SEED_PACKET_HIDDEN) continue;
+
+			if (aChosenSeed.mSeedState == SEED_IN_CHOOSER && (i < startIdx || i >= endIdx)) continue;
+
 			if (Rect(aChosenSeed.mX, aChosenSeed.mY, SEED_PACKET_WIDTH, SEED_PACKET_HEIGHT).Contains(x, y)) return aSeedType;
 		}
 	}
@@ -789,8 +884,10 @@ SeedType SeedChooserScreen::SeedHitTest(int x, int y)
 
 SeedType SeedChooserScreen::FindSeedInBank(int theIndexInBank)
 {
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		if (mApp->HasSeedType(aSeedType))
 		{
 			ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
@@ -829,7 +926,7 @@ void SeedChooserScreen::ClickedSeedInBank(ChosenSeed& theChosenSeed)
 	theChosenSeed.mTimeEndMotion = mSeedChooserAge + 25;
 	theChosenSeed.mStartX = theChosenSeed.mX;
 	theChosenSeed.mStartY = theChosenSeed.mY;
-	GetSeedPositionInChooser(theChosenSeed.mSeedType, theChosenSeed.mEndX, theChosenSeed.mEndY);
+	GetSeedPositionInChooser(GetAlmanacIndex(theChosenSeed.mSeedType), theChosenSeed.mEndX, theChosenSeed.mEndY);
 	theChosenSeed.mSeedState = SEED_FLYING_TO_CHOOSER;
 	theChosenSeed.mSeedIndexInBank = 0;
 	mSeedsInBank--;
@@ -936,7 +1033,7 @@ void SeedChooserScreen::ShowToolTip()
 				}
 				else
 				{
-					GetSeedPositionInChooser(aSeedType, aSeedX, aSeedY);
+					GetSeedPositionInChooser(GetAlmanacIndex(aSeedType), aSeedX, aSeedY);
 				}
 
 				mToolTip->mX = ClampInt((SEED_PACKET_WIDTH - mToolTip->mWidth) / 2 + aSeedX, 0, BOARD_WIDTH - mToolTip->mWidth);
@@ -968,6 +1065,8 @@ void SeedChooserScreen::MouseUp(int x, int y, int theClickCount)
 		else if (mStartButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Start);
 		else if (mAlmanacButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Almanac);
 		else if (mStoreButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Store);
+		else if (mNextPageButton->IsMouseOver() && !mNextPageButton->mDisabled) ButtonDepress(SeedChooserScreen::SeedChooserScreen_NextPage);
+		else if (mPrevPageButton->IsMouseOver() && !mPrevPageButton->mDisabled) ButtonDepress(SeedChooserScreen::SeedChooserScreen_PrevPage);
 	}
 }
 
@@ -991,9 +1090,11 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 
 	if (mSeedsInFlight > 0)
 	{
-		for (int i = 0; i < NUM_SEEDS_IN_CHOOSER; i++)
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		for (int i = 0; i < maxPlants; i++)
 		{
-			LandFlyingSeed(mChosenSeeds[i]);
+			SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
+			LandFlyingSeed(mChosenSeeds[aSeedType]);
 		}
 	}
 
@@ -1083,8 +1184,10 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 
 bool SeedChooserScreen::PickedPlantType(SeedType theSeedType)
 {
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		if (aChosenSeed.mSeedState == SEED_IN_BANK)
 		{
@@ -1133,13 +1236,15 @@ void SeedChooserScreen::KeyChar(char theChar)
 
 void SeedChooserScreen::UpdateAfterPurchase()
 {
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		if (aChosenSeed.mSeedState == SEED_IN_BANK)
 			GetSeedPositionInBank(aChosenSeed.mSeedIndexInBank, aChosenSeed.mX, aChosenSeed.mY);
 		else if (aChosenSeed.mSeedState == SEED_IN_CHOOSER)
-			GetSeedPositionInChooser(aSeedType, aChosenSeed.mX, aChosenSeed.mY);
+			GetSeedPositionInChooser(i, aChosenSeed.mX, aChosenSeed.mY);
 		else continue;
 		aChosenSeed.mStartX = aChosenSeed.mX;
 		aChosenSeed.mStartY = aChosenSeed.mY;
