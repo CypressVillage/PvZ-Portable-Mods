@@ -485,6 +485,8 @@ void ModLoader::ApplyStringOverrides(Sexy::SexyAppBase* app) const
 				app->SetString(kv.first, kv.second);
 		}
 	}
+
+	gModRegistry.InjectPlantStringOverrides(app);
 }
 
 bool ModLoader::LoadManifestFromFile(const std::string& manifestPath, const std::string& rootPath)
@@ -628,6 +630,7 @@ bool ModLoader::LoadPlantDefs()
 				GetObjectInt(root, "projectileType", plantDef.projectileType, false, error);
 			}
 			GetObjectString(root, "name", plantDef.plantName, false, error);
+			GetObjectString(root, "description", plantDef.description, false, error);
 			GetObjectString(root, "reanimation", plantDef.reanimationName, false, error);
 			GetObjectString(root, "image", plantDef.imageName, false, error);
 

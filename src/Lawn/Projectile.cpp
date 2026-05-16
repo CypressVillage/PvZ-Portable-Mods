@@ -34,6 +34,7 @@
 #include "Widget/AchievementsScreen.h"
 #include "../Mod/ModRegistry.h"
 #include "../SexyAppFramework/graphics/GLImage.h"
+#include "../SexyAppFramework/misc/ResourceManager.h"
 
 ProjectileDefinition gProjectileDefinition[] = {
 	{ ProjectileType::PROJECTILE_PEA,           0,  20  },
@@ -1046,6 +1047,13 @@ void Projectile::Draw(Graphics* g)
 				if (modDef && !modDef->imageName.empty())
 				{
 					Image* loaded = gSexyAppBase->GetImage(modDef->imageName);
+					if (!loaded)
+					{
+						SharedImageRef ref = gSexyAppBase->mResourceManager->GetImage(modDef->imageName);
+						loaded = static_cast<Image*>(ref);
+					}
+					if (!loaded)
+						loaded = IMAGE_PROJECTILEPEA;
 					sModProjectileImages[ptype] = loaded;
 					aImage = loaded;
 				}

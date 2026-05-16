@@ -83,6 +83,7 @@ Only `id` is required. All other fields have defaults.
 | `reanimation` | string | No | *(none)* | Vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"` |
 | `reanimFile` | string | No | *(none)* | External reanim file path (relative to mod root), e.g. `"resources/reanim/custom.xml"` |
 | `image` | string | No | *(none)* | Custom static image path (relative to mod root), e.g. `"resources/images/my_plant.png"`. Used as seed packet icon when no reanimation is set. |
+| `description` | string | No | *(none)* | Almanac description text displayed in the plant's Almanac entry |
 
 ### Animation Selection
 

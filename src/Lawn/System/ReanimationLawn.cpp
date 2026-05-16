@@ -253,6 +253,10 @@ MemoryImage* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVar
 			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle3", theDrawVariation);
 			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle2", theDrawVariation);
 		}
+		else if (static_cast<int>(theSeedType) >= 2000 && aPlantDef.mSubClass == PlantSubClass::SUBCLASS_SHOOTER)
+		{
+			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle", theDrawVariation);
+		}
 	}
 
 	return aMemoryImage;

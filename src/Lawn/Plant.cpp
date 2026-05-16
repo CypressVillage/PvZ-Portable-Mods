@@ -484,7 +484,24 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
     default:
         break;
     }
-    
+
+    if (static_cast<int>(theSeedType) >= 2000 && aBodyReanim && mSubclass == PlantSubClass::SUBCLASS_SHOOTER)
+    {
+        if (aBodyReanim->TrackExists("anim_head_idle"))
+        {
+            Reanimation* aHeadReanim = mApp->AddReanimation(0.0f, 0.0f, mRenderOrder + 2, aPlantDef.mReanimationType);
+            aHeadReanim->mLoopType = ReanimLoopType::REANIM_LOOP;
+            aHeadReanim->mAnimRate = aBodyReanim->mAnimRate;
+            aHeadReanim->SetFramesForLayer("anim_head_idle");
+            mHeadReanimID = mApp->ReanimationGetID(aHeadReanim);
+
+            if (aBodyReanim->TrackExists("anim_stem"))
+                aHeadReanim->AttachToAnotherReanimation(aBodyReanim, "anim_stem");
+            else if (aBodyReanim->TrackExists("anim_idle"))
+                aHeadReanim->AttachToAnotherReanimation(aBodyReanim, "anim_idle");
+        }
+    }
+
     if ((mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BIG_TIME) &&
         (theSeedType == SeedType::SEED_WALLNUT || theSeedType == SeedType::SEED_SUNFLOWER || theSeedType == SeedType::SEED_MARIGOLD))
     {

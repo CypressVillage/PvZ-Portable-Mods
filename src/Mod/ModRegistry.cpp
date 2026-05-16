@@ -5,6 +5,7 @@
  */
 
 #include "ModRegistry.h"
+#include "../SexyAppFramework/SexyAppBase.h"
 #include "../Sexy.TodLib/Reanimator.h"
 
 static bool HasFileExtension(const std::string& path)
@@ -230,4 +231,19 @@ unsigned int ModRegistry::RegisterDynamicReanim(const std::string& reanimFilePat
 	mReanimNameMap[reanimFilePath] = dynamicIndex;
 	ReanimatorEnsureDynamicDefinitionLoaded(dynamicIndex);
 	return dynamicIndex;
+}
+
+void ModRegistry::InjectPlantStringOverrides(Sexy::SexyAppBase* app)
+{
+	for (auto& pair : mPlants)
+	{
+		ModPlantDef& def = pair.second;
+		if (!def.plantName.empty())
+			app->SetString(def.plantName, def.plantName);
+		if (!def.description.empty())
+		{
+			app->SetString(def.plantName + "_DESCRIPTION", def.description);
+			app->SetString(def.plantName + "_TOOLTIP", def.description);
+		}
+	}
 }

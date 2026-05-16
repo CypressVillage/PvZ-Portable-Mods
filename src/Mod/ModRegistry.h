@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+namespace Sexy { class SexyAppBase; }
+
 struct ModPlantDef
 {
 	std::string id;
@@ -24,6 +26,7 @@ struct ModPlantDef
 	std::string plantName;
 	std::string reanimationName;
 	std::string imageName;
+	std::string description;
 };
 
 struct ModZombieDef
@@ -75,6 +78,7 @@ public:
 
 	void BuildReanimNameMap();
 	unsigned int RegisterDynamicReanim(const std::string& reanimFilePath);
+	void InjectPlantStringOverrides(Sexy::SexyAppBase* app);
 
 private:
 	bool ValidateId(const std::string& id, std::string* outError) const;
