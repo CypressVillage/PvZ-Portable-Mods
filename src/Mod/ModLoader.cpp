@@ -334,6 +334,15 @@ namespace
 		return true;
 	}
 
+	bool GetObjectFloat(const JsonValue& object, const char* key, float& outValue, bool required, std::string& outError)
+	{
+		int intValue = 0;
+		if (!GetObjectInt(object, key, intValue, required, outError))
+			return false;
+		outValue = static_cast<float>(intValue);
+		return true;
+	}
+
 	bool GetStringArray(const JsonValue& value, std::vector<std::string>& outValues, std::string& outError)
 	{
 		if (value.type != JsonType::Array)
@@ -600,7 +609,24 @@ bool ModLoader::LoadPlantDefs()
 			GetObjectInt(root, "packetIndex", plantDef.packetIndex, false, error);
 			GetObjectInt(root, "subClass", plantDef.subClass, false, error);
 			GetObjectInt(root, "launchRate", plantDef.launchRate, false, error);
-			GetObjectInt(root, "projectileType", plantDef.projectileType, false, error);
+
+			std::string projTypeStr;
+			if (GetObjectString(root, "projectileType", projTypeStr, false, error) && !projTypeStr.empty())
+			{
+				const ModProjectileDef* projDef = gModRegistry.FindProjectile(projTypeStr);
+				if (projDef && projDef->projectileType >= 0)
+				{
+					plantDef.projectileType = projDef->projectileType;
+				}
+				else
+				{
+					mErrors.push_back(PathToU8(filePath) + ": projectileType string '" + projTypeStr + "' not found in registered projectiles");
+				}
+			}
+			else
+			{
+				GetObjectInt(root, "projectileType", plantDef.projectileType, false, error);
+			}
 			GetObjectString(root, "name", plantDef.plantName, false, error);
 			GetObjectString(root, "reanimation", plantDef.reanimationName, false, error);
 
@@ -620,6 +646,90 @@ bool ModLoader::LoadPlantDefs()
 			}
 
 			nextSeedType++;
+		}
+	}
+
+	return true;
+}
+
+bool ModLoader::LoadProjectileDefs()
+{
+	for (const ModManifest& manifest : mManifests)
+	{
+		auto it = manifest.dataFiles.find("projectiles");
+		if (it == manifest.dataFiles.end())
+			continue;
+
+		for (const std::string& relativePath : it->second)
+		{
+			std::filesystem::path filePath = PathFromU8(manifest.rootPath) / PathFromU8(relativePath);
+			std::string jsonText;
+			if (!ReadFileToString(PathToU8(filePath), jsonText))
+			{
+				mErrors.push_back("Failed to read projectile file: " + PathToU8(filePath));
+				continue;
+			}
+
+			JsonParser parser(jsonText);
+			JsonValue root;
+			std::string error;
+			if (!parser.Parse(root, error))
+			{
+				mErrors.push_back("Parse error in " + PathToU8(filePath) + ": " + error);
+				continue;
+			}
+
+			if (root.type == JsonType::Object)
+			{
+				ModProjectileDef projDef;
+				if (!GetObjectString(root, "id", projDef.id, true, error))
+				{
+					mErrors.push_back(PathToU8(filePath) + ": " + error);
+					continue;
+				}
+				GetObjectInt(root, "damage", projDef.damage, false, error);
+				GetObjectFloat(root, "speed", projDef.speed, false, error);
+				GetObjectString(root, "image", projDef.imageName, false, error);
+
+				std::string outError;
+				if (!gModRegistry.RegisterProjectile(projDef, &outError))
+				{
+					mErrors.push_back("Projectile registration failed: " + outError);
+					continue;
+				}
+			}
+			else if (root.type == JsonType::Array)
+			{
+				for (const JsonValue& item : root.arrayValue)
+				{
+					if (item.type != JsonType::Object)
+					{
+						mErrors.push_back("Projectile array item must be object in " + PathToU8(filePath));
+						continue;
+					}
+
+					ModProjectileDef projDef;
+					if (!GetObjectString(item, "id", projDef.id, true, error))
+					{
+						mErrors.push_back(PathToU8(filePath) + ": " + error);
+						continue;
+					}
+					GetObjectInt(item, "damage", projDef.damage, false, error);
+					GetObjectFloat(item, "speed", projDef.speed, false, error);
+					GetObjectString(item, "image", projDef.imageName, false, error);
+
+					std::string outError;
+					if (!gModRegistry.RegisterProjectile(projDef, &outError))
+					{
+						mErrors.push_back("Projectile registration failed: " + outError);
+						continue;
+					}
+				}
+			}
+			else
+			{
+				mErrors.push_back("Projectile file root must be object or array: " + PathToU8(filePath));
+			}
 		}
 	}
 

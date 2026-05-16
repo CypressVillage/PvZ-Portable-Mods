@@ -32,6 +32,7 @@
 #include "../Sexy.TodLib/Reanimator.h"
 #include "../Sexy.TodLib/Attachment.h"
 #include "Widget/AchievementsScreen.h"
+#include "../Mod/ModRegistry.h"
 
 ProjectileDefinition gProjectileDefinition[] = {
 	{ ProjectileType::PROJECTILE_PEA,           0,  20  },
@@ -711,7 +712,15 @@ void Projectile::UpdateNormalMotion()
 	}
 	else
 	{
-		mPosX += 3.33f;
+		if (static_cast<int>(mProjectileType) >= 4000)
+		{
+			const ModProjectileDef* modDef = gModRegistry.FindProjectileByRuntimeId(static_cast<int>(mProjectileType));
+			mPosX += modDef ? modDef->speed : 3.33f;
+		}
+		else
+		{
+			mPosX += 3.33f;
+		}
 	}
 
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY)
@@ -1025,7 +1034,10 @@ void Projectile::Draw(Graphics* g)
 		aScale = 1.0f;
 		break;
 	default:
-		TOD_ASSERT(false);
+		if (static_cast<int>(mProjectileType) >= 4000)
+			aImage = IMAGE_PROJECTILEPEA;
+		else
+			TOD_ASSERT(false);
 		break;
 	}
 
@@ -1225,8 +1237,6 @@ void Projectile::ConvertToPea(int theGridX)
 	mApp->PlayFoley(FoleyType::FOLEY_THROW);
 }
 
-#include "../Mod/ModRegistry.h"
-
 ProjectileDefinition& Projectile::GetProjectileDef()
 {
 	if (static_cast<int>(mProjectileType) >= 4000)
@@ -1234,7 +1244,7 @@ ProjectileDefinition& Projectile::GetProjectileDef()
 		static std::map<int, ProjectileDefinition> sModProjectileDefs;
 		if (sModProjectileDefs.find(static_cast<int>(mProjectileType)) == sModProjectileDefs.end())
 		{
-			ProjectileDefinition def = { mProjectileType, 0, 20 }; // damage defaults to 20
+			ProjectileDefinition def = { mProjectileType, 0, 20 };
 			const ModProjectileDef* modDef = gModRegistry.FindProjectileByRuntimeId(static_cast<int>(mProjectileType));
 			if (modDef)
 			{

@@ -98,6 +98,44 @@ namespace
 		lua_setglobal(L, name);
 	}
 
+	int Lua_GameRegisterProjectile(lua_State* L)
+	{
+		luaL_checktype(L, 1, LUA_TTABLE);
+
+		ModProjectileDef def;
+
+		lua_getfield(L, 1, "id");
+		if (lua_isstring(L, -1))
+			def.id = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "damage");
+		if (lua_isinteger(L, -1))
+			def.damage = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "speed");
+		if (lua_isnumber(L, -1))
+			def.speed = static_cast<float>(lua_tonumber(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "image");
+		if (lua_isstring(L, -1))
+			def.imageName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		std::string error;
+		if (gModRegistry.RegisterProjectile(def, &error))
+		{
+			lua_pushinteger(L, def.projectileType);
+			return 1;
+		}
+
+		lua_pushnil(L);
+		lua_pushstring(L, error.c_str());
+		return 2;
+	}
+
 	// Entity wrapper
 	struct LuaEntity {
 		int type; // 0 = plant, 1 = zombie, 2 = coin
@@ -552,6 +590,8 @@ namespace
 		lua_setfield(L, -2, "GetSpeed");
 		lua_pushcfunction(L, Lua_GameGetMenuButtonRect);
 		lua_setfield(L, -2, "GetMenuButtonRect");
+		lua_pushcfunction(L, Lua_GameRegisterProjectile);
+		lua_setfield(L, -2, "RegisterProjectile");
 		lua_setglobal(L, "Game");
 
 		// Board

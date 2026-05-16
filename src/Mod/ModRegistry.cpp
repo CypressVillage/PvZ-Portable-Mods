@@ -29,6 +29,7 @@ void ModRegistry::Reset()
 	mRuntimeZombies.clear();
 	mRuntimeModes.clear();
 	mRuntimeProjectiles.clear();
+	mNextProjectileType = 4000;
 	mErrors.clear();
 }
 
@@ -91,8 +92,15 @@ bool ModRegistry::RegisterProjectile(const ModProjectileDef& def, std::string* o
 		mErrors.push_back("Projectile id already registered: " + def.id);
 		return false;
 	}
-	mProjectiles[def.id] = def;
-	mRuntimeProjectiles[def.damage] = def;
+
+	ModProjectileDef storedDef = def;
+	if (storedDef.projectileType < 0)
+	{
+		storedDef.projectileType = mNextProjectileType++;
+	}
+
+	mProjectiles[def.id] = storedDef;
+	mRuntimeProjectiles[storedDef.projectileType] = storedDef;
 	return true;
 }
 
@@ -138,9 +146,9 @@ const ModModeDef* ModRegistry::FindModeByRuntimeId(int baseMode) const
 	return it == mRuntimeModes.end() ? nullptr : &it->second;
 }
 
-const ModProjectileDef* ModRegistry::FindProjectileByRuntimeId(int damage) const
+const ModProjectileDef* ModRegistry::FindProjectileByRuntimeId(int projectileType) const
 {
-	auto it = mRuntimeProjectiles.find(damage);
+	auto it = mRuntimeProjectiles.find(projectileType);
 	return it == mRuntimeProjectiles.end() ? nullptr : &it->second;
 }
 

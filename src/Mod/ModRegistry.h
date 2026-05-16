@@ -41,6 +41,9 @@ struct ModProjectileDef
 {
 	std::string id;
 	int damage = 0;
+	float speed = 3.0f;
+	std::string imageName;
+	int projectileType = -1;
 };
 
 class ModRegistry
@@ -61,7 +64,7 @@ public:
 	const ModPlantDef* FindPlantByRuntimeId(int seedType) const;
 	const ModZombieDef* FindZombieByRuntimeId(int zombieType) const;
 	const ModModeDef* FindModeByRuntimeId(int baseMode) const;
-	const ModProjectileDef* FindProjectileByRuntimeId(int damage) const;
+	const ModProjectileDef* FindProjectileByRuntimeId(int projectileType) const;
 
 	const std::vector<std::string>& GetErrors() const;
 
@@ -84,6 +87,7 @@ private:
 	std::map<int, ModZombieDef> mRuntimeZombies;
 	std::map<int, ModModeDef> mRuntimeModes;
 	std::map<int, ModProjectileDef> mRuntimeProjectiles;
+	int mNextProjectileType = 4000;
 	std::map<std::string, int> mReanimNameMap;
 	std::vector<std::string> mErrors;
 };

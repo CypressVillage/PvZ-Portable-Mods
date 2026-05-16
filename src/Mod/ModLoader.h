@@ -39,6 +39,7 @@ public:
 	void ApplyStringOverrides(Sexy::SexyAppBase* app) const;
 
 	bool LoadPlantDefs();
+	bool LoadProjectileDefs();
 
 private:
 	bool LoadManifestFromFile(const std::string& manifestPath, const std::string& rootPath);

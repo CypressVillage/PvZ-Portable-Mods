@@ -1,0 +1,11 @@
+{
+  "id": "super_pea",
+  "name": "Super Peashooter",
+  "cost": 150,
+  "cooldown": 750,
+  "packetIndex": 0,
+  "subClass": 1,
+  "launchRate": 90,
+  "projectileType": "super_pea_bullet",
+  "reanimation": "reanim/PeaShooterSingle.reanim"
+}
