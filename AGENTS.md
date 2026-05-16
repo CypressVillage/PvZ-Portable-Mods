@@ -84,4 +84,4 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 | `docs/custom-plants.md` | Custom plant JSON schema + reanim XML guide |
 | `docs/ARCHITECTURE.md` | Mod framework architecture, module details, engine patch points |
 | `docs/TODO.md` | Remaining dev tasks (Phase 7, Phase 8, hot reload) |
-| `docs/bugs/` | Known Seed Chooser / Almanac bugs |
+| `docs/bug-fixes/` | Resolved bug postmortems (Seed Chooser / Almanac) |

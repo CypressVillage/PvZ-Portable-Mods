@@ -334,6 +334,12 @@ namespace
 			lua_getfield(L, -1, "SetBody");
 			return 1;
 		}
+		if (strcmp(key, "AddLabel") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, "AddLabel");
+			return 1;
+		}
 
 		lua_pushnil(L);
 		return 1;
@@ -395,6 +401,18 @@ namespace
 			return 0;
 		const char* text = luaL_checkstring(L, 2);
 		ud->dialog->mDialogLines = text;
+		return 0;
+	}
+
+	int Lua_DialogAddLabel(lua_State* L)
+	{
+		LuaDialogUD* ud = (LuaDialogUD*)luaL_checkudata(L, 1, "Game.Dialog");
+		if (!ud->dialog || ud->dialog->mDestroyed)
+			return 0;
+		const char* text = luaL_checkstring(L, 2);
+		int x = luaL_checkinteger(L, 3);
+		int y = luaL_checkinteger(L, 4);
+		ud->dialog->AddLuaLabel(text, x, y);
 		return 0;
 	}
 
@@ -638,6 +656,8 @@ namespace
 		lua_setfield(L, -2, "SetTitle");
 		lua_pushcfunction(L, Lua_DialogSetBody);
 		lua_setfield(L, -2, "SetBody");
+		lua_pushcfunction(L, Lua_DialogAddLabel);
+		lua_setfield(L, -2, "AddLabel");
 		lua_pop(L, 1);
 
 		// UI table
@@ -858,5 +878,41 @@ void ModLua::CallOnBoardButtonClick(int buttonId)
 	Lua_CallGlobal(L, "OnBoardButtonClick", 1);
 #else
 	(void)buttonId;
+#endif
+}
+
+void ModLua::CallOnGameStart()
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	Lua_CallGlobal(L, "OnGameStart", 0);
+#endif
+}
+
+void ModLua::CallOnWaveStart(int waveIndex)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	lua_pushinteger(L, waveIndex);
+	Lua_CallGlobal(L, "OnWaveStart", 1);
+#else
+	(void)waveIndex;
+#endif
+}
+
+void ModLua::CallOnPlantUpdate(Plant* plant)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, plant);
+	Lua_CallGlobal(L, "OnPlantUpdate", 1);
+#else
+	(void)plant;
 #endif
 }

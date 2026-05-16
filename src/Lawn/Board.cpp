@@ -5053,6 +5053,7 @@ int Board::TotalZombiesHealthInWave(int theWaveIndex)
 
 void Board::SpawnZombieWave()
 {
+	gModLua.CallOnWaveStart(mCurrentWave);
 	mChallenge->SpawnZombieWave();
 	if (mApp->IsBungeeBlitzLevel())
 	{

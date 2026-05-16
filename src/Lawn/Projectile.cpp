@@ -33,6 +33,7 @@
 #include "../Sexy.TodLib/Attachment.h"
 #include "Widget/AchievementsScreen.h"
 #include "../Mod/ModRegistry.h"
+#include "../SexyAppFramework/graphics/GLImage.h"
 
 ProjectileDefinition gProjectileDefinition[] = {
 	{ ProjectileType::PROJECTILE_PEA,           0,  20  },
@@ -1035,9 +1036,34 @@ void Projectile::Draw(Graphics* g)
 		break;
 	default:
 		if (static_cast<int>(mProjectileType) >= 4000)
-			aImage = IMAGE_PROJECTILEPEA;
+		{
+			static std::map<int, Image*> sModProjectileImages;
+			int ptype = static_cast<int>(mProjectileType);
+			auto it = sModProjectileImages.find(ptype);
+			if (it == sModProjectileImages.end())
+			{
+				const ModProjectileDef* modDef = gModRegistry.FindProjectileByRuntimeId(ptype);
+				if (modDef && !modDef->imageName.empty())
+				{
+					Image* loaded = gSexyAppBase->GetImage(modDef->imageName);
+					sModProjectileImages[ptype] = loaded;
+					aImage = loaded;
+				}
+				else
+				{
+					sModProjectileImages[ptype] = IMAGE_PROJECTILEPEA;
+					aImage = IMAGE_PROJECTILEPEA;
+				}
+			}
+			else
+			{
+				aImage = it->second;
+			}
+		}
 		else
+		{
 			TOD_ASSERT(false);
+		}
 		break;
 	}
 

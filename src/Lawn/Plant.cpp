@@ -2874,6 +2874,9 @@ void Plant::Update()
 
         UpdateReanim();
     }
+
+    if (doUpdate && static_cast<int>(mSeedType) >= 2000)
+        gModLua.CallOnPlantUpdate(this);
 }
 
 bool Plant::NotOnGround()
@@ -4971,12 +4974,14 @@ void Plant::Die()
 }
 
 #include "../Mod/ModRegistry.h"
+#include "../SexyAppFramework/graphics/GLImage.h"
 
 PlantDefinition& GetPlantDefinition(SeedType theSeedType)
 {
     if (static_cast<int>(theSeedType) >= 2000)
     {
         static std::map<int, PlantDefinition> sModPlantDefs;
+        static std::map<int, Image*> sModPlantImages;
         int key = static_cast<int>(theSeedType);
         if (sModPlantDefs.find(key) == sModPlantDefs.end())
         {
@@ -5003,6 +5008,15 @@ PlantDefinition& GetPlantDefinition(SeedType theSeedType)
                 {
                     def.mReanimationType = static_cast<ReanimationType>(
                         gModRegistry.ResolveReanimationType(modDef->reanimationName));
+                }
+                if (!modDef->imageName.empty() && sModPlantImages.find(key) == sModPlantImages.end())
+                {
+                    Sexy::Image* img = gSexyAppBase->GetImage(modDef->imageName);
+                    if (img)
+                    {
+                        sModPlantImages[key] = img;
+                        def.mPlantImage = &sModPlantImages[key];
+                    }
                 }
                 if (!modDef->plantName.empty())
                 {
@@ -5250,6 +5264,8 @@ void Plant::PreloadPlantResources(SeedType theSeedType)
     if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)
     {
         ReanimatorEnsureDefinitionLoaded(aPlantDef.mReanimationType, true);
+        if (static_cast<int>(theSeedType) >= 2000)
+            ReanimatorEnsureDynamicDefinitionLoaded(static_cast<int>(aPlantDef.mReanimationType));
     }
 
     if (theSeedType == SeedType::SEED_CHERRYBOMB)

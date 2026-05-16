@@ -23,6 +23,9 @@ public:
 	void CallOnLevelEnd(bool isWin);
 	void CallOnBoardButtonClick(int buttonId);
 	void CallOnCoinSpawn(class Coin* coin);
+	void CallOnGameStart();
+	void CallOnWaveStart(int waveIndex);
+	void CallOnPlantUpdate(class Plant* plant);
 
 private:
 	void* mState = nullptr;

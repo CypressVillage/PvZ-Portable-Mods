@@ -181,7 +181,7 @@ SeedChooserScreen::SeedChooserScreen()
 		mStoreButton->mDisabled = true;
 	}
 
-	DBG_ASSERT(mApp->GetSeedsAvailable() < NUM_SEED_TYPES);
+	DBG_ASSERT(gModRegistry.GetTotalAlmanacPlants() <= SeedType::MAX_SEED_TYPES);
 	memset(mChosenSeeds, 0, sizeof(mChosenSeeds));
 	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
 	for (int i = 0; i < maxPlants; i++)
@@ -251,11 +251,11 @@ int SeedChooserScreen::PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArra
 void SeedChooserScreen::CrazyDavePickSeeds()
 {
 	TodWeightedArray aSeedArray[SeedType::MAX_SEED_TYPES];
-	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+	for (int i = 0; i < maxPlants; i++)
 	{
+		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
 		aSeedArray[aSeedType].mItem = aSeedType;
-		// Seems to be a pure function, should be okay to comment out
-		// uint aRecFlags = SeedNotRecommendedToPick(aSeedType);
 		if ((aSeedType == SEED_GATLINGPEA && !mApp->mPlayerInfo->mPurchases[STORE_ITEM_PLANT_GATLINGPEA]) || !mApp->HasSeedType(aSeedType) ||
 			SeedNotAllowedToPick(aSeedType) || Plant::IsUpgrade(aSeedType) || aSeedType == SEED_IMITATER || aSeedType == SEED_UMBRELLA || aSeedType == SEED_BLOVER)
 		{
@@ -783,11 +783,14 @@ void SeedChooserScreen::OnStartButton()
 
 void SeedChooserScreen::PickRandomSeeds()
 {
+	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
 	for (int anIndex = mSeedsInBank; anIndex < mBoard->mSeedBank->mNumPackets; anIndex++)
 	{
 		SeedType aSeedType;
-		do aSeedType = (SeedType)Rand(mApp->GetSeedsAvailable());
-		while (!mApp->HasSeedType(aSeedType) || aSeedType == SEED_IMITATER || mChosenSeeds[aSeedType].mSeedState != SEED_IN_CHOOSER);
+		do {
+			int r = Rand(maxPlants);
+			aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(r);
+		} while (!mApp->HasSeedType(aSeedType) || aSeedType == SEED_IMITATER || mChosenSeeds[aSeedType].mSeedState != SEED_IN_CHOOSER);
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		aChosenSeed.mTimeStartMotion = 0;
 		aChosenSeed.mTimeEndMotion = 0;
@@ -798,7 +801,6 @@ void SeedChooserScreen::PickRandomSeeds()
 		aChosenSeed.mSeedIndexInBank = anIndex;
 		mSeedsInBank++;
 	}
-	int maxPlants = gModRegistry.GetTotalAlmanacPlants();
 	for (int i = 0; i < maxPlants; i++)
 	{
 		SeedType aSeedType = (SeedType)gModRegistry.GetAlmanacPlantAt(i);

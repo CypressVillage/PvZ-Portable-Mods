@@ -467,6 +467,7 @@ void LawnApp::StartPlaying()
 	KillSeedChooserScreen();
 	mBoard->StartLevel();
 	gModLua.CallOnLevelStart(static_cast<int>(mGameMode));
+	gModLua.CallOnGameStart();
 	mGameScene = GameScenes::SCENE_PLAYING;
 }
 
@@ -3145,6 +3146,10 @@ int LawnApp::GetNumPreloadingTasks()
 			}
 		}
 
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		if (maxPlants > 49)
+			aTaskCount += (maxPlants - 49);
+
 		for (ZombieType i = ZombieType::ZOMBIE_NORMAL; i < ZombieType::NUM_ZOMBIE_TYPES; i = static_cast<ZombieType>(static_cast<int>(i) + 1))
 		{
 			if (HasFinishedAdventure() || mPlayerInfo->mLevel >= GetZombieDefinition(i).mStartingLevel)
@@ -3214,6 +3219,25 @@ void LawnApp::PreloadForUser()
 				{
 					return;
 				}
+			}
+		}
+
+		{
+			int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+			for (int i = 49; i < maxPlants; i++)
+			{
+				SeedType modSeed = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
+				Plant::PreloadPlantResources(modSeed);
+				if (mCompletedLoadingThreadTasks < aNumTasks)
+					mCompletedLoadingThreadTasks += 68;
+				if (mTitleScreen && mTitleScreen->mQuickLoadKey != KeyCode::KEYCODE_UNKNOWN)
+				{
+					TodTrace("preload canceled\n");
+					mNumLoadingThreadTasks = aNumTasks;
+					return;
+				}
+				if (mShutdown || mCloseRequest)
+					return;
 			}
 		}
 

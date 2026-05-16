@@ -111,7 +111,7 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mNextPlantPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	mNextPlantPageButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
 	mNextPlantPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
-	mNextPlantPageButton->Resize(710, 567, 40, 26);
+	mNextPlantPageButton->Resize(440, 567, 40, 26);
 	mNextPlantPageButton->mParentWidget = this;
 	
 	mPrevPlantPageButton = new GameButton(AlmanacDialog::ALMANAC_BUTTON_PREV_PLANT_PAGE);
@@ -122,7 +122,7 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mPrevPlantPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	mPrevPlantPageButton->mColors[ButtonWidget::COLOR_LABEL] = aColor;
 	mPrevPlantPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aColor;
-	mPrevPlantPageButton->Resize(670, 567, 40, 26);
+	mPrevPlantPageButton->Resize(270, 567, 40, 26);
 	mPrevPlantPageButton->mParentWidget = this;
 
 	SetPage(ALMANAC_PAGE_INDEX);
@@ -298,7 +298,9 @@ void AlmanacDialog::Update()
 	int aMouseX = mApp->mWidgetManager->mLastMouseX;
 	int aMouseY = mApp->mWidgetManager->mLastMouseY;
 	if (SeedHitTest(aMouseX, aMouseY) != SeedType::SEED_NONE || ZombieHitTest(aMouseX, aMouseY) != ZombieType::ZOMBIE_INVALID || 
-		mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver() || mPlantButton->IsMouseOver() || mZombieButton->IsMouseOver())
+		mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver() || mPlantButton->IsMouseOver() || mZombieButton->IsMouseOver() ||
+		(!mNextPlantPageButton->mBtnNoDraw && !mNextPlantPageButton->mDisabled && mNextPlantPageButton->IsMouseOver()) ||
+		(!mPrevPlantPageButton->mBtnNoDraw && !mPrevPlantPageButton->mDisabled && mPrevPlantPageButton->IsMouseOver()))
 	{
 		mApp->SetCursor(CURSOR_HAND);
 	}

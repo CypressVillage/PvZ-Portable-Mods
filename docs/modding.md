@@ -116,6 +116,7 @@ Optional fields:
 - `launchRate`: frames between shots (default: `0`)
 - `reanimation`: vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"`
 - `reanimFile`: external reanim XML path relative to mod root, e.g. `"resources/reanim/custom.xml"`
+- `image`: custom static image path for seed packet icon, e.g. `"resources/images/my_plant.png"` (default: none, uses reanimation for rendering)
 
 Animation:
 - If `reanimFile` is set, the external file is loaded and registered dynamically.
@@ -250,6 +251,7 @@ Recommended paths inside `resources/`:
 
 `Dialog` (userdata returned by `UI.CreateDialog` / `UI.ShowMessage`):
 - `dialog:AddButton(text, callback)` — Add a button with a Lua closure callback. When clicked, the callback runs and the dialog is automatically closed.
+- `dialog:AddLabel(text, x, y)` — Add a static text label at position `(x, y)` relative to the dialog. Rendered in `FONT_DWARVENTODCRAFT12`.
 - `dialog:Close()` — Manually close and destroy the dialog.
 - `dialog:SetTitle(text)` — Change the dialog title.
 - `dialog:SetBody(text)` — Change the dialog body text.
@@ -264,6 +266,7 @@ function OnGameStart() end
 function OnLevelStart(mode_id) end
 function OnWaveStart(wave_index) end
 function OnPlantSpawn(plant) end
+function OnPlantUpdate(plant) end
 function OnZombieSpawn(zombie) end
 function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
@@ -276,6 +279,11 @@ Callback parameters:
 - `wave_index`: integer, wave number
 - `plant` / `zombie` / `target` / `coin`: Entity objects
 - `is_win`: boolean, `true` if level won, `false` if lost
+
+Notes:
+- `OnPlantUpdate(plant)` is called every frame for each mod plant (seedType >= 2000). Use sparingly to avoid performance impact.
+- `OnWaveStart(wave_index)` fires before the wave's zombies are spawned.
+- `OnGameStart()` fires at the beginning of gameplay, after `OnLevelStart`.
 
 Notes:
 - Callbacks are optional.
@@ -360,7 +368,7 @@ The loader should warn if a mod uses a newer schema.
 
 ## 13. Future Extensions (Non-Blocking)
 
-- ~~Custom UI panels for mods~~ (partially implemented: `UI.CreateDialog` / `UI.ShowMessage` with buttons and Lua closure callbacks; TODO: text labels, input fields)
+- ~~Custom UI panels for mods~~ (implemented: `UI.CreateDialog` / `UI.ShowMessage` with buttons and `Dialog:AddLabel`)
 - Modular event filters and priorities
 - Network-safe mod validation for competitive modes
 - Dependency version ranges

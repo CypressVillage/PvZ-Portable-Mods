@@ -22,6 +22,13 @@ public:
 		int luaRef;
 	};
 
+	struct LabelEntry
+	{
+		std::string text;
+		int x;
+		int y;
+	};
+
 	static const int DIALOG_MOD_BASE = 1000;
 	static int sNextDialogId;
 
@@ -29,6 +36,7 @@ public:
 	virtual ~LuaProxyDialog();
 
 	void AddLuaButton(const std::string& text, int luaRef);
+	void AddLuaLabel(const std::string& text, int x, int y);
 	void SetLuaState(lua_State* L);
 
 	virtual void AddedToManager(Sexy::WidgetManager* theWidgetManager);
@@ -44,6 +52,7 @@ public:
 	lua_State* mLuaState;
 	std::vector<ButtonEntry> mButtons;
 	std::vector<LawnStoneButton*> mButtonWidgets;
+	std::vector<LabelEntry> mLabels;
 };
 
 #endif

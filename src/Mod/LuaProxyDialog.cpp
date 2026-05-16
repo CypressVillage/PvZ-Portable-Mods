@@ -133,9 +133,19 @@ void LuaProxyDialog::ButtonDepress(int theId)
 #endif
 }
 
+void LuaProxyDialog::AddLuaLabel(const std::string& text, int x, int y)
+{
+	mLabels.push_back({text, x, y});
+}
+
 void LuaProxyDialog::Draw(Sexy::Graphics* g)
 {
 	LawnDialog::Draw(g);
+
+	for (auto& label : mLabels)
+	{
+		TodDrawString(g, label.text, mX + label.x, mY + label.y, Sexy::FONT_DWARVENTODCRAFT12, Color::White, DS_ALIGN_LEFT);
+	}
 }
 
 void LuaProxyDialog::ReleaseRefs()

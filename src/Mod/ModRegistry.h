@@ -23,6 +23,7 @@ struct ModPlantDef
 	int projectileType = 0;
 	std::string plantName;
 	std::string reanimationName;
+	std::string imageName;
 };
 
 struct ModZombieDef

@@ -82,6 +82,7 @@ Only `id` is required. All other fields have defaults.
 | `launchRate` | int | No | `0` | Frames between projectile launches (0 = no projectile) |
 | `reanimation` | string | No | *(none)* | Vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"` |
 | `reanimFile` | string | No | *(none)* | External reanim file path (relative to mod root), e.g. `"resources/reanim/custom.xml"` |
+| `image` | string | No | *(none)* | Custom static image path (relative to mod root), e.g. `"resources/images/my_plant.png"`. Used as seed packet icon when no reanimation is set. |
 
 ### Animation Selection
 
@@ -125,6 +126,21 @@ There are two ways to assign an animation:
 If both `reanimation` and `reanimFile` are specified, `reanimFile` takes priority.
 
 If neither is specified, the plant will have no animation (invisible body).
+
+### Static Image Fallback
+
+If `image` is set instead of `reanimation`/`reanimFile`, the plant uses it as a static sprite for the seed packet icon:
+
+```json
+{
+  "id": "static_plant",
+  "name": "Static Plant",
+  "cost": 50,
+  "image": "resources/images/static_plant.png"
+}
+```
+
+The image is loaded from disk via `SexyAppBase::GetImage()`. It is rendered in the Seed Chooser and Almanac. Note that the plant will have **no body animation** in-game unless a `reanimation` is also provided — this is best used for plants that reuse vanilla reanim logic or have no on-field presence.
 
 ## 5. Custom Reanim File Format
 

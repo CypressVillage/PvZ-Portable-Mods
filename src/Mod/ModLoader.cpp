@@ -629,6 +629,7 @@ bool ModLoader::LoadPlantDefs()
 			}
 			GetObjectString(root, "name", plantDef.plantName, false, error);
 			GetObjectString(root, "reanimation", plantDef.reanimationName, false, error);
+			GetObjectString(root, "image", plantDef.imageName, false, error);
 
 			std::string reanimFile;
 			if (GetObjectString(root, "reanimFile", reanimFile, false, error) && !reanimFile.empty())

@@ -37,6 +37,7 @@
 #include "System/PlayerInfo.h"
 #include "Widget/StoreScreen.h"
 #include "Widget/ChallengeScreen.h"
+#include "../Mod/ModRegistry.h"
 #include "../Sexy.TodLib/TodFoley.h"
 #include "Widget/SeedChooserScreen.h"
 #include "../Sexy.TodLib/TodCommon.h"
@@ -368,6 +369,15 @@ void CutScene::PreloadResources()
 		if (mApp->HasSeedType(aSeedType))
 		{
 			Plant::PreloadPlantResources(aSeedType);
+		}
+	}
+
+	{
+		int maxPlants = gModRegistry.GetTotalAlmanacPlants();
+		for (int i = 49; i < maxPlants; i++)
+		{
+			SeedType modSeed = (SeedType)gModRegistry.GetAlmanacPlantAt(i);
+			Plant::PreloadPlantResources(modSeed);
 		}
 	}
 
