@@ -6,7 +6,7 @@
 
 A cross-platform community reimplementation of Plants vs. Zombies GOTY Edition (v1.2.0.1073) using C++20, SDL2, and OpenGL ES 2.0. Runs on Linux, Windows, macOS, Android, iOS, WASM, Switch, etc. License: LGPL-3.0-or-later.
 
-**User intent**: Develop a Lua/JSON-based Mod framework, delivered as the `mods/` system with C++ scaffolding under `src/Mod/`.
+**User intent**: Develop a Lua-based Mod framework, delivered as the `mods/` system with C++ scaffolding under `src/Mod/`.
 
 ---
 
@@ -39,7 +39,7 @@ src/
     ModRegistry_patch.cpp  — registry integrations into engine
 ```
 
-Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 4000`.
+Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 4000`; mode IDs: `>= 5000`. All auto-assigned on registration.
 
 ---
 
@@ -69,7 +69,8 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 |-----|---------------------|
 | `example_mod` | Pipeline validation (strings, logging, zombie hooks) |
 | `auto_collect_sun` | `OnCoinSpawn` + `coin:Collect()` |
-| `demo_plant` | Custom plant JSON + external reanim XML |
+| `demo_plant` | Custom plant via `Game.RegisterPlant()` + external reanim XML |
+| `peashooter_plus` | `Game.RegisterPlant` + `Game.RegisterProjectile` + custom reanim |
 | `speed_control` | `Board.AddButton` + `Game.SetSpeed` + mod save |
 | `ui_test_mod` | `UI.CreateDialog` / `UI.ShowMessage` / `Dialog:AddButton` |
 
@@ -81,7 +82,7 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 |------|---------|
 | `docs/modding.md` | Full modding specification (English) |
 | `docs/modding.zh-CN.md` | Modding spec (Chinese) |
-| `docs/custom-plants.md` | Custom plant JSON schema + reanim XML guide |
+| `docs/custom-plants.md` | Custom plant Lua API + reanim XML guide |
 | `docs/ARCHITECTURE.md` | Mod framework architecture, module details, engine patch points |
 | `docs/TODO.md` | Remaining dev tasks (Phase 7, Phase 8, hot reload) |
 | `docs/bug-fixes/` | Resolved bug postmortems (Seed Chooser / Almanac) |

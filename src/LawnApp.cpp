@@ -1377,8 +1377,6 @@ void LawnApp::Init()
 
 	ReanimatorLoadDefinitions(gLawnReanimationArray, ReanimationType::NUM_REANIMS);
 	gModRegistry.BuildReanimNameMap();
-	gModLoader.LoadProjectileDefs();
-	gModLoader.LoadPlantDefs();
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_SPROUT, true);
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_ZOMBIEHEAD, true);
 

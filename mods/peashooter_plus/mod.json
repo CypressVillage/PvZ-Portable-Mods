@@ -5,9 +5,5 @@
   "author": "pvz-portable",
   "description": "A powerful peashooter that fires super winter melon projectiles",
   "priority": 100,
-  "entry": "scripts/main.lua",
-  "data": {
-    "projectiles": ["data/projectiles.json"],
-    "plants": ["data/super_pea.json"]
-  }
+  "entry": "scripts/main.lua"
 }

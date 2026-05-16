@@ -19,18 +19,15 @@ Vanilla plants use `SeedType` IDs from `0` to `52`. Mod plants are automatically
 mods/
   <mod_id>/
     mod.json
-    data/
-      my_plant.json          # One JSON file per plant definition
-      another_plant.json
+    scripts/
+      main.lua              # Lua entry script — plant registration here
     resources/
       reanim/
         my_plant.xml         # Optional: custom animation file(s)
       images/                # Optional: custom images
-      properties/
-        default.xml          # Optional: string overrides
 ```
 
-Each plant is defined in its own JSON file. Multiple files can be listed in `mod.json`.
+Plants are registered via Lua in the entry script. No JSON data files are needed.
 
 ## 3. mod.json
 
@@ -42,59 +39,56 @@ Each plant is defined in its own JSON file. Multiple files can be listed in `mod
   "author": "author_name",
   "description": "Adds custom plants",
   "priority": 100,
-  "data": {
-    "plants": [
-      "data/fire_pea.json",
-      "data/ice_melon.json",
-      "data/custom_shooter.json"
-    ]
-  }
+  "entry": "scripts/main.lua"
 }
 ```
 
-- `data.plants`: array of relative paths to plant definition JSON files. Each file defines exactly one plant.
+## 4. Registering Plants in Lua
 
-## 4. Plant Definition JSON
+Call `Game.RegisterPlant(def)` from `OnModInit()`:
 
 ### Minimal Example
 
-```json
-{
-  "id": "my_plant",
-  "name": "My Plant",
-  "cost": 100,
-  "cooldown": 500
-}
+```lua
+function OnModInit()
+    Game.RegisterPlant({
+        id = "my_plant",
+        name = "My Plant",
+        cost = 100,
+        cooldown = 500
+    })
+end
 ```
 
 Only `id` is required. All other fields have defaults.
 
 ### Full Field Reference
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| `id` | string | Yes | - | Unique identifier (must not collide with other mods) |
-| `name` | string | No | `"ModPlant"` | Display name |
-| `cost` | int | No | `50` | Sun cost |
-| `cooldown` | int | No | `750` | Cooldown time in frames (~750 frames = 25 seconds at 30fps) |
-| `packetIndex` | int | No | `0` | Seed packet visual variant index |
-| `subClass` | int | No | `0` | `0` = normal, `1` = shooter (determines idle/shooting behavior) |
-| `launchRate` | int | No | `0` | Frames between projectile launches (0 = no projectile) |
-| `reanimation` | string | No | *(none)* | Vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"` |
-| `reanimFile` | string | No | *(none)* | External reanim file path (relative to mod root), e.g. `"resources/reanim/custom.xml"` |
-| `image` | string | No | *(none)* | Custom static image path (relative to mod root), e.g. `"resources/images/my_plant.png"`. Used as seed packet icon when no reanimation is set. |
-| `description` | string | No | *(none)* | Almanac description text displayed in the plant's Almanac entry |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | string | **(required)** | Unique identifier (must not collide with other mods) |
+| `name` | string | `"ModPlant"` | Display name |
+| `cost` | int | `50` | Sun cost |
+| `cooldown` | int | `750` | Cooldown time in frames (~750 frames = 25 seconds at 30fps) |
+| `packetIndex` | int | `0` | Seed packet visual variant index |
+| `subClass` | int | `0` | `0` = normal, `1` = shooter (determines idle/shooting behavior) |
+| `launchRate` | int | `0` | Frames between projectile launches (0 = no projectile) |
+| `projectileType` | string or int | `0` | Projectile ID string (registered via `Game.RegisterProjectile`) or raw integer type |
+| `reanimation` | string | *(none)* | Vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"` |
+| `reanimFile` | string | *(none)* | External reanim file path (relative to mod root), e.g. `"resources/reanim/custom.xml"` |
+| `image` | string | *(none)* | Custom static image path (relative to mod root), e.g. `"resources/images/my_plant.png"`. Used as seed packet icon when no reanimation is set. |
+| `description` | string | *(none)* | Almanac description text displayed in the plant's Almanac entry |
 
 ### Animation Selection
 
 There are two ways to assign an animation:
 
 1. **Reuse a vanilla animation** via `reanimation`:
-   ```json
-   {
-     "id": "my_fire_pea",
-     "reanimation": "reanim/FirePea.reanim"
-   }
+   ```lua
+   Game.RegisterPlant({
+       id = "my_fire_pea",
+       reanimation = "reanim/FirePea.reanim"
+   })
    ```
    The value must match an existing path in the game's reanim table. Common vanilla paths:
 
@@ -116,11 +110,11 @@ There are two ways to assign an animation:
    | Kernel-pult | `reanim/Cornpult.reanim` |
 
 2. **Load an external reanim file** via `reanimFile`:
-   ```json
-   {
-     "id": "my_custom_shooter",
-     "reanimFile": "resources/reanim/custom_shooter.xml"
-   }
+   ```lua
+   Game.RegisterPlant({
+       id = "my_custom_shooter",
+       reanimFile = "resources/reanim/custom_shooter.xml"
+   })
    ```
    The path is relative to the mod root directory. See Section 5 for the file format.
 
@@ -132,16 +126,41 @@ If neither is specified, the plant will have no animation (invisible body).
 
 If `image` is set instead of `reanimation`/`reanimFile`, the plant uses it as a static sprite for the seed packet icon:
 
-```json
-{
-  "id": "static_plant",
-  "name": "Static Plant",
-  "cost": 50,
-  "image": "resources/images/static_plant.png"
-}
+```lua
+Game.RegisterPlant({
+    id = "static_plant",
+    name = "Static Plant",
+    cost = 50,
+    image = "resources/images/static_plant.png"
+})
 ```
 
 The image is loaded from disk via `SexyAppBase::GetImage()`. It is rendered in the Seed Chooser and Almanac. Note that the plant will have **no body animation** in-game unless a `reanimation` is also provided — this is best used for plants that reuse vanilla reanim logic or have no on-field presence.
+
+### Using Custom Projectiles
+
+Register a projectile first, then reference it by string ID:
+
+```lua
+function OnModInit()
+    Game.RegisterProjectile({
+        id = "super_pea",
+        damage = 200,
+        speed = 1.67,
+        image = "IMAGE_REANIM_WINTERMELON_PROJECTILE"
+    })
+
+    Game.RegisterPlant({
+        id = "super_peashooter",
+        name = "Super Pea Shooter",
+        cost = 175,
+        subClass = 1,
+        launchRate = 90,
+        projectileType = "super_pea",
+        reanimation = "reanim/PeaShooterSingle.reanim"
+    })
+end
+```
 
 ## 5. Custom Reanim File Format
 
@@ -243,55 +262,46 @@ No additional configuration is needed. Custom plants appear after all vanilla pl
   "author": "pvz-portable",
   "description": "Demonstrates how to add custom plants via the mod system",
   "priority": 200,
-  "data": {
-    "plants": [
-      "data/fire_pea.json",
-      "data/ice_melon.json",
-      "data/custom_shooter.json"
-    ]
-  }
+  "entry": "scripts/main.lua"
 }
 ```
 
-### data/fire_pea.json (reusing vanilla animation)
+### scripts/main.lua
 
-```json
-{
-  "id": "demo_fire_pea",
-  "name": "Fire Pea",
-  "cost": 200,
-  "cooldown": 750,
-  "subClass": 1,
-  "launchRate": 90,
-  "reanimation": "reanim/FirePea.reanim"
-}
-```
+```lua
+function OnModInit()
+    -- Fire Pea (reusing vanilla animation)
+    Game.RegisterPlant({
+        id = "demo_fire_pea",
+        name = "Fire Pea",
+        cost = 200,
+        cooldown = 750,
+        subClass = 1,
+        launchRate = 90,
+        reanimation = "reanim/FirePea.reanim"
+    })
 
-### data/ice_melon.json (reusing vanilla animation)
+    -- Ice Melon (reusing vanilla animation)
+    Game.RegisterPlant({
+        id = "demo_ice_melon",
+        name = "Ice Melon",
+        cost = 350,
+        cooldown = 750,
+        launchRate = 100,
+        reanimation = "reanim/WinterMelon.reanim"
+    })
 
-```json
-{
-  "id": "demo_ice_melon",
-  "name": "Ice Melon",
-  "cost": 350,
-  "cooldown": 750,
-  "launchRate": 100,
-  "reanimation": "reanim/WinterMelon.reanim"
-}
-```
-
-### data/custom_shooter.json (external animation)
-
-```json
-{
-  "id": "demo_custom_shooter",
-  "name": "Custom Shooter",
-  "cost": 125,
-  "cooldown": 500,
-  "subClass": 1,
-  "launchRate": 85,
-  "reanimFile": "resources/reanim/custom_pea.xml"
-}
+    -- Custom Shooter (external animation)
+    Game.RegisterPlant({
+        id = "demo_custom_shooter",
+        name = "Custom Shooter",
+        cost = 125,
+        cooldown = 500,
+        subClass = 1,
+        launchRate = 85,
+        reanimFile = "resources/reanim/custom_pea.xml"
+    })
+end
 ```
 
 ### resources/reanim/custom_pea.xml (custom animation)
@@ -314,10 +324,8 @@ No additional configuration is needed. Custom plants appear after all vanilla pl
 ```
 mods/demo_plant/
   mod.json
-  data/
-    fire_pea.json
-    ice_melon.json
-    custom_shooter.json
+  scripts/
+    main.lua
   resources/
     reanim/
       custom_pea.xml
@@ -332,3 +340,4 @@ mods/demo_plant/
 | Custom animation fails to load | Invalid XML syntax or missing file | Check the game log for "Failed to load dynamic reanim" messages |
 | Plant is invisible | No animation assigned | Add `reanimation` or `reanimFile` field |
 | Vanilla animation name not found | Path doesn't match reanim table entry | Use exact paths from Section 4 (e.g. `reanim/FirePea.reanim`) |
+| "id already registered" | Multiple mods use the same plant id | Use unique string IDs across all mods |

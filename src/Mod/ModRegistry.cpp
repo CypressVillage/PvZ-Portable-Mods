@@ -30,6 +30,9 @@ void ModRegistry::Reset()
 	mRuntimeZombies.clear();
 	mRuntimeModes.clear();
 	mRuntimeProjectiles.clear();
+	mNextSeedType = 2000;
+	mNextZombieType = 3000;
+	mNextModeType = 5000;
 	mNextProjectileType = 4000;
 	mErrors.clear();
 }
@@ -45,8 +48,11 @@ bool ModRegistry::RegisterPlant(const ModPlantDef& def, std::string* outError)
 		mErrors.push_back("Plant id already registered: " + def.id);
 		return false;
 	}
-	mPlants[def.id] = def;
-	mRuntimePlants[def.seedType] = def;
+	ModPlantDef storedDef = def;
+	if (storedDef.seedType < 0)
+		storedDef.seedType = mNextSeedType++;
+	mPlants[def.id] = storedDef;
+	mRuntimePlants[storedDef.seedType] = storedDef;
 	return true;
 }
 
@@ -61,8 +67,11 @@ bool ModRegistry::RegisterZombie(const ModZombieDef& def, std::string* outError)
 		mErrors.push_back("Zombie id already registered: " + def.id);
 		return false;
 	}
-	mZombies[def.id] = def;
-	mRuntimeZombies[def.zombieType] = def;
+	ModZombieDef storedDef = def;
+	if (storedDef.zombieType < 0)
+		storedDef.zombieType = mNextZombieType++;
+	mZombies[def.id] = storedDef;
+	mRuntimeZombies[storedDef.zombieType] = storedDef;
 	return true;
 }
 
@@ -77,8 +86,11 @@ bool ModRegistry::RegisterMode(const ModModeDef& def, std::string* outError)
 		mErrors.push_back("Mode id already registered: " + def.id);
 		return false;
 	}
-	mModes[def.id] = def;
-	mRuntimeModes[def.baseMode] = def;
+	ModModeDef storedDef = def;
+	if (storedDef.baseMode < 0)
+		storedDef.baseMode = mNextModeType++;
+	mModes[def.id] = storedDef;
+	mRuntimeModes[storedDef.baseMode] = storedDef;
 	return true;
 }
 

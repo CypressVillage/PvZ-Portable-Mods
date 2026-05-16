@@ -136,6 +136,156 @@ namespace
 		return 2;
 	}
 
+	int Lua_GameRegisterPlant(lua_State* L)
+	{
+		luaL_checktype(L, 1, LUA_TTABLE);
+
+		ModPlantDef def;
+		def.seedType = -1;
+
+		lua_getfield(L, 1, "id");
+		if (lua_isstring(L, -1))
+			def.id = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "name");
+		if (lua_isstring(L, -1))
+			def.plantName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "cost");
+		if (lua_isinteger(L, -1))
+			def.seedCost = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "cooldown");
+		if (lua_isinteger(L, -1))
+			def.refreshTime = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "packetIndex");
+		if (lua_isinteger(L, -1))
+			def.packetIndex = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "subClass");
+		if (lua_isinteger(L, -1))
+			def.subClass = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "launchRate");
+		if (lua_isinteger(L, -1))
+			def.launchRate = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "description");
+		if (lua_isstring(L, -1))
+			def.description = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "image");
+		if (lua_isstring(L, -1))
+			def.imageName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "projectileType");
+		if (lua_isstring(L, -1))
+		{
+			std::string projId = lua_tostring(L, -1);
+			const ModProjectileDef* projDef = gModRegistry.FindProjectile(projId);
+			if (projDef && projDef->projectileType >= 0)
+				def.projectileType = projDef->projectileType;
+		}
+		else if (lua_isinteger(L, -1))
+		{
+			def.projectileType = static_cast<int>(lua_tointeger(L, -1));
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "reanimation");
+		if (lua_isstring(L, -1))
+			def.reanimationName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "reanimFile");
+		if (lua_isstring(L, -1))
+		{
+			std::string relPath = lua_tostring(L, -1);
+			if (!relPath.empty())
+			{
+				lua_getglobal(L, "__mod_root");
+				if (lua_isstring(L, -1))
+				{
+					std::string modRoot = lua_tostring(L, -1);
+					std::filesystem::path absPath = Sexy::PathFromU8(modRoot) / Sexy::PathFromU8(relPath);
+					def.reanimationName = Sexy::PathToU8(absPath);
+					gModRegistry.RegisterDynamicReanim(def.reanimationName);
+				}
+				lua_pop(L, 1);
+			}
+		}
+		lua_pop(L, 1);
+
+		std::string error;
+		if (gModRegistry.RegisterPlant(def, &error))
+		{
+			lua_pushinteger(L, def.seedType);
+			return 1;
+		}
+
+		lua_pushnil(L);
+		lua_pushstring(L, error.c_str());
+		return 2;
+	}
+
+	int Lua_GameRegisterZombie(lua_State* L)
+	{
+		luaL_checktype(L, 1, LUA_TTABLE);
+
+		ModZombieDef def;
+		def.zombieType = -1;
+
+		lua_getfield(L, 1, "id");
+		if (lua_isstring(L, -1))
+			def.id = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		std::string error;
+		if (gModRegistry.RegisterZombie(def, &error))
+		{
+			lua_pushinteger(L, def.zombieType);
+			return 1;
+		}
+
+		lua_pushnil(L);
+		lua_pushstring(L, error.c_str());
+		return 2;
+	}
+
+	int Lua_GameRegisterMode(lua_State* L)
+	{
+		luaL_checktype(L, 1, LUA_TTABLE);
+
+		ModModeDef def;
+		def.baseMode = -1;
+
+		lua_getfield(L, 1, "id");
+		if (lua_isstring(L, -1))
+			def.id = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		std::string error;
+		if (gModRegistry.RegisterMode(def, &error))
+		{
+			lua_pushinteger(L, def.baseMode);
+			return 1;
+		}
+
+		lua_pushnil(L);
+		lua_pushstring(L, error.c_str());
+		return 2;
+	}
+
 	// Entity wrapper
 	struct LuaEntity {
 		int type; // 0 = plant, 1 = zombie, 2 = coin
@@ -610,6 +760,12 @@ namespace
 		lua_setfield(L, -2, "GetMenuButtonRect");
 		lua_pushcfunction(L, Lua_GameRegisterProjectile);
 		lua_setfield(L, -2, "RegisterProjectile");
+		lua_pushcfunction(L, Lua_GameRegisterPlant);
+		lua_setfield(L, -2, "RegisterPlant");
+		lua_pushcfunction(L, Lua_GameRegisterZombie);
+		lua_setfield(L, -2, "RegisterZombie");
+		lua_pushcfunction(L, Lua_GameRegisterMode);
+		lua_setfield(L, -2, "RegisterMode");
 		lua_setglobal(L, "Game");
 
 		// Board

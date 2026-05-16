@@ -85,24 +85,22 @@ Conflicts:
 - If two mods define the same `id`, the later mod overrides by default.
 - The loader should log overrides with mod ids and file paths.
 
-## 5. Data Tables
+## 5. Data Registration via Lua
 
-All tables are arrays of objects. Unknown fields are ignored.
+All mod content (plants, zombies, projectiles, modes) is registered via Lua API calls in the entry script's `OnModInit()` function. No JSON data files are used.
 
-### 5.1 Plants (data/plants.json)
+### 5.1 Plants
 
-Each file defines one plant. Multiple plant files can be listed in `mod.json` under `data.plants`.
-
-```json
-{
-  "id": "fire_pea",
-  "name": "Fire Pea",
-  "cost": 200,
-  "cooldown": 750,
-  "subClass": 1,
-  "launchRate": 90,
-  "reanimation": "reanim/FirePea.reanim"
-}
+```lua
+Game.RegisterPlant({
+    id = "fire_pea",
+    name = "Fire Pea",
+    cost = 200,
+    cooldown = 750,
+    subClass = 1,
+    launchRate = 90,
+    reanimation = "reanim/FirePea.reanim"
+})
 ```
 
 Required fields:
@@ -114,97 +112,68 @@ Optional fields:
 - `cooldown`: cooldown in frames (default: `750`)
 - `subClass`: `0` = normal, `1` = shooter (default: `0`)
 - `launchRate`: frames between shots (default: `0`)
-- `reanimation`: vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"`
+- `projectileType`: string (projectile ID) or integer (runtime type)
+- `reanimation`: vanilla reanim path, e.g. `"reanim/FirePea.reanim"`
 - `reanimFile`: external reanim XML path relative to mod root, e.g. `"resources/reanim/custom.xml"`
-- `image`: custom static image path for seed packet icon, e.g. `"resources/images/my_plant.png"` (default: none, uses reanimation for rendering)
-
-Animation:
-- If `reanimFile` is set, the external file is loaded and registered dynamically.
-- If only `reanimation` is set, an existing vanilla animation is reused.
-- If neither is set, the plant has no body animation.
-- For the custom reanim XML format, see `docs/custom-plants.md`.
+- `image`: custom static image path for seed packet icon
+- `description`: Almanac description text
 
 Reserved ranges:
 - Mod plant SeedType IDs are automatically assigned starting from `2000`.
 
-### 5.2 Zombies (data/zombies.json)
+### 5.2 Zombies
 
-```json
-[
-  {
-    "id": "conehead_fast",
-    "zombie_type": 3001,
-    "name_key": "CONEHEAD_FAST_NAME",
-    "desc_key": "CONEHEAD_FAST_DESC",
-    "hp": 600,
-    "speed": "fast",
-    "damage": 100,
-    "animation": {
-      "reanim": "REANIM_CONEHEAD_ZOMBIE",
-      "atlas": "reanim/conehead_fast.atlas"
-    },
-    "ui": {
-      "almanac_image": "IMAGE_ALMANAC_CONEHEAD_FAST"
-    }
-  }
-]
+```lua
+Game.RegisterZombie({
+    id = "conehead_fast"
+})
 ```
 
 Required fields:
-- `id`, `zombie_type`, `hp`, `speed`
+- `id`: unique identifier
 
 Reserved ranges:
-- `zombie_type` >= 3000 for mods
+- ZombieType IDs are automatically assigned starting from `3000`.
 
-### 5.3 Projectiles (data/projectiles.json)
+### 5.3 Projectiles
 
-```json
-[
-  {
-    "id": "pea_plus",
-    "damage": 20,
-    "speed": 7.5,
-    "image": "IMAGE_PROJECTILE_PEA_PLUS"
-  }
-]
-```
-
-### 5.4 Modes (data/modes.json)
-
-```json
-[
-  {
-    "id": "rush_mode",
-    "name_key": "RUSH_MODE_TITLE",
-    "desc_key": "RUSH_MODE_DESC",
-    "base_mode": "SURVIVAL",
-    "flags": {
-      "fast_zombies": true,
-      "no_lawnmowers": true
-    },
-    "waves": [
-      { "time": 30, "zombies": ["zombie_basic", "conehead_fast"] }
-    ]
-  }
-]
+```lua
+Game.RegisterProjectile({
+    id = "pea_plus",
+    damage = 20,
+    speed = 7.5,
+    image = "IMAGE_PROJECTILE_PEA_PLUS"
+})
 ```
 
 Required fields:
-- `id`, `base_mode`
+- `id`: unique identifier
 
-### 5.5 Strings (data/strings.json)
+Optional fields:
+- `damage`: damage value (default: `0`)
+- `speed`: projectile speed (default: `3.0`)
+- `image`: image name for rendering
 
-```json
-{
-  "PEA_SHOOTER_PLUS_NAME": "Pea Shooter Plus",
-  "PEA_SHOOTER_PLUS_DESC": "Shoots stronger peas.",
-  "CONEHEAD_FAST_NAME": "Conehead Sprinter",
-  "CONEHEAD_FAST_DESC": "Faster but still tough."
-}
+Reserved ranges:
+- ProjectileType IDs are automatically assigned starting from `4000`.
+
+### 5.4 Modes
+
+```lua
+Game.RegisterMode({
+    id = "rush_mode"
+})
 ```
 
-Strings can also be provided via `resources/properties/default.xml`.
-If both exist, `default.xml` has higher priority.
+Required fields:
+- `id`: unique identifier
+
+Reserved ranges:
+- Mode IDs are automatically assigned starting from `5000`.
+
+### 5.5 Strings
+
+String overrides can be provided via `resources/properties/default.xml` in the mod package. See Section 6 for the overlay rules.
 
 ## 6. Resource Overlay Rules
 

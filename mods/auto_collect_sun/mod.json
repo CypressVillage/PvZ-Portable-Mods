@@ -6,6 +6,5 @@
   "description": "Automatically collects suns when they drop.",
   "priority": 100,
   "dependencies": [],
-  "entry": "scripts/main.lua",
-  "data": {}
+  "entry": "scripts/main.lua"
 }

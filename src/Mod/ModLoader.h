@@ -7,7 +7,6 @@
 #ifndef __MODLOADER_H__
 #define __MODLOADER_H__
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -27,7 +26,6 @@ struct ModManifest
 	std::string rootPath;
 	int priority = 0;
 	std::vector<std::string> dependencies;
-	std::map<std::string, std::vector<std::string>> dataFiles;
 };
 
 class ModLoader
@@ -37,9 +35,6 @@ public:
 	const std::vector<ModManifest>& GetManifests() const;
 	const std::vector<std::string>& GetErrors() const;
 	void ApplyStringOverrides(Sexy::SexyAppBase* app) const;
-
-	bool LoadPlantDefs();
-	bool LoadProjectileDefs();
 
 private:
 	bool LoadManifestFromFile(const std::string& manifestPath, const std::string& rootPath);

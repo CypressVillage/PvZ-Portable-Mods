@@ -17,10 +17,9 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 ### (1) ModLoader — Mod 加载器
 
 - 扫描 `mods/<mod_id>/mod.json` 清单文件
-- 解析 `ModManifest`（id, name, version, priority, dependencies, entry, dataFiles）
+- 解析 `ModManifest`（id, name, version, priority, dependencies, entry）
 - **依赖排序**：按 dependencies 拓扑排序 + priority 稳定排序
-- **字符串覆盖**：加载所有 Mod 的 `strings.json` 和 `properties/default.xml`
-- **数据文件加载**：`LoadPlantDefs()` / `LoadProjectileDefs()` 加载 JSON 定义
+- **字符串覆盖**：加载所有 Mod 的 `properties/default.xml`
 
 ### (2) ModLua — Lua 虚拟机与 API
 
@@ -36,6 +35,9 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | | `GetSpeed()` | 获取游戏速度 |
 | | `GetMenuButtonRect()` | 获取菜单按钮位置 |
 | | `RegisterProjectile(def)` | 注册自定义投射物 |
+| | `RegisterPlant(def)` | 注册自定义植物 |
+| | `RegisterZombie(def)` | 注册自定义僵尸 |
+| | `RegisterMode(def)` | 注册自定义模式 |
 | `Board` | `SpawnZombie(id_or_type, row)` | 生成僵尸 |
 | | `SpawnPlant(id_or_type, row, col)` | 放置植物 |
 | | `GetWave()` | 获取当前波次 |
@@ -74,7 +76,7 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 
 ### (3) ModRegistry — 数据注册表
 
-- **运行时 ID 映射**：Mod 植物 `seedType >= 2000`，僵尸 `zombieType >= 3000`，投射物 `projectileType >= 4000`
+- **运行时 ID 映射**：Mod 植物 `seedType >= 2000`，僵尸 `zombieType >= 3000`，模式 `baseMode >= 5000`，投射物 `projectileType >= 4000`（自动分配）
 - **注册类型**：
   - `ModPlantDef` — id, seedType, seedCost, refreshTime, subClass, launchRate, projectileType, plantName, reanimationName, imageName
   - `ModZombieDef` — id, zombieType
@@ -113,21 +115,15 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 
 ```
 mods/<mod_id>/
-├── mod.json                           # 清单文件（id, name, version, priority, entry, data）
+├── mod.json                           # 清单文件（id, name, version, priority, entry）
 ├── scripts/
-│   └── main.lua                       # Lua 入口脚本
-├── data/
-│   ├── plants.json                    # 植物定义
-│   ├── zombies.json                   # 僵尸定义
-│   ├── modes.json                     # 模式定义
-│   ├── projectiles.json               # 投射物定义
-│   └── strings.json                   # 字符串覆盖
+│   └── main.lua                       # Lua 入口脚本（植物/僵尸/模式/投射物注册在此）
 ├── resources/
 │   ├── images/                        # 图片资源
 │   ├── sounds/                        # 音频资源
 │   ├── reanim/                        # 自定义动画 XML
 │   └── properties/
-│       └── default.xml                # 属性文件覆盖
+│       └── default.xml                # 属性文件覆盖（字符串本地化）
 ```
 
 ## 四、修改了原项目的哪些部分
@@ -174,7 +170,6 @@ mods/<mod_id>/
 │                     mods/<mod_id>/         │        │
 │                     ├─ mod.json            │        │
 │                     ├─ scripts/main.lua    │        │
-│                     ├─ data/*.json         │        │
 │                     └─ resources/          │        │
 └─────────────────────────────────────────────────────┘
 ```

@@ -92,6 +92,9 @@ private:
 	std::map<int, ModZombieDef> mRuntimeZombies;
 	std::map<int, ModModeDef> mRuntimeModes;
 	std::map<int, ModProjectileDef> mRuntimeProjectiles;
+	int mNextSeedType = 2000;
+	int mNextZombieType = 3000;
+	int mNextModeType = 5000;
 	int mNextProjectileType = 4000;
 	std::map<std::string, int> mReanimNameMap;
 	std::vector<std::string> mErrors;
