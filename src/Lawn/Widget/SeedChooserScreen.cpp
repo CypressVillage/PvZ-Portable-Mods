@@ -156,7 +156,7 @@ SeedChooserScreen::SeedChooserScreen()
 	mNextPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	mNextPageButton->mColors[ButtonWidget::COLOR_LABEL] = aBtnColor;
 	mNextPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aBtnColor;
-	mNextPageButton->Resize(420, 547, 40, 26);
+	mNextPageButton->Resize(325, 547, 40, 26);
 	mNextPageButton->mParentWidget = this;
 
 	mPrevPageButton = new GameButton(SeedChooserScreen::SeedChooserScreen_PrevPage);
@@ -167,7 +167,7 @@ SeedChooserScreen::SeedChooserScreen()
 	mPrevPageButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	mPrevPageButton->mColors[ButtonWidget::COLOR_LABEL] = aBtnColor;
 	mPrevPageButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = aBtnColor;
-	mPrevPageButton->Resize(370, 547, 40, 26);
+	mPrevPageButton->Resize(25, 547, 40, 26);
 	mPrevPageButton->mParentWidget = this;
 
 	if (!mApp->CanShowAlmanac())
