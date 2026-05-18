@@ -1136,10 +1136,6 @@ void Zombie::PickRandomSpeed()
     {
         mVelX = 0.3f;
     }
-    else if (mZombiePhase == ZombiePhase::PHASE_DOLPHIN_WALKING_IN_POOL)
-    {
-        mVelX = 0.3f;
-    }
     else if (mZombiePhase == ZombiePhase::PHASE_DIGGER_WALKING)
     {
         if (mApp->IsIZombieLevel())
@@ -1184,7 +1180,7 @@ void Zombie::PickRandomSpeed()
     }
     else
     {
-        mVelX = RandRangeFloat(0.23f, 0.32f);
+        mVelX = RandRangeFloat(0.23f, 0.37f);
         if (mVelX < 0.3f)
         {
             mAnimTicksPerFrame = 12;
@@ -2906,9 +2902,7 @@ void Zombie::UpdateZombieBackupDancer()
             break;
 
         case ZombiePhase::PHASE_DANCER_RAISE_LEFT_1:
-        case ZombiePhase::PHASE_DANCER_RAISE_RIGHT_1:
         case ZombiePhase::PHASE_DANCER_RAISE_LEFT_2:
-        case ZombiePhase::PHASE_DANCER_RAISE_RIGHT_2:
             mZombiePhase = aDancerPhase;
             PlayZombieReanim("anim_armraise", ReanimLoopType::REANIM_LOOP, 10, 18.0f);
             break;
@@ -2927,7 +2921,7 @@ void Zombie::UpdateZombieDancer()
     if (mSummonCounter > 0)
     {
         mSummonCounter--;
-        if (mSummonCounter == 1) // @Patoke: checking 0 instead of 1
+        if (mSummonCounter == 0)
         {
             if (GetDancerFrame() == 12 && mHasHead && mPosX < 700.0f)
             {
@@ -2993,9 +2987,7 @@ void Zombie::UpdateZombieDancer()
                 break;
 
             case ZombiePhase::PHASE_DANCER_RAISE_LEFT_1:
-            case ZombiePhase::PHASE_DANCER_RAISE_RIGHT_1:
             case ZombiePhase::PHASE_DANCER_RAISE_LEFT_2:
-            case ZombiePhase::PHASE_DANCER_RAISE_RIGHT_2:
                 mZombiePhase = aDancerPhase;
                 PlayZombieReanim("anim_armraise", ReanimLoopType::REANIM_LOOP, 10, 18.0f);
                 break;
@@ -3872,11 +3864,9 @@ bool Zombie::ZombieNotWalking()
         mZombieHeight == ZombieHeight::HEIGHT_ZOMBIQUARIUM ||
         mZombieType == ZombieType::ZOMBIE_BUNGEE || 
         mZombieType == ZombieType::ZOMBIE_BOSS ||
-        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_LEFT_1 || 
+        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_LEFT_1 ||
         mZombiePhase == ZombiePhase::PHASE_DANCER_WALK_TO_RAISE ||
-        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_RIGHT_1 || 
-        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_LEFT_2 ||
-        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_RIGHT_2)
+        mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_LEFT_2)
     {
         return true;
     }
@@ -5235,8 +5225,7 @@ void Zombie::UpdateReanim()
     {
         anOpposite = false;
 
-        if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN || mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_RIGHT_1 || 
-            mZombiePhase == ZombiePhase::PHASE_DANCER_RAISE_RIGHT_2)
+        if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN)
         {
             if (!mIsEating)
             {
@@ -6094,9 +6083,8 @@ ZombiePhase Zombie::GetDancerPhase()
     return
         aFrame <= 11 ? ZombiePhase::PHASE_DANCER_DANCING_LEFT :
         aFrame <= 12 ? ZombiePhase::PHASE_DANCER_WALK_TO_RAISE :
-        aFrame <= 15 ? ZombiePhase::PHASE_DANCER_RAISE_RIGHT_1 :
         aFrame <= 18 ? ZombiePhase::PHASE_DANCER_RAISE_LEFT_1 :
-        aFrame <= 21 ? ZombiePhase::PHASE_DANCER_RAISE_RIGHT_2 : ZombiePhase::PHASE_DANCER_RAISE_LEFT_2;
+                       ZombiePhase::PHASE_DANCER_RAISE_LEFT_2;
 }
 
 void Zombie::DrawIceTrap(Graphics* g, const ZombieDrawPosition& theDrawPos, bool theFront)
