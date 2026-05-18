@@ -83,6 +83,7 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 | `docs/modding.md` | Full modding specification (English) |
 | `docs/modding.zh-CN.md` | Modding spec (Chinese) |
 | `docs/custom-plants.md` | Custom plant Lua API + reanim XML guide |
+| `docs/pvz-animation.md` | Reanim animation system reference (peashooter example) |
 | `docs/ARCHITECTURE.md` | Mod framework architecture, module details, engine patch points |
 | `docs/TODO.md` | Remaining dev tasks (Phase 7, Phase 8, hot reload) |
 | `docs/bug-fixes/` | Resolved bug postmortems (Seed Chooser / Almanac) |

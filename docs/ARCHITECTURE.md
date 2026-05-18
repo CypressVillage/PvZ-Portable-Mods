@@ -147,6 +147,7 @@ mods/<mod_id>/
 | `src/SexyAppFramework/paklib/PakInterface.cpp` | PAK 覆盖支持 |
 | `src/Sexy.TodLib/Reanimator.h/.cpp` | 动态 reanim 加载（外部 XML 跟踪元素解析） |
 | `src/Mod/ModLua.h/.cpp` | 新增 `OnGameStart`、`OnWaveStart`、`OnPlantUpdate` 钩子、`Dialog:AddLabel` API |
+| `docs/pvz-animation.md` | Reanim 动画系统参考文档（以豌豆射手为例，含 XML 格式、轨道命名、Mod 使用指南） |
 | `src/Mod/ModRegistry.h/.cpp` | `ModPlantDef` 新增 `imageName` 字段 |
 
 ## 五、架构关系图
