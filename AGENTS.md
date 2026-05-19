@@ -36,7 +36,6 @@ src/
     ModRegistry.h/.cpp     — dynamic data registry (plants/zombies/modes/projectiles)
     ModSave.h/.cpp         — per-mod KV persistence (modsave/<id>.json)
     LuaProxyDialog.h/.cpp  — Lua-created dialog proxy
-    ModRegistry_patch.cpp  — registry integrations into engine
 ```
 
 Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 4000`; mode IDs: `>= 5000`. All auto-assigned on registration.

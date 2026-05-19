@@ -3,13 +3,12 @@
 ## 一、Mod 框架组成部分
 
 ```
-src/Mod/                         # Mod 框架核心（6 个模块）
+src/Mod/                         # Mod 框架核心（5 个模块）
 ├── ModLoader.h/.cpp             # Mod 加载器
 ├── ModLua.h/.cpp                # Lua 虚拟机与 API 绑定
 ├── ModRegistry.h/.cpp           # 数据注册表（植物、僵尸、模式、投射物）
 ├── ModSave.h/.cpp               # Mod 独立存档
-├── LuaProxyDialog.h/.cpp        # Lua 创建的对话框代理
-└── ModRegistry_patch.cpp        # 注册表集成补丁（引擎接入点）
+└── LuaProxyDialog.h/.cpp        # Lua 创建的对话框代理
 ```
 
 ## 二、各模块功能
@@ -100,9 +99,9 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 - 支持 `AddLuaLabel()` 添加静态文本标签
 - 对话框 ID 从 `1000` 开始分配
 
-### (6) ModRegistry_patch — 引擎适配补丁
+### (6) 引擎适配集成点
 
-引擎集成点分散在各模块中（`Plant.cpp`、`Projectile.cpp`、`SeedChooserScreen` 等），通过 `gModRegistry` 查询运行时数据：
+引擎集成点直接内联在各模块中（`Plant.cpp`、`Projectile.cpp`、`SeedChooserScreen` 等），通过 `gModRegistry` 查询运行时数据：
 - **AlmanacDialog**：显示 Mod 植物的图鉴条目
 - **SeedChooserScreen**：Mod 植物显示在选卡界面、支持分页、随机选取
 - **Board**：Mod 植物的放置与行为
@@ -165,9 +164,8 @@ mods/<mod_id>/
 │    Sexy.TodLib  Lawn/  ModLoader  ModLua   │        │
 │    (动画/粒子)  (逻辑)  ModRegistry ModSave │        │
 │                          LuaProxyDialog    │        │
-│                          ModRegistry_patch │        │
-│                            │               │        │
-│                            ▼               │        │
+│                               │            │        │
+│                               ▼            │        │
 │                     mods/<mod_id>/         │        │
 │                     ├─ mod.json            │        │
 │                     ├─ scripts/main.lua    │        │
