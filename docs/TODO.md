@@ -201,29 +201,29 @@
 
 ### 实体通用属性与方法
 
-- [ ] **扩展 Plant 实体属性**
+- [x] **扩展 Plant 实体属性**
   - `row`, `col`, `x`, `y`, `maxHp`, `state`, `subClass`, `isAsleep`, `isDead`, `launchCounter`, `launchRate`, `age`, `imitaterType`, `recentlyEaten`, `squished`
   - 位置：`src/Mod/ModLua.cpp` — Lua_EntityIndex 元表
 
-- [ ] **扩展 Plant 实体方法**
+- [x] **扩展 Plant 实体方法**
   - `:Die()`, `:Squish()`, `:SetSleeping(bool)`, `:GetCost()`, `:GetName()`
   - `:IsNocturnal()`, `:IsFungus()`, `:IsAquatic()`, `:IsUpgrade()`, `:IsFlying()`
 
-- [ ] **扩展 Zombie 实体属性**
+- [x] **扩展 Zombie 实体属性**
   - `row`, `x`, `y`, `velX`, `maxHp`, `phase`, `isEating`, `isDead`, `age`
   - `chilled`, `buttered`, `mindControlled`, `helmType`, `helmHp`, `shieldType`, `shieldHp`
   - `hasHead`, `hasArm`, `inPool`, `onHighGround`, `altitude`
 
-- [ ] **扩展 Zombie 实体方法**
+- [x] **扩展 Zombie 实体方法**
   - `:SetRow(n)`, `:ApplyChill(isIce)`, `:ApplyButter()`, `:RemoveButter()`
   - `:StartMindControlled()`, `:DieNoLoot()`, `:DieWithLoot()`
   - `:TakeHelmDamage(n)`, `:TakeShieldDamage(n)`
   - `:IsFlying()`, `:IsOnHighGround()`, `:IsImmobilized()`
 
-- [ ] **扩展 Coin 实体属性**
+- [x] **扩展 Coin 实体属性**
   - `x`, `y`, `velX`, `velY`, `age`, `value`, `isBeingCollected`, `coinMotion`, `isMoney`, `scale`
 
-- [ ] **扩展 Coin 实体方法**
+- [x] **扩展 Coin 实体方法**
   - `:GetValue()`, `:Die()`, `:StartFade()`
 
 - [x] **新增 Projectile 实体类型（全新包装）**

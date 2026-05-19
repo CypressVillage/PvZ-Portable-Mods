@@ -402,7 +402,17 @@ namespace
 			strcmp(key, "IsAnimPlaying") == 0 || strcmp(key, "TrackExists") == 0 ||
 			strcmp(key, "GetBodyReanimLoopType") == 0 || strcmp(key, "GetBodyReanimLoopCount") == 0 ||
 			strcmp(key, "SetDamage") == 0 || strcmp(key, "SetVelocity") == 0 || strcmp(key, "SetDamageFlags") == 0 ||
-			strcmp(key, "SetMotionType") == 0 || strcmp(key, "SetTargetZombie") == 0) {
+			strcmp(key, "SetMotionType") == 0 || strcmp(key, "SetTargetZombie") == 0 ||
+			strcmp(key, "Die") == 0 || strcmp(key, "Squish") == 0 || strcmp(key, "SetSleeping") == 0 ||
+			strcmp(key, "GetCost") == 0 || strcmp(key, "GetName") == 0 ||
+			strcmp(key, "IsNocturnal") == 0 || strcmp(key, "IsFungus") == 0 || strcmp(key, "IsAquatic") == 0 ||
+			strcmp(key, "IsUpgrade") == 0 || strcmp(key, "IsFlying") == 0 ||
+			strcmp(key, "SetRow") == 0 || strcmp(key, "ApplyChill") == 0 ||
+			strcmp(key, "ApplyButter") == 0 || strcmp(key, "RemoveButter") == 0 ||
+			strcmp(key, "StartMindControlled") == 0 || strcmp(key, "DieNoLoot") == 0 || strcmp(key, "DieWithLoot") == 0 ||
+			strcmp(key, "TakeHelmDamage") == 0 || strcmp(key, "TakeShieldDamage") == 0 ||
+			strcmp(key, "IsOnHighGround") == 0 || strcmp(key, "IsImmobilized") == 0 ||
+			strcmp(key, "GetValue") == 0 || strcmp(key, "StartFade") == 0) {
 			lua_getmetatable(L, 1);
 			lua_getfield(L, -1, key);
 			return 1;
@@ -419,6 +429,21 @@ namespace
 				}
 				lua_pushstring(L, ""); return 1;
 			}
+			if (strcmp(key, "row") == 0) { lua_pushinteger(L, ent->ptr.plant->mRow); return 1; }
+			if (strcmp(key, "col") == 0) { lua_pushinteger(L, ent->ptr.plant->mPlantCol); return 1; }
+			if (strcmp(key, "x") == 0) { lua_pushnumber(L, static_cast<float>(ent->ptr.plant->mX)); return 1; }
+			if (strcmp(key, "y") == 0) { lua_pushnumber(L, static_cast<float>(ent->ptr.plant->mY)); return 1; }
+			if (strcmp(key, "maxHp") == 0) { lua_pushinteger(L, ent->ptr.plant->mPlantMaxHealth); return 1; }
+			if (strcmp(key, "state") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.plant->mState)); return 1; }
+			if (strcmp(key, "subClass") == 0) { lua_pushinteger(L, ent->ptr.plant->mSubclass); return 1; }
+			if (strcmp(key, "isAsleep") == 0) { lua_pushboolean(L, ent->ptr.plant->mIsAsleep ? 1 : 0); return 1; }
+			if (strcmp(key, "isDead") == 0) { lua_pushboolean(L, ent->ptr.plant->mDead ? 1 : 0); return 1; }
+			if (strcmp(key, "launchCounter") == 0) { lua_pushinteger(L, ent->ptr.plant->mLaunchCounter); return 1; }
+			if (strcmp(key, "launchRate") == 0) { lua_pushinteger(L, ent->ptr.plant->mLaunchRate); return 1; }
+			if (strcmp(key, "age") == 0) { lua_pushinteger(L, ent->ptr.plant->mAnimCounter); return 1; }
+			if (strcmp(key, "imitaterType") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.plant->mImitaterType)); return 1; }
+			if (strcmp(key, "recentlyEaten") == 0) { lua_pushinteger(L, ent->ptr.plant->mRecentlyEatenCountdown); return 1; }
+			if (strcmp(key, "squished") == 0) { lua_pushboolean(L, ent->ptr.plant->mSquished ? 1 : 0); return 1; }
 		} else if (ent->type == 1 && ent->ptr.zombie) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mZombieType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mBodyHealth); return 1; }
@@ -430,10 +455,44 @@ namespace
 				}
 				lua_pushstring(L, ""); return 1;
 			}
+			if (strcmp(key, "row") == 0) { lua_pushinteger(L, ent->ptr.zombie->mRow); return 1; }
+			if (strcmp(key, "x") == 0) { lua_pushnumber(L, ent->ptr.zombie->mPosX); return 1; }
+			if (strcmp(key, "y") == 0) { lua_pushnumber(L, ent->ptr.zombie->mPosY); return 1; }
+			if (strcmp(key, "velX") == 0) { lua_pushnumber(L, ent->ptr.zombie->mVelX); return 1; }
+			if (strcmp(key, "maxHp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mBodyMaxHealth); return 1; }
+			if (strcmp(key, "phase") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mZombiePhase)); return 1; }
+			if (strcmp(key, "isEating") == 0) { lua_pushboolean(L, ent->ptr.zombie->mIsEating ? 1 : 0); return 1; }
+			if (strcmp(key, "isDead") == 0) { lua_pushboolean(L, ent->ptr.zombie->mDead ? 1 : 0); return 1; }
+			if (strcmp(key, "age") == 0) { lua_pushinteger(L, ent->ptr.zombie->mZombieAge); return 1; }
+			if (strcmp(key, "chilled") == 0) { lua_pushboolean(L, ent->ptr.zombie->mChilledCounter > 0 ? 1 : 0); return 1; }
+			if (strcmp(key, "buttered") == 0) { lua_pushboolean(L, ent->ptr.zombie->mButteredCounter > 0 ? 1 : 0); return 1; }
+			if (strcmp(key, "mindControlled") == 0) { lua_pushboolean(L, ent->ptr.zombie->mMindControlled ? 1 : 0); return 1; }
+			if (strcmp(key, "helmType") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mHelmType)); return 1; }
+			if (strcmp(key, "helmHp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mHelmHealth); return 1; }
+			if (strcmp(key, "shieldType") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mShieldType)); return 1; }
+			if (strcmp(key, "shieldHp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mShieldHealth); return 1; }
+			if (strcmp(key, "hasHead") == 0) { lua_pushboolean(L, ent->ptr.zombie->mHasHead ? 1 : 0); return 1; }
+			if (strcmp(key, "hasArm") == 0) { lua_pushboolean(L, ent->ptr.zombie->mHasArm ? 1 : 0); return 1; }
+			if (strcmp(key, "inPool") == 0) { lua_pushboolean(L, ent->ptr.zombie->mInPool ? 1 : 0); return 1; }
+			if (strcmp(key, "onHighGround") == 0) { lua_pushboolean(L, ent->ptr.zombie->mOnHighGround ? 1 : 0); return 1; }
+			if (strcmp(key, "altitude") == 0) { lua_pushnumber(L, ent->ptr.zombie->mAltitude); return 1; }
 		} else if (ent->type == 2 && ent->ptr.coin) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.coin->mType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 0); return 1; }
 			if (strcmp(key, "id") == 0) { lua_pushstring(L, ""); return 1; }
+			if (strcmp(key, "x") == 0) { lua_pushnumber(L, ent->ptr.coin->mPosX); return 1; }
+			if (strcmp(key, "y") == 0) { lua_pushnumber(L, ent->ptr.coin->mPosY); return 1; }
+			if (strcmp(key, "velX") == 0) { lua_pushnumber(L, ent->ptr.coin->mVelX); return 1; }
+			if (strcmp(key, "velY") == 0) { lua_pushnumber(L, ent->ptr.coin->mVelY); return 1; }
+			if (strcmp(key, "age") == 0) { lua_pushinteger(L, ent->ptr.coin->mCoinAge); return 1; }
+			if (strcmp(key, "value") == 0) {
+				if (ent->ptr.coin->IsSun()) { lua_pushinteger(L, ent->ptr.coin->GetSunValue()); return 1; }
+				lua_pushinteger(L, Coin::GetCoinValue(ent->ptr.coin->mType)); return 1;
+			}
+			if (strcmp(key, "isBeingCollected") == 0) { lua_pushboolean(L, ent->ptr.coin->mIsBeingCollected ? 1 : 0); return 1; }
+			if (strcmp(key, "coinMotion") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.coin->mCoinMotion)); return 1; }
+			if (strcmp(key, "isMoney") == 0) { lua_pushboolean(L, ent->ptr.coin->IsMoney() ? 1 : 0); return 1; }
+			if (strcmp(key, "scale") == 0) { lua_pushnumber(L, ent->ptr.coin->mScale); return 1; }
 		} else if (ent->type == 3 && ent->ptr.projectile) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.projectile->mProjectileType)); return 1; }
 			if (strcmp(key, "x") == 0) { lua_pushnumber(L, ent->ptr.projectile->mPosX); return 1; }
@@ -1198,6 +1257,202 @@ namespace
 		LuaEntity* target = (LuaEntity*)luaL_checkudata(L, 2, "Game.Entity");
 		if (target->type != 1 || !target->ptr.zombie) return 0;
 		ent->ptr.projectile->mTargetZombieID = gLawnApp->mBoard->ZombieGetID(target->ptr.zombie);
+		return 0;
+	}
+
+	int Lua_EntityDie(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) ent->ptr.plant->Die();
+		else if (ent->type == 2 && ent->ptr.coin) ent->ptr.coin->Die();
+		return 0;
+	}
+
+	int Lua_EntitySquish(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) ent->ptr.plant->Squish();
+		return 0;
+	}
+
+	int Lua_EntitySetSleeping(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) ent->ptr.plant->SetSleeping(lua_toboolean(L, 2) != 0);
+		return 0;
+	}
+
+	int Lua_EntityGetCost(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushinteger(L, Plant::GetCost(ent->ptr.plant->mSeedType, ent->ptr.plant->mImitaterType));
+		} else { lua_pushinteger(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityGetName(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushstring(L, Plant::GetNameString(ent->ptr.plant->mSeedType, ent->ptr.plant->mImitaterType).c_str());
+		} else { lua_pushstring(L, ""); }
+		return 1;
+	}
+
+	int Lua_EntityIsNocturnal(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushboolean(L, Plant::IsNocturnal(ent->ptr.plant->mSeedType) ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityIsFungus(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushboolean(L, Plant::IsFungus(ent->ptr.plant->mSeedType) ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityIsAquatic(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushboolean(L, Plant::IsAquatic(ent->ptr.plant->mSeedType) ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityIsUpgrade(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushboolean(L, Plant::IsUpgrade(ent->ptr.plant->mSeedType) ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityIsFlying(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 0 && ent->ptr.plant) {
+			lua_pushboolean(L, Plant::IsFlying(ent->ptr.plant->mSeedType) ? 1 : 0);
+		} else if (ent->type == 1 && ent->ptr.zombie) {
+			lua_pushboolean(L, ent->ptr.zombie->IsFlying() ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntitySetRow(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			ent->ptr.zombie->SetRow(luaL_checkinteger(L, 2));
+		}
+		return 0;
+	}
+
+	int Lua_EntityApplyChill(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			ent->ptr.zombie->ApplyChill(lua_toboolean(L, 2) != 0);
+		}
+		return 0;
+	}
+
+	int Lua_EntityApplyButter(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) ent->ptr.zombie->ApplyButter();
+		return 0;
+	}
+
+	int Lua_EntityRemoveButter(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) ent->ptr.zombie->RemoveButter();
+		return 0;
+	}
+
+	int Lua_EntityStartMindControlled(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) ent->ptr.zombie->StartMindControlled();
+		return 0;
+	}
+
+	int Lua_EntityDieNoLoot(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) ent->ptr.zombie->DieNoLoot();
+		return 0;
+	}
+
+	int Lua_EntityDieWithLoot(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) ent->ptr.zombie->DieWithLoot();
+		return 0;
+	}
+
+	int Lua_EntityTakeHelmDamage(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			ent->ptr.zombie->TakeHelmDamage(luaL_checkinteger(L, 2), 0);
+		}
+		return 0;
+	}
+
+	int Lua_EntityTakeShieldDamage(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			ent->ptr.zombie->TakeShieldDamage(luaL_checkinteger(L, 2), 0);
+		}
+		return 0;
+	}
+
+	int Lua_EntityIsOnHighGround(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			lua_pushboolean(L, ent->ptr.zombie->IsOnHighGround() ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityIsImmobilized(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 1 && ent->ptr.zombie) {
+			lua_pushboolean(L, ent->ptr.zombie->IsImmobilizied() ? 1 : 0);
+		} else { lua_pushboolean(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityCoinGetValue(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 2 && ent->ptr.coin) {
+			if (ent->ptr.coin->IsSun()) {
+				lua_pushinteger(L, ent->ptr.coin->GetSunValue());
+			} else {
+				lua_pushinteger(L, Coin::GetCoinValue(ent->ptr.coin->mType));
+			}
+		} else { lua_pushinteger(L, 0); }
+		return 1;
+	}
+
+	int Lua_EntityStartFade(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type == 2 && ent->ptr.coin) ent->ptr.coin->StartFade();
 		return 0;
 	}
 
@@ -1976,6 +2231,52 @@ namespace
 		lua_setfield(L, -2, "SetMotionType");
 		lua_pushcfunction(L, Lua_EntitySetTargetZombie);
 		lua_setfield(L, -2, "SetTargetZombie");
+		lua_pushcfunction(L, Lua_EntityDie);
+		lua_setfield(L, -2, "Die");
+		lua_pushcfunction(L, Lua_EntitySquish);
+		lua_setfield(L, -2, "Squish");
+		lua_pushcfunction(L, Lua_EntitySetSleeping);
+		lua_setfield(L, -2, "SetSleeping");
+		lua_pushcfunction(L, Lua_EntityGetCost);
+		lua_setfield(L, -2, "GetCost");
+		lua_pushcfunction(L, Lua_EntityGetName);
+		lua_setfield(L, -2, "GetName");
+		lua_pushcfunction(L, Lua_EntityIsNocturnal);
+		lua_setfield(L, -2, "IsNocturnal");
+		lua_pushcfunction(L, Lua_EntityIsFungus);
+		lua_setfield(L, -2, "IsFungus");
+		lua_pushcfunction(L, Lua_EntityIsAquatic);
+		lua_setfield(L, -2, "IsAquatic");
+		lua_pushcfunction(L, Lua_EntityIsUpgrade);
+		lua_setfield(L, -2, "IsUpgrade");
+		lua_pushcfunction(L, Lua_EntityIsFlying);
+		lua_setfield(L, -2, "IsFlying");
+		lua_pushcfunction(L, Lua_EntitySetRow);
+		lua_setfield(L, -2, "SetRow");
+		lua_pushcfunction(L, Lua_EntityApplyChill);
+		lua_setfield(L, -2, "ApplyChill");
+		lua_pushcfunction(L, Lua_EntityApplyButter);
+		lua_setfield(L, -2, "ApplyButter");
+		lua_pushcfunction(L, Lua_EntityRemoveButter);
+		lua_setfield(L, -2, "RemoveButter");
+		lua_pushcfunction(L, Lua_EntityStartMindControlled);
+		lua_setfield(L, -2, "StartMindControlled");
+		lua_pushcfunction(L, Lua_EntityDieNoLoot);
+		lua_setfield(L, -2, "DieNoLoot");
+		lua_pushcfunction(L, Lua_EntityDieWithLoot);
+		lua_setfield(L, -2, "DieWithLoot");
+		lua_pushcfunction(L, Lua_EntityTakeHelmDamage);
+		lua_setfield(L, -2, "TakeHelmDamage");
+		lua_pushcfunction(L, Lua_EntityTakeShieldDamage);
+		lua_setfield(L, -2, "TakeShieldDamage");
+		lua_pushcfunction(L, Lua_EntityIsOnHighGround);
+		lua_setfield(L, -2, "IsOnHighGround");
+		lua_pushcfunction(L, Lua_EntityIsImmobilized);
+		lua_setfield(L, -2, "IsImmobilized");
+		lua_pushcfunction(L, Lua_EntityCoinGetValue);
+		lua_setfield(L, -2, "GetValue");
+		lua_pushcfunction(L, Lua_EntityStartFade);
+		lua_setfield(L, -2, "StartFade");
 		lua_pop(L, 1);
 
 		// Dialog metatable
