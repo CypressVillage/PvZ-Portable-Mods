@@ -1,0 +1,9 @@
+{
+  "id": "demo_plant",
+  "name": "Triple Pea Demo",
+  "version": "1.0.0",
+  "author": "pvz-portable",
+  "description": "Demonstrates a custom plant (Triple Pea) using PlantHelper.SimpleAI state machine. Fires three peas in a spread pattern.",
+  "priority": 100,
+  "entry": "scripts/main.lua"
+}

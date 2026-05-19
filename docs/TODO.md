@@ -1,6 +1,8 @@
 # Mod Framework — 待办清单
 
 > 评估日期：2026-05-19，框架完整性约 75%
+> 
+> **近期目标阶段**：P5 — Lua 辅助模块体系（2026-05-19 起）
 
 ---
 
@@ -241,47 +243,213 @@
 - [x] **`OnCoinCollect(coin)`** — 补丁位置：`Coin::Collect()`
 - [x] **`OnZombieReachHouse(zombie)`** — 补丁位置：`Zombie::WalkIntoHouse()`
 
-### Lua 辅助模块（可选但强烈推荐）
+### Lua 辅助模块体系 — Phase 1：基础设施 + plant_helper（当前阶段目标）
 
-- [ ] **创建 `plant_helper.lua` 内置辅助模块**
-  - 路径：`mods/_internal/plant_helper.lua`（或嵌入到 ModLua 中作为 require 模块）
-  - 提供以下高阶封装降低模组作者门槛：
+**架构决策**：所有辅助模块以独立 `.lua` 文件存放在 `mods/_internal/` 目录下，在 `Init()` 中通过 `Sexy::GetResourcePath()` 读取文件后 `luaL_loadbuffer` 执行，注册为全局表。Mod 作者可直接阅读源码学习，修改无需重新编译。
 
-- [ ] **`plant_helper.SimpleAI(plant, { ... })`** — 简易状态机 AI
-  ```lua
-  -- 用法示例
-  plant_helper.SimpleAI(plant, {
-      idle = {
-          animation = "anim_idle",
-          on_update = function(p) 
-              local t = Board:FindTargetZombie(p)
-              if t then return "attacking" end
-          end
-      },
-      attacking = {
-          animation = "anim_shoot",
-          loopType = REANIM_PLAY_ONCE_AND_HOLD,
-          on_finish = function(p)
-              Board:AddProjectile(p.x, p.y, p.row, PROJ_PEA)
-              return "idle"
-          end
-      }
-  })
-  ```
+**C++ 侧改动**（`src/Mod/ModLua.cpp`）：
+- 新增 `Lua_LoadHelperModules(lua_State* L)` 函数
+- 使用 `Sexy::GetResourcePath("mods/_internal/...lua")` 定位文件
+- 通过已有的 `ReadFileText()` 读取 + `luaL_loadbuffer` + `lua_pcall` 执行
+- 在 `Init()` 末尾调用 `Lua_LoadHelperModules(L)`
+- `ModLua.h` 无需新增公开方法（仅在 `Init()` 内部调用）
 
-- [ ] **`plant_helper.AutoShooter(plant, { ... })`** — 简化版自动射击封装
-  ```lua
-  plant_helper.AutoShooter(plant, {
-      range = 300,
-      fireRate = 90,
-      projectileType = PROJ_PEA,
-      projectileDamage = 20,
-      onFire = function(plant, target) end,  -- 可选回调
-  })
-  ```
+**Lua 侧策略**：
+- 使用弱表（`__mode = "k"`）管理 plant→state 映射，植物销毁后自动回收
+- 每个模块提供 `Update(plant)` 供 mod 在 `OnPlantUpdate` 中调用
+- 所有模块通过 `_helpers` 内部表共享计时器基础设施
 
-- [ ] **`plant_helper.TimedAction(plant, frames, callback)`** — 计时器辅助
-  - 方便在 `OnPlantUpdate` 中实现延迟/间隔逻辑，无需手动管理计数器
+#### 步骤 1：基础计时器设施（`_timer` 内部模块）
+
+- [x] **实现 C++ 全局计时器池（取代原 Lua 实现）**
+  - 路径：`src/Mod/ModTimer.h`、`src/Mod/ModTimer.cpp`
+  - 功能：全局统一的帧计数器管理，供所有 helper 模块共用
+  - 实现方式：C++ `ModTimer` 类管理定时器池，通过 Lua C 绑定注册为 `_timer` 全局表
+  - API 签名（与旧 Lua 实现完全一致，对 Lua 侧透明）：
+    ```lua
+    -- _timer 模块（内部使用，不暴露给 mod 作者）
+    _timer.New(parent, frames, callback) → timer_id  -- 创建计时器
+    _timer.Cancel(id)                                  -- 取消计时器
+    _timer.TickAll(parent)                             -- 每帧推进某父对象的所有计时器
+    _timer.CancelAll(parent)                           -- 取消某父对象的所有计时器
+    ```
+  - 实现：`_timer.TickAll()` 由各 helper 的 `Update()` 隐式调用
+  - 回调管理：Lua 函数通过 `lua_Ref` 存储在 C++ 端，回调时通过 Lua C API 调用
+  - 生命周期：`gModTimer.Shutdown()` 在 `ModLua::Shutdown()` 中释放所有 Lua 引用
+
+#### 步骤 2：`plant_helper` 模块 — 封装成独立的 Lua 模块字符串
+
+- [x] **`plant_helper.SimpleAI(plant, state_table)`** — 简易状态机 AI
+  - 位置：`src/Mod/ModLua.cpp` 嵌入字符串 `plant_helper.lua`
+  - 注册为全局表 `PlantHelper`
+  - 设计细节：
+    - 内部维护 `_plants` 弱表：`plant_userdata → { current_state, states, anim_playing }`
+    - 状态结构：`{ animation?, loopType?, on_update?, on_finish?, on_enter?, on_exit? }`
+    - `on_update(p)` → 返回下一个状态名或 nil（保持当前状态）
+    - `on_finish(p)` → 动画播放完毕时调用，返回下一个状态名
+    - 自动管理动画切换：状态变更时自动调用 `plant:PlayBodyReanim(state.animation, state.loopType)`
+    - 通过 `reanim:GetLoopCount()` 变化检测 `on_finish` 触发时机
+  - 用法示例：
+    ```lua
+    function OnPlantUpdate(plant)
+        PlantHelper.Update(plant)
+        -- 如果植物没有注册 SimpleAI，Update 是空操作
+    end
+
+    function OnPlantSpawn(plant)
+        if plant.id == "fire_pea" then
+            PlantHelper.SimpleAI(plant, {
+                idle = {
+                    animation = "anim_idle",
+                    on_update = function(p)
+                        if Board:FindTargetZombie(p) then return "attacking" end
+                    end
+                },
+                attacking = {
+                    animation = "anim_shoot",
+                    loopType = ReanimLoopType.PLAY_ONCE_AND_HOLD,
+                    on_finish = function(p)
+                        Board:AddProjectile(p.x, p.y, p.row, ProjectileType.PEA)
+                        return "idle"
+                    end
+                }
+            })
+        end
+    end
+    ```
+  - 验证：用 `peashooter_plus` 或新建 `demo_plant` mod 做端到端测试
+
+- [x] **`plant_helper.AutoShooter(plant, config)`** — 自动射击封装
+  - 设计细节：
+    - 基于 `_timer` 实现发射间隔计数器
+    - 配置：`{ range, fireRate, projectileType, projectileDamage?, onFire? }`
+    - `Update(plant)` 内部：查找目标 → 目标在射程内 → 倒计时递减 → 到 0 发射
+    - 发射时调用 `Board:AddProjectile()` + 设置伤害 + 触发 `onFire` 回调
+    - 无目标时重置计时器（不浪费帧）
+  - 用法示例：
+    ```lua
+    function OnPlantSpawn(plant)
+        PlantHelper.AutoShooter(plant, {
+            range = 300,
+            fireRate = 90,
+            projectileType = ProjectileType.PEA,
+            projectileDamage = 20,
+        })
+    end
+    ```
+
+- [x] **`plant_helper.TimedAction(plant, frames, callback)`** — 单次延时
+  - 设计细节：
+    - 基于 `_timer` 实现，`frames` 帧后调用 `callback(plant)`
+    - 返回 `cancel()` 函数用于提前取消
+    - 支持链式调用：`TimedAction(p, 30, f):Then(60, g)`
+  - 用法示例：
+    ```lua
+    function OnPlantSpawn(plant)
+        PlantHelper.TimedAction(plant, 60, function(p)
+            p:PlayBodyReanim("anim_idle", ReanimLoopType.LOOP)
+        end)
+    end
+    ```
+
+- [x] **`plant_helper.RepeatAction(plant, interval, callback)`** — 重复执行
+  - 类似 TimedAction 但循环执行，`callback` 返回 false 时停止
+  - 适合周期性效果（如每 120 帧产生阳光）
+
+### Lua 辅助模块体系 — Phase 2：扩展模块
+
+以下模块在 Phase 1 基础设施就绪后按需添加，共享 `_timer` 设施。
+
+#### `zombie_helper` — 僵尸行为辅助
+
+- [ ] **`zombie_helper.SimpleAI(zombie, state_table)`**
+  - 位置：`src/Mod/ModLua.cpp` 嵌入字符串 `zombie_helper.lua`
+  - 注册为全局表 `ZombieHelper`
+  - 与 `plant_helper.SimpleAI` 结构相同，但操作 Zombie 实体
+  - 僵尸状态机可在 `OnZombieSpawn` 中注册，`OnPlantUpdate` 中不适用（需新增 `OnZombieUpdate` 回调 —— 参见 Phase 3）
+
+#### `projectile_helper` — 弹道辅助
+
+- [ ] **`projectile_helper.Spread(plant, count, angle, config)`** — 扇形散射
+  - 一次发射 count 发投射物，呈 angle 度扇形分布
+  - 每发单独调用 `Board:AddProjectile()` + `proj:SetVelocity()` 设置方向
+
+- [ ] **`projectile_helper.Burst(plant, count, delay, config)`** — 连射
+  - 使用 `_timer` 按 delay 帧间隔依次发射 count 发
+
+- [ ] **`projectile_helper.Homing(projectile, target, turnRate)`** — 跟踪弹
+  - 标记投射物为跟踪模式，在 `OnProjectileUpdate`（需新增回调）中逐帧修正方向
+
+#### `wave_helper` — 波次/刷怪辅助
+
+- [ ] **`wave_helper.ScheduleWave(wave_index, spawn_list)`** — 自定义波次
+  - 格式：`{ { type, row, delay }, ... }`
+  - 在 `OnWaveStart` 中使用 `_timer` 调度僵尸生成
+
+- [ ] **`wave_helper.TimedSpawn(delay, type, row, count)`** — 延时刷怪
+  - 任意时刻调用，不依赖波次系统
+
+#### `tween_helper` — 插值/动画辅助
+
+- [ ] **`tween_helper.Tween(entity, props, duration, easing)`** — 属性平滑过渡
+  - 支持对 `x`, `y`, `scale`, `rotation` 等属性的线性/缓动插值
+  - 基于 `_timer` 驱动，每帧更新实体属性
+  - 缓动函数：`linear`, `easeIn`, `easeOut`, `easeInOut`, `bounce`
+
+- [ ] **`tween_helper.Sequence(steps)`** — 动画序列编排
+  - `steps` 数组：`{ { action, duration }, ... }`
+  - `action` 可以是函数调用或 Tween 配置
+
+#### `ui_helper` — UI 辅助
+
+- [ ] **`ui_helper.ProgressBar(x, y, w, h, max_value)`** — HUD 进度条
+  - 基于 `Board.AddButton` 或全新绘制（需 C++ 侧渲染支持）
+  - 当前优先使用 `Board.AddButton` 模拟
+
+- [ ] **`ui_helper.FloatingText(text, x, y, duration, color)`** — 浮动文字
+  - 使用 `_timer` 驱动显示和淡出
+
+#### `util_helper` — 通用工具
+
+- [ ] **`util_helper.Clamp(v, min, max)`**
+- [ ] **`util_helper.Lerp(a, b, t)`**
+- [ ] **`util_helper.RandomWeighted({{value, weight}, ...})`**
+- [ ] **`util_helper.GridDistance(col1, row1, col2, row2)`**
+- [ ] **`util_helper.Shuffle(t)`**
+- [ ] **`util_helper.TableContains(t, v)`**
+
+---
+
+### C++ 侧预置条件（辅助模块的前置基础设施）
+
+以下 C++ 改动是辅助模块正常工作所必需的：
+
+- [x] **在 `ModLua::Init()` 中加载 helper 模块**
+  - 位置：`src/Mod/ModLua.cpp`（`Init()` 中 `Lua_RegisterGameTable(L)` 后调用）
+  - 实现方式：
+    - `_timer`：C++ 类 `ModTimer`，通过 `Lua_RegisterTimerTable()` 注册为 `_timer` 全局表
+    - `plant_helper`：`Sexy::GetResourcePath()` + `ReadFileText()` + `luaL_loadbuffer` + `lua_pcall`
+  - `src/Mod/Scripts/plant_helper.lua` 以独立文件存放；`_timer` 不再从 Lua 文件加载
+  - 新增 `entity._ptr` 属性（lightuserdata）作为跨回调稳定标识符
+
+- [ ] **考虑新增 `OnZombieUpdate(zombie)` 回调**（如需僵尸辅助模块）
+  - 位置：`src/Mod/ModLua.h:29`，`src/Mod/ModLua.cpp` 新增函数
+  - 补丁：`Zombie::Update()` 中插入调用
+  - 这是 `zombie_helper.SimpleAI` 能正常工作的前提
+
+- [ ] **考虑新增 `OnProjectileUpdate(projectile)` 回调**（如需跟踪弹辅助）
+  - 位置：`src/Mod/ModLua.h`，`src/Mod/ModLua.cpp` 新增函数
+  - 补丁：`Projectile::Update()` 中插入调用
+
+### 实施验证（测试）
+
+- [x] **创建 `_test_helpers/` 测试 mod 验证 Phase 1**
+  - 测试 `SimpleAI`：注册一个自定义植物，状态机在 idle/attacking 之间切换
+  - 测试 `AutoShooter`：注册一个自动射击植物，验证发射间隔和伤害
+  - 测试 `TimedAction`：验证延时执行和取消
+
+- [ ] **创建 `demo_plant` 示例 mod**（AGENTS.md 提及但不存在）
+  - 演示完整的自定义植物生命周期：注册 → 动画 → AI → 射击
 
 ---
 
@@ -342,13 +510,17 @@
 
 ## 附录：建议实施顺序
 
-| 阶段 | 内容 | 预估工作量 |
-|------|------|-----------|
-| **P0** | 基础设施修复（Game.GetMode、ModZombieDef、依赖排序） | ~1天 |
-| **P1** | 常量表注册（全部枚举，纯 Lua 侧） | ~半天 |
-| **P2** | **自定义植物三大 API**（动画控制 + 目标查找 + 投射物生成） | ~3天 |
-| **P3** | 实体属性+方法扩展 + Projectile 新实体类型 | ~2天 |
-| **P4** | 关键回调（PlantDie、ZombieAttack、ProjectileSpawn/Hit/Miss、CoinCollect、ZombieReachHouse） | ~2天 |
-| **P5** | Lua 辅助模块（plant_helper 状态机/自动射击/计时器） | ~1天 |
-| **P6** | Game/Board API 扩展 + 现有问题修复 | ~1天 |
-| **P7** | 次要回调 + UI 回调 + 质量增强 | ~2天 |
+| 阶段 | 内容 | 预估工作量 | 状态 |
+|------|------|-----------|------|
+| **P0** | 基础设施修复（Game.GetMode、ModZombieDef、依赖排序） | ~1天 | ✅ 完成 |
+| **P1** | 常量表注册（全部枚举，纯 Lua 侧） | ~半天 | ✅ 完成 |
+| **P2** | **自定义植物三大 API**（动画控制 + 目标查找 + 投射物生成） | ~3天 | ✅ 完成 |
+| **P3** | 实体属性+方法扩展 + Projectile 新实体类型 | ~2天 | ✅ 完成 |
+| **P4** | 关键回调（PlantDie、ZombieAttack、ProjectileSpawn/Hit/Miss、CoinCollect、ZombieReachHouse） | ~2天 | ✅ 完成 |
+| **P5a** | **C++ 预置条件**：helper 模块嵌入加载、`entity._ptr` 稳定标识符 | ~0.5天 | ✅ 完成 |
+| **P5b** | **plant_helper 模块**：C++ `_timer` + SimpleAI + AutoShooter + TimedAction | ~1天 | ✅ 完成 |
+| **P5c** | **验证**：`_test_helpers` 端到端测试 | ~0.5天 | ✅ 完成 |
+| **P6** | 辅助模块 Phase 2（zombie_helper + projectile_helper + wave_helper + tween_helper + util_helper + ui_helper） | ~2天 | ❌ 待定 |
+| **P7** | Game/Board API 扩展（Sun、Coin、Foley、场地类型等） | ~1天 | ❌ 待定 |
+| **P8** | 次要回调 + UI 回调（OnPlantEaten、OnPause、OnSeedChooserOpen 等） | ~2天 | ❌ 待定 |
+| **P9** | 质量增强：测试套件、声音覆盖、资源覆盖 | ~2天 | ❌ 待定 |

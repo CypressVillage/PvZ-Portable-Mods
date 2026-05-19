@@ -1,0 +1,9 @@
+{
+  "id": "_test_helpers",
+  "name": "Helper Module Tests",
+  "version": "1.0.0",
+  "author": "pvz-portable",
+  "description": "End-to-end validation of plant_helper.lua: SimpleAI, AutoShooter, TimedAction, RepeatAction",
+  "priority": 999,
+  "entry": "scripts/main.lua"
+}

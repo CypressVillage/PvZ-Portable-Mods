@@ -33,6 +33,7 @@ src/
   Mod/                 ★ MOD FRAMEWORK (focus)
     ModLoader.h/.cpp       — scan mods/, parse manifest, dependency sort
     ModLua.h/.cpp          — Lua 5.4 VM, API bindings, event hooks
+    ModTimer.h/.cpp        — frame-based timer pool (C++, replaces former _timer.lua)
     ModRegistry.h/.cpp     — dynamic data registry (plants/zombies/modes/projectiles)
     ModSave.h/.cpp         — per-mod KV persistence (modsave/<id>.json)
     LuaProxyDialog.h/.cpp  — Lua-created dialog proxy
@@ -66,12 +67,13 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 
 | Mod | What it demonstrates |
 |-----|---------------------|
-| `example_mod` | Pipeline validation (strings, logging, zombie hooks) |
 | `auto_collect_sun` | `OnCoinSpawn` + `coin:Collect()` |
-| `demo_plant` | Custom plant via `Game.RegisterPlant()` + external reanim XML |
+| `demo_plant` | `Game.RegisterPlant` + `PlantHelper.SimpleAI` state machine (triple shot) |
 | `peashooter_plus` | `Game.RegisterPlant` + `Game.RegisterProjectile` + custom reanim |
 | `speed_control` | `Board.AddButton` + `Game.SetSpeed` + mod save |
-| `ui_test_mod` | `UI.CreateDialog` / `UI.ShowMessage` / `Dialog:AddButton` |
+| `_test_helpers` | End-to-end validation of PlantHelper module (SimpleAI, AutoShooter, TimedAction, RepeatAction) |
+| `example_mod` *(planned)* | Pipeline validation (strings, logging, zombie hooks) |
+| `ui_test_mod` *(planned)* | `UI.CreateDialog` / `UI.ShowMessage` / `Dialog:AddButton` |
 
 ---
 
@@ -79,10 +81,10 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 
 | Path | Content |
 |------|---------|
-| `docs/modding.md` | Full modding specification (English) |
+| `docs/modding.md` | Full modding specification (English) — covers all APIs, callbacks, constants, PlantHelper module, examples |
 | `docs/modding.zh-CN.md` | Modding spec (Chinese) |
 | `docs/custom-plants.md` | Custom plant Lua API + reanim XML guide |
 | `docs/pvz-animation.md` | Reanim animation system reference (peashooter example) |
 | `docs/ARCHITECTURE.md` | Mod framework architecture, module details, engine patch points |
-| `docs/TODO.md` | Remaining dev tasks (Phase 7, Phase 8, hot reload) |
+| `docs/TODO.md` | Remaining dev tasks (Phase 6–9: Game API, minor callbacks, quality) |
 | `docs/bug-fixes/` | Resolved bug postmortems (Seed Chooser / Almanac) |

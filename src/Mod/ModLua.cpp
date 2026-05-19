@@ -7,6 +7,7 @@
 #include "ModLua.h"
 #include "ModSave.h"
 #include "ModRegistry.h"
+#include "ModTimer.h"
 #include "LuaProxyDialog.h"
 #include "../LawnApp.h"
 #include "../GameConstants.h"
@@ -415,6 +416,18 @@ namespace
 			strcmp(key, "GetValue") == 0 || strcmp(key, "StartFade") == 0) {
 			lua_getmetatable(L, 1);
 			lua_getfield(L, -1, key);
+			return 1;
+		}
+
+		// _ptr: stable lightuserdata for the C++ pointer, usable as Lua table key
+		if (strcmp(key, "_ptr") == 0) {
+			void* p = nullptr;
+			if (ent->type == 0) p = ent->ptr.plant;
+			else if (ent->type == 1) p = ent->ptr.zombie;
+			else if (ent->type == 2) p = ent->ptr.coin;
+			else if (ent->type == 3) p = ent->ptr.projectile;
+			if (p) { lua_pushlightuserdata(L, p); return 1; }
+			lua_pushnil(L);
 			return 1;
 		}
 
@@ -2322,6 +2335,86 @@ namespace
 			lua_pop(L, 1);
 		}
 	}
+
+	// ---- _timer C implementation (replaces _timer.lua) ----
+
+	int Lua_TimerNew(lua_State* L)
+	{
+		void* parentPtr = lua_touserdata(L, 1);
+		int frames = static_cast<int>(luaL_checkinteger(L, 2));
+		luaL_checktype(L, 3, LUA_TFUNCTION);
+		bool isRepeat = lua_isboolean(L, 4) ? lua_toboolean(L, 4) != 0 : false;
+		int interval = lua_isinteger(L, 5) ? static_cast<int>(lua_tointeger(L, 5)) : frames;
+
+		lua_pushvalue(L, 3);
+		int callbackRef = luaL_ref(L, LUA_REGISTRYINDEX);
+
+		int id = gModTimer.New(parentPtr, frames, callbackRef, isRepeat, interval);
+		lua_pushinteger(L, id);
+		return 1;
+	}
+
+	int Lua_TimerCancel(lua_State* L)
+	{
+		int id = static_cast<int>(luaL_checkinteger(L, 1));
+		gModTimer.Cancel(id, L);
+		return 0;
+	}
+
+	int Lua_TimerCancelAll(lua_State* L)
+	{
+		void* parentPtr = lua_touserdata(L, 1);
+		gModTimer.CancelAll(parentPtr, L);
+		return 0;
+	}
+
+	int Lua_TimerTickAll(lua_State* L)
+	{
+		void* parentPtr = lua_touserdata(L, 1);
+		gModTimer.TickAll(parentPtr, L);
+		return 0;
+	}
+
+	static void Lua_RegisterTimerTable(lua_State* L)
+	{
+		lua_newtable(L);
+		lua_pushcfunction(L, Lua_TimerNew);
+		lua_setfield(L, -2, "New");
+		lua_pushcfunction(L, Lua_TimerCancel);
+		lua_setfield(L, -2, "Cancel");
+		lua_pushcfunction(L, Lua_TimerCancelAll);
+		lua_setfield(L, -2, "CancelAll");
+		lua_pushcfunction(L, Lua_TimerTickAll);
+		lua_setfield(L, -2, "TickAll");
+		lua_setglobal(L, "_timer");
+	}
+
+	static void Lua_LoadHelperModules(lua_State* L)
+	{
+		// Load plant_helper from ModScripts/plant_helper.lua
+		{
+			std::string path = Sexy::GetResourcePath("ModScripts/plant_helper.lua");
+			std::string text = ReadFileText(path);
+			if (text.empty())
+			{
+				TodLog("Lua plant_helper file missing at %s", path.c_str());
+				return;
+			}
+			if (luaL_loadbuffer(L, text.c_str(), text.size(), "plant_helper") != 0)
+			{
+				TodLog("Lua plant_helper load failed: %s", lua_tostring(L, -1));
+				lua_pop(L, 1);
+				return;
+			}
+			if (lua_pcall(L, 0, 0, 0) != 0)
+			{
+				TodLog("Lua plant_helper run failed: %s", lua_tostring(L, -1));
+				lua_pop(L, 1);
+				return;
+			}
+		}
+		TodLog("Lua helper modules loaded successfully");
+	}
 #endif
 }
 
@@ -2337,6 +2430,8 @@ bool ModLua::Init()
 
 	luaL_openlibs(L);
 	Lua_RegisterGameTable(L);
+	Lua_RegisterTimerTable(L);
+	Lua_LoadHelperModules(L);
 	mState = L;
 	return true;
 #else
@@ -2351,6 +2446,7 @@ void ModLua::Shutdown()
 	if (mState != nullptr)
 	{
 		lua_State* L = static_cast<lua_State*>(mState);
+		gModTimer.Shutdown(L);
 		lua_close(L);
 		mState = nullptr;
 	}

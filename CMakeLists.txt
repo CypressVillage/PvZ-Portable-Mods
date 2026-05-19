@@ -187,6 +187,9 @@ if(BUILD_STATIC AND TARGET SDL2::SDL2-static)
 	_pvz_patch_sdl2_iface_libs(SDL2_mixer_ext_Static)
 endif()
 
+# Copy built-in Lua helper scripts alongside the binary (for runtime loading via GetResourcePath)
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/src/Mod/Scripts/ DESTINATION ${CMAKE_BINARY_DIR}/ModScripts/)
+
 # Android requires a shared library loaded by SDLActivity; other platforms use an executable.
 if(ANDROID)
 	add_library(pvz-portable SHARED ${SOURCES})
