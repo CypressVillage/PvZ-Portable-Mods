@@ -179,17 +179,21 @@
 
 ### 现有问题修复（移至此处以便集中处理）
 
-- [ ] **修复保存格式为 JSON**
-  - 位置：`src/Mod/ModSave.cpp:74`
+- [x] **修复保存格式为 JSON**
+  - 位置：`src/Mod/ModJson.h/.cpp`, `src/Mod/ModSave.cpp`
+  - 提取 JSON 解析/序列化到 `ModJson` 共享模块，`ModLoader` 和 `ModSave` 统一调用
 
-- [ ] **实现实体 `id` 字符串查找**
-  - 位置：`src/Mod/ModLua.cpp:313-321`
+- [x] **实现实体 `id` 字符串查找**
+  - 位置：`src/Mod/ModLua.cpp:386-413`
+  - `entity.id` 通过 `ModRegistry` 查询自定义实体注册 ID（plant≥2000, zombie≥3000, projectile≥4000）
 
-- [ ] **`LuaProxyDialog::ButtonDepress` 支持不关闭对话框**
-  - 位置：`src/Mod/LuaProxyDialog.cpp:128`
+- [x] **`LuaProxyDialog::ButtonDepress` 支持不关闭对话框**
+  - 位置：`src/Mod/LuaProxyDialog.cpp:99-134`
+  - Lua 回调返回 `false` 阻止对话框关闭
 
-- [ ] **实现自定义模式挑战 UI 集成**
-  - Challenge.cpp 仍使用硬编码数组
+- [x] **实现自定义模式挑战 UI 集成**
+  - 位置：`src/Mod/ModRegistry.h/.cpp`, `src/Lawn/Widget/ChallengeScreen.h/.cpp`
+  - `ModModeDef` 新增挑战 UI 字段，`ChallengeScreen` 动态读取并创建按钮
 
 ---
 

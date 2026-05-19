@@ -342,6 +342,31 @@ namespace
 			def.id = lua_tostring(L, -1);
 		lua_pop(L, 1);
 
+		lua_getfield(L, 1, "name");
+		if (lua_isstring(L, -1))
+			def.challengeName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "page");
+		if (lua_isinteger(L, -1))
+			def.challengePage = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "row");
+		if (lua_isinteger(L, -1))
+			def.challengeRow = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "col");
+		if (lua_isinteger(L, -1))
+			def.challengeCol = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "iconIndex");
+		if (lua_isinteger(L, -1))
+			def.challengeIconIndex = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
 		std::string error;
 		if (gModRegistry.RegisterMode(def, &error))
 		{
@@ -386,15 +411,29 @@ namespace
 		if (ent->type == 0 && ent->ptr.plant) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.plant->mSeedType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, ent->ptr.plant->mPlantHealth); return 1; }
-			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; } // No direct ID equivalent
+			if (strcmp(key, "id") == 0) {
+				int seedType = static_cast<int>(ent->ptr.plant->mSeedType);
+				if (seedType >= 2000) {
+					const ModPlantDef* def = gModRegistry.FindPlantByRuntimeId(seedType);
+					if (def) { lua_pushstring(L, def->id.c_str()); return 1; }
+				}
+				lua_pushstring(L, ""); return 1;
+			}
 		} else if (ent->type == 1 && ent->ptr.zombie) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.zombie->mZombieType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, ent->ptr.zombie->mBodyHealth); return 1; }
-			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; } // No direct ID equivalent
+			if (strcmp(key, "id") == 0) {
+				int zombieType = static_cast<int>(ent->ptr.zombie->mZombieType);
+				if (zombieType >= 3000) {
+					const ModZombieDef* def = gModRegistry.FindZombieByRuntimeId(zombieType);
+					if (def) { lua_pushstring(L, def->id.c_str()); return 1; }
+				}
+				lua_pushstring(L, ""); return 1;
+			}
 		} else if (ent->type == 2 && ent->ptr.coin) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.coin->mType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 0); return 1; }
-			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; }
+			if (strcmp(key, "id") == 0) { lua_pushstring(L, ""); return 1; }
 		} else if (ent->type == 3 && ent->ptr.projectile) {
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.projectile->mProjectileType)); return 1; }
 			if (strcmp(key, "x") == 0) { lua_pushnumber(L, ent->ptr.projectile->mPosX); return 1; }
@@ -404,7 +443,14 @@ namespace
 			if (strcmp(key, "motionType") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.projectile->mMotionType)); return 1; }
 			if (strcmp(key, "age") == 0) { lua_pushinteger(L, ent->ptr.projectile->mProjectileAge); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 1); return 1; }
-			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; }
+			if (strcmp(key, "id") == 0) {
+				int projectileType = static_cast<int>(ent->ptr.projectile->mProjectileType);
+				if (projectileType >= 4000) {
+					const ModProjectileDef* def = gModRegistry.FindProjectileByRuntimeId(projectileType);
+					if (def) { lua_pushstring(L, def->id.c_str()); return 1; }
+				}
+				lua_pushstring(L, ""); return 1;
+			}
 			if (strcmp(key, "damage") == 0) { lua_pushinteger(L, ent->ptr.projectile->mDamageOverride >= 0 ? ent->ptr.projectile->mDamageOverride : ent->ptr.projectile->GetProjectileDef().mDamage); return 1; }
 			if (strcmp(key, "velX") == 0) { lua_pushnumber(L, ent->ptr.projectile->mVelX); return 1; }
 			if (strcmp(key, "velY") == 0) { lua_pushnumber(L, ent->ptr.projectile->mVelY); return 1; }

@@ -51,6 +51,11 @@ struct ModModeDef
 {
 	std::string id;
 	int baseMode = -1;
+	int challengePage = 1;
+	int challengeRow = 0;
+	int challengeCol = 0;
+	int challengeIconIndex = 0;
+	std::string challengeName;
 };
 
 struct ModProjectileDef
@@ -60,6 +65,16 @@ struct ModProjectileDef
 	float speed = 3.0f;
 	std::string imageName;
 	int projectileType = -1;
+};
+
+struct ModModeChallengeDef
+{
+	int baseMode;
+	int page;
+	int row;
+	int col;
+	int iconIndex;
+	std::string name;
 };
 
 class ModRegistry
@@ -87,6 +102,8 @@ public:
 	int GetTotalAlmanacPlants() const;
 	int GetAlmanacPlantAt(int index) const;
 	int ResolveReanimationType(const std::string& reanimName) const;
+
+	std::vector<ModModeChallengeDef> GetModeChallengeDefs() const;
 
 	void BuildReanimNameMap();
 	unsigned int RegisterDynamicReanim(const std::string& reanimFilePath);

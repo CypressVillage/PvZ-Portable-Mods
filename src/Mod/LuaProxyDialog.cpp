@@ -110,11 +110,18 @@ void LuaProxyDialog::ButtonDepress(int theId)
 			{
 				lua_State* L = static_cast<lua_State*>(mLuaState);
 				lua_rawgeti(L, LUA_REGISTRYINDEX, entry.luaRef);
+				bool shouldClose = true;
 				if (lua_isfunction(L, -1))
 				{
-					if (lua_pcall(L, 0, 0, 0) != 0)
+					if (lua_pcall(L, 0, 1, 0) != 0)
 					{
 						TodLog("Lua button callback failed: %s", lua_tostring(L, -1));
+						lua_pop(L, 1);
+					}
+					else
+					{
+						if (lua_isboolean(L, -1) && !lua_toboolean(L, -1))
+							shouldClose = false;
 						lua_pop(L, 1);
 					}
 				}
@@ -123,9 +130,12 @@ void LuaProxyDialog::ButtonDepress(int theId)
 					lua_pop(L, 1);
 				}
 
-				LawnApp* app = mApp;
-				int dialogId = mId;
-				app->KillDialog(dialogId);
+				if (shouldClose)
+				{
+					LawnApp* app = mApp;
+					int dialogId = mId;
+					app->KillDialog(dialogId);
+				}
 				return;
 			}
 		}

@@ -165,6 +165,21 @@ const ModProjectileDef* ModRegistry::FindProjectileByRuntimeId(int projectileTyp
 	return it == mRuntimeProjectiles.end() ? nullptr : &it->second;
 }
 
+std::vector<ModModeChallengeDef> ModRegistry::GetModeChallengeDefs() const
+{
+	std::vector<ModModeChallengeDef> out;
+	for (const auto& pair : mRuntimeModes)
+	{
+		const ModModeDef& def = pair.second;
+		if (!def.challengeName.empty())
+		{
+			out.push_back({ def.baseMode, def.challengePage, def.challengeRow, def.challengeCol,
+				def.challengeIconIndex, def.challengeName });
+		}
+	}
+	return out;
+}
+
 const std::vector<std::string>& ModRegistry::GetErrors() const
 {
 	return mErrors;

@@ -3,11 +3,12 @@
 ## 一、Mod 框架组成部分
 
 ```
-src/Mod/                         # Mod 框架核心（5 个模块）
+src/Mod/                         # Mod 框架核心（6 个模块）
 ├── ModLoader.h/.cpp             # Mod 加载器
 ├── ModLua.h/.cpp                # Lua 虚拟机与 API 绑定
 ├── ModRegistry.h/.cpp           # 数据注册表（植物、僵尸、模式、投射物）
-├── ModSave.h/.cpp               # Mod 独立存档
+├── ModSave.h/.cpp               # Mod 独立存档（JSON 格式）
+├── ModJson.h/.cpp               # JSON 解析/序列化共享基础模块
 └── LuaProxyDialog.h/.cpp        # Lua 创建的对话框代理
 ```
 
@@ -44,7 +45,7 @@ src/Mod/                         # Mod 框架核心（5 个模块）
 | | `RemoveButton(id)` | 移除按钮 |
 | | `SetButtonVisible(id, visible)` | 设置按钮可见性 |
 | | `SetButtonLabel(id, label)` | 设置按钮标签 |
-| `Entity` | `entity.type` / `entity.hp` / `entity.id` | 属性只读访问 |
+| `Entity` | `entity.type` / `entity.hp` / `entity.id` | 属性只读访问（`id` 返回 Mod 注册字符串） |
 | | `entity:Damage(amount)` | 造成伤害 |
 | | `entity:IsSun()` | 是否为阳光 |
 | | `entity:Collect()` | 收集（硬币） |
@@ -79,27 +80,35 @@ src/Mod/                         # Mod 框架核心（5 个模块）
 - **注册类型**：
   - `ModPlantDef` — id, seedType, seedCost, refreshTime, subClass, launchRate, projectileType, plantName, reanimationName, imageName
   - `ModZombieDef` — id, zombieType
-  - `ModModeDef` — id, baseMode
+  - `ModModeDef` — id, baseMode, challengePage/Row/Col/IconIndex/Name
   - `ModProjectileDef` — id, damage, speed, imageName, projectileType
+  - `ModModeChallengeDef` — baseMode, page, row, col, iconIndex, name（供 ChallengeScreen 动态渲染）
 - **反向查询**：`FindByRuntimeId()` 支持运行时 ID → Mod 定义的反查
 - **动态 Reanim**：`RegisterDynamicReanim()` 支持外部 reanim XML 注册
 - **图鉴集成**：`GetTotalAlmanacPlants()` / `GetAlmanacPlantAt()` 与图鉴联动
 
-### (4) ModSave — Mod 独立存档
+### (4) ModJson — JSON 共享模块
+
+- 提供 `ModJsonParser`、`ModJsonSerializeMap`、`ModJsonDeserializeMap`、`ModJsonReadFile`
+- 被 `ModLoader`（解析 mod.json 清单）和 `ModSave`（存档读写）统一调用，消除重复代码
+
+### (5) ModSave — Mod 独立存档
 
 - 存储路径：`<appdata>/modsave/<mod_id>.json`
+- 格式：标准 JSON `{"key":"value", ...}`
 - API：`SaveValue(modId, key, value)` / `LoadValue(modId, key, &outValue)`
 - 与游戏存档 `userdata/` 完全隔离
 
-### (5) LuaProxyDialog — Lua 对话框代理
+### (6) LuaProxyDialog — Lua 对话框代理
 
 - 继承 `LawnDialog`，支持 Lua 侧创建模态/非模态对话框
 - 使用 `luaL_ref` 管理 Lua 回调引用，避免 GC 问题
 - 支持 `AddLuaButton()` 动态添加按钮
 - 支持 `AddLuaLabel()` 添加静态文本标签
 - 对话框 ID 从 `1000` 开始分配
+- `ButtonDepress`：Lua 回调返回 `false` 阻止对话框关闭，返回 `nil`/其他值则照常关闭
 
-### (6) 引擎适配集成点
+### (7) 引擎适配集成点
 
 引擎集成点直接内联在各模块中（`Plant.cpp`、`Projectile.cpp`、`SeedChooserScreen` 等），通过 `gModRegistry` 查询运行时数据：
 - **AlmanacDialog**：显示 Mod 植物的图鉴条目
@@ -147,7 +156,13 @@ mods/<mod_id>/
 | `src/Sexy.TodLib/Reanimator.h/.cpp` | 动态 reanim 加载（外部 XML 跟踪元素解析） |
 | `src/Mod/ModLua.h/.cpp` | 新增 `OnGameStart`、`OnWaveStart`、`OnPlantUpdate` 钩子、`Dialog:AddLabel` API |
 | `docs/pvz-animation.md` | Reanim 动画系统参考文档（以豌豆射手为例，含 XML 格式、轨道命名、Mod 使用指南） |
-| `src/Mod/ModRegistry.h/.cpp` | `ModPlantDef` 新增 `imageName` 字段 |
+| `src/Mod/ModRegistry.h/.cpp` | `ModPlantDef` 新增 `imageName` 字段；`ModModeDef` 新增挑战 UI 字段；新增 `ModModeChallengeDef`、`GetModeChallengeDefs()` |
+| `src/Mod/ModJson.h/.cpp` | **新增**：JSON 解析/序列化共享模块，供 ModLoader 和 ModSave 统一调用 |
+| `src/Mod/ModSave.cpp` | 存档格式从 `key=value` 文本改为标准 JSON，依赖 `ModJson` |
+| `src/Mod/ModLoader.cpp` | 移除内联 JSON 解析器，改用 `ModJson` |
+| `src/Mod/ModLua.cpp` | `entity.id` 返回 Mod 注册 ID 字符串；`Game.RegisterMode()` 新增挑战 UI 参数读取 |
+| `src/Mod/LuaProxyDialog.cpp` | `ButtonDepress` Lua 回调返回 `false` 可阻止对话框关闭 |
+| `src/Lawn/Widget/ChallengeScreen.h/.cpp` | 支持 `ModRegistry` 注册的自定义模式动态生成按钮 |
 
 ## 五、架构关系图
 
@@ -170,5 +185,8 @@ mods/<mod_id>/
 │                     ├─ mod.json            │        │
 │                     ├─ scripts/main.lua    │        │
 │                     └─ resources/          │        │
+│                                          │        │
+│    ModJson (解析/序列化) ─── ModLoader   │        │
+│                └──────── ModSave         │        │
 └─────────────────────────────────────────────────────┘
 ```

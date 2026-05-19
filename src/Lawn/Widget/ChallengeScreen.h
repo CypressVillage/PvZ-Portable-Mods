@@ -23,7 +23,9 @@
 #define __CHALLENGESCREEN_H__
 
 #include "../../ConstEnums.h"
+#include "../../Mod/ModRegistry.h"
 #include "widget/Dialog.h"
+#include <vector>
 using namespace Sexy;
 
 #define NUM_CHALLENGE_MODES (static_cast<int>(GameMode::NUM_GAME_MODES) - 1)
@@ -38,7 +40,8 @@ private:
     {
         ChallengeScreen_Back = 100,
         ChallengeScreen_Mode = 200,
-        ChallengeScreen_Page = 300
+        ChallengeScreen_Page = 300,
+        ChallengeScreen_ModMode = 1000
     };
 
 public:
@@ -54,6 +57,11 @@ public:
     int                         mUnlockChallengeIndex;
     float                       mLockShakeX;
     float                       mLockShakeY;
+
+    std::vector<ModModeChallengeDef>
+                                mModChallengeDefs;
+    std::vector<ButtonWidget*>
+                                mModChallengeButtons;
 
 public:
     ChallengeScreen(LawnApp* theApp, ChallengePage thePage);

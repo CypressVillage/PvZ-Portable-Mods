@@ -22,6 +22,7 @@
 #include "GameButton.h"
 #include "../../LawnApp.h"
 #include "../System/Music.h"
+#include "../../Mod/ModRegistry.h"
 #include "ChallengeScreen.h"
 #include "../../Resources.h"
 #include "../ToolTipWidget.h"
@@ -171,6 +172,21 @@ ChallengeScreen::ChallengeScreen(LawnApp* theApp, ChallengePage thePage)
 		}
 	}
 
+	mModChallengeDefs = gModRegistry.GetModeChallengeDefs();
+	mModChallengeButtons.reserve(mModChallengeDefs.size());
+	for (size_t i = 0; i < mModChallengeDefs.size(); i++)
+	{
+		const auto& modDef = mModChallengeDefs[i];
+		ButtonWidget* aBtn = new ButtonWidget(ChallengeScreen_ModMode + static_cast<int>(i), this);
+		mModChallengeButtons.push_back(aBtn);
+		aBtn->mDoFinger = true;
+		aBtn->mFrameNoDraw = true;
+		if (modDef.page == CHALLENGE_PAGE_CHALLENGE || modDef.page == CHALLENGE_PAGE_LIMBO || modDef.page == CHALLENGE_PAGE_PUZZLE)
+			aBtn->Resize(38 + modDef.col * 155, 93 + modDef.row * 119, 104, 115);
+		else
+			aBtn->Resize(38 + modDef.col * 155, 125 + modDef.row * 145, 104, 115);
+	}
+
 	mToolTip = new ToolTipWidget();
 	mToolTip->mCenter = true;
 	mToolTip->mVisible = false;
@@ -210,6 +226,7 @@ ChallengeScreen::~ChallengeScreen()
 	delete mBackButton;
 	for (ButtonWidget* aPageButton : mPageButton) delete aPageButton;
 	for (ButtonWidget* aChallengeButton : mChallengeButtons) delete aChallengeButton;
+	for (ButtonWidget* aModButton : mModChallengeButtons) delete aModButton;
 	delete mToolTip;
 }
 
@@ -365,6 +382,8 @@ void ChallengeScreen::UpdateButtons()
 {
 	for (int aChallengeMode = 0; aChallengeMode < NUM_CHALLENGE_MODES; aChallengeMode++)
 		mChallengeButtons[aChallengeMode]->mVisible = GetChallengeDefinition(aChallengeMode).mPage == mPageIndex;
+	for (size_t i = 0; i < mModChallengeButtons.size(); i++)
+		mModChallengeButtons[i]->mVisible = mModChallengeDefs[i].page == mPageIndex;
 	for (int aPage = 0; aPage < MAX_CHALLANGE_PAGES; aPage++)
 	{
 		ButtonWidget* aPageButton = mPageButton[aPage];
@@ -562,6 +581,47 @@ void ChallengeScreen::Draw(Graphics* g)
 	for (int aChallengeMode = 0; aChallengeMode < NUM_CHALLENGE_MODES; aChallengeMode++)
 		DrawButton(g, aChallengeMode);
 
+	for (size_t i = 0; i < mModChallengeButtons.size(); i++)
+	{
+		ButtonWidget* aBtn = mModChallengeButtons[i];
+		if (!aBtn->mVisible) continue;
+
+		const auto& modDef = mModChallengeDefs[i];
+		int aPosX = aBtn->mX + (aBtn->mIsDown ? 1 : 0);
+		int aPosY = aBtn->mY + (aBtn->mIsDown ? 1 : 0);
+
+		g->DrawImageCel(Sexy::IMAGE_CHALLENGE_THUMBNAILS, aPosX + 13, aPosY + 4, modDef.iconIndex);
+		bool aHighLight = aBtn->mIsOver;
+		g->SetColorizeImages(false);
+		g->DrawImage(aHighLight ? Sexy::IMAGE_CHALLENGE_WINDOW : Sexy::IMAGE_CHALLENGE_WINDOW_HIGHLIGHT, aPosX - 6, aPosY - 2);
+
+		Color aTextColor = aHighLight ? Color(250, 40, 40) : Color(42, 42, 90);
+		std::string aName = TodStringTranslate(modDef.name);
+		int aNameLen = (int)aName.size();
+		int aAutoWrapNum = mApp->GetInteger("CHALLENGE_SCREEN_BUTTON_AUTO_WRAP_NUM", 13);
+		if (aNameLen < aAutoWrapNum)
+		{
+			TodDrawString(g, aName, aPosX + 52, aPosY + 96, Sexy::FONT_BRIANNETOD12, aTextColor, DS_ALIGN_CENTER);
+		}
+		else
+		{
+			int aHalfPos = aNameLen / 2 - 1;
+			const char* aSpacedChar = strchr(aName.c_str() + aHalfPos, ' ');
+			if (aSpacedChar == nullptr)
+				aSpacedChar = strchr(aName.c_str(), ' ');
+			int aLine1Len = aNameLen;
+			int aLine2Len = 0;
+			if (aSpacedChar != nullptr)
+			{
+				aLine1Len = aSpacedChar - aName.c_str();
+				aLine2Len = aNameLen - aLine1Len - 1;
+			}
+			TodDrawString(g, aName.substr(0, aLine1Len), aPosX + 52, aPosY + 88, Sexy::FONT_BRIANNETOD12, aTextColor, DS_ALIGN_CENTER);
+			if (aLine2Len > 0)
+				TodDrawString(g, aName.substr(aLine1Len + 1, aLine2Len), aPosX + 52, aPosY + 102, Sexy::FONT_BRIANNETOD12, aTextColor, DS_ALIGN_CENTER);
+		}
+	}
+
 	mToolTip->Draw(g);
 }
 
@@ -603,6 +663,7 @@ void ChallengeScreen::AddedToManager(WidgetManager* theWidgetManager)
 	AddWidget(mBackButton);
 	for (ButtonWidget* aButton : mPageButton) AddWidget(aButton);
 	for (ButtonWidget* aButton : mChallengeButtons) AddWidget(aButton);
+	for (ButtonWidget* aButton : mModChallengeButtons) AddWidget(aButton);
 }
 
 void ChallengeScreen::RemovedFromManager(WidgetManager* theWidgetManager)
@@ -611,6 +672,7 @@ void ChallengeScreen::RemovedFromManager(WidgetManager* theWidgetManager)
 	RemoveWidget(mBackButton);
 	for (ButtonWidget* aButton : mPageButton) RemoveWidget(aButton);
 	for (ButtonWidget* aButton : mChallengeButtons) RemoveWidget(aButton);
+	for (ButtonWidget* aButton : mModChallengeButtons) RemoveWidget(aButton);
 }
 
 void ChallengeScreen::ButtonPress(int theId)
@@ -632,6 +694,15 @@ void ChallengeScreen::ButtonDepress(int theId)
 	{
 		mApp->KillChallengeScreen();
 		mApp->PreNewGame((GameMode)(aChallengeMode + 1), true);
+		return;
+	}
+
+	int aModMode = theId - ChallengeScreen::ChallengeScreen_ModMode;
+	if (aModMode >= 0 && aModMode < static_cast<int>(mModChallengeDefs.size()))
+	{
+		mApp->KillChallengeScreen();
+		mApp->PreNewGame((GameMode)mModChallengeDefs[aModMode].baseMode, true);
+		return;
 	}
 
 	int aPageIndex = theId - ChallengeScreen::ChallengeScreen_Page;

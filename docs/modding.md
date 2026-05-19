@@ -207,7 +207,7 @@ Recommended paths inside `resources/`:
 - `Board.GetWave()` — Current wave index
 
 `Entity` (wrapper for a plant, zombie, or coin):
-- `entity.id` — Entity ID (placeholder, always 0)
+- `entity.id` — Mod registration ID string, e.g. `"peashooter_plus"`. Returns `""` for vanilla entities
 - `entity.type` — Entity type as integer (`SeedType` or `ZombieType` or `CoinType`)
 - `entity.hp` — Current health (`mPlantHealth` or `mBodyHealth`)
 - `entity:Damage(amount)` — Deal damage; auto-triggers death at zero HP

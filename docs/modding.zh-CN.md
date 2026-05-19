@@ -224,7 +224,7 @@ mods/
 - `Board.GetWave()` — 获取当前波次编号
 
 `Entity`（植物或僵尸的包装对象）:
-- `entity.id` — 实体 ID（当前为占位，始终为 0）
+- `entity.id` — Mod 注册 ID 字符串，如 `"peashooter_plus"`；原版实体返回 `""`
 - `entity.type` — 实体类型（`SeedType` 或 `ZombieType` 的整数值）
 - `entity.hp` — 当前血量（`mPlantHealth` 或 `mBodyHealth`）
 - `entity:Damage(amount)` — 对实体造成伤害，血量归零时自动触发死亡
