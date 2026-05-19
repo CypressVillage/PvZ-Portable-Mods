@@ -62,36 +62,74 @@
 
 #### A. 动画控制 API — 暴露 Reanimation 系统到 Lua
 
-- [ ] **`plant:PlayBodyReanim(trackName, loopType, blendTime, animRate)`**
+- [x] **`plant:PlayBodyReanim(trackName, loopType, blendTime, animRate)`**
   - 映射 C++ `Plant::PlayBodyReanim(theTrackName, theLoopType, theBlendTime, theAnimRate)`
-  - 位置：`src/Lawn/Plant.cpp:1148`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityPlayBodyReanim`
+  - `plant:GetBodyReanim()` 返回可链式调用的 Reanim 对象
 
-- [ ] **`plant:PlayIdleAnim(animRate)`**
+- [x] **`plant:PlayIdleAnim(animRate)`**
   - 映射 C++ `Plant::PlayIdleAnim(theRate)` → 播放 `"anim_idle"` 轨道
-  - 位置：`src/Lawn/Plant.cpp:5311`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityPlayIdleAnim`
 
-- [ ] **`plant:GetBodyReanimProgress()`** → float
+- [x] **`plant:GetBodyReanimProgress()`** → float
   - 返回 `mAnimTime`（0.0~1.0 归一化进度）
-  - 位置：`src/Sexy.TodLib/Reanimator.h:211`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityGetBodyReanimProgress`
 
-- [ ] **`plant:SetBodyReanimRate(rate)`**
+- [x] **`plant:SetBodyReanimRate(rate)`**
   - 设置 `mAnimRate`，控制动画播放速度
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntitySetBodyReanimRate`
 
-- [ ] **`plant:GetBodyReanimRate()`** → float
+- [x] **`plant:GetBodyReanimRate()`** → float
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityGetBodyReanimRate`
 
-- [ ] **`plant:IsAnimPlaying(trackName)`** → bool
+- [x] **`plant:IsAnimPlaying(trackName)`** → bool
   - 映射 C++ `Reanimation::IsAnimPlaying(theTrackName)`
-  - 位置：`src/Sexy.TodLib/Reanimator.h:279`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityIsAnimPlaying`
 
-- [ ] **`plant:TrackExists(trackName)`** → bool
+- [x] **`plant:TrackExists(trackName)`** → bool
   - 映射 C++ `Reanimation::TrackExists(theTrackName)`
-  - 位置：`src/Sexy.TodLib/Reanimator.h:252`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityTrackExists`
 
-- [ ] **`plant:GetBodyReanimLoopType()`** → int
+- [x] **`plant:GetBodyReanimLoopType()`** → int
   - 返回当前 `mLoopType`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityGetBodyReanimLoopType`
 
-- [ ] **`plant:GetBodyReanimLoopCount()`** → int
+- [x] **`plant:GetBodyReanimLoopCount()`** → int
   - 返回已循环次数 `mLoopCount`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_EntityGetBodyReanimLoopCount`
+
+#### D. Reanim 对象独立 API — 新增 Reanimation Lua 用户数据类型
+
+- [x] **`plant:GetBodyReanim()`** → reanim_userdata
+  - 返回植物主体动画的 Reanim 对象，可链式调用以下方法
+
+- [x] **`reanim:Play(trackName, loopType[, blendTime=0, animRate=0])`**
+  - 映射 C++ `Reanimation::PlayReanim(theTrackName, theLoopType, theBlendTime, theAnimRate)`
+
+- [x] **`reanim:GetRate()` / `reanim:SetRate(rate)`** → float
+  - 读写 `mAnimRate`
+
+- [x] **`reanim:GetProgress()` / `reanim:SetProgress(time)`** → float
+  - 读写 `mAnimTime`（0.0~1.0）
+
+- [x] **`reanim:IsPlaying(trackName)`** → bool
+  - 映射 `Reanimation::IsAnimPlaying`
+
+- [x] **`reanim:TrackExists(trackName)`** → bool
+
+- [x] **`reanim:GetLoopType()` / `reanim:GetLoopCount()`** → int
+  - 读取 `mLoopType` / `mLoopCount`
+
+- [x] **`reanim:SetPosition(x, y)`**
+  - 映射 `Reanimation::SetPosition`
+
+- [x] **`reanim:OverrideScale(sx[, sy])`**
+  - 映射 `Reanimation::OverrideScale`，单参数时等比缩放
+
+- [x] **`reanim:ShowOnlyTrack(trackName)`**
+  - 映射 `Reanimation::ShowOnlyTrack`
+
+- 位置：`src/Mod/ModLua.cpp` — `Game.Reanim` 元表 + `Lua_Reanim*` 系列函数
 
 #### B. 目标查找 API — 暴露实体查询到 Lua
 

@@ -12,6 +12,7 @@
 #include "../GameConstants.h"
 #include "../Lawn/Board.h"
 #include "../Lawn/Plant.h"
+#include "Sexy.TodLib/Reanimator.h"
 #include "../Lawn/Zombie.h"
 #include "../Lawn/Coin.h"
 #include "../Lawn/Widget/GameButton.h"
@@ -366,7 +367,11 @@ namespace
 		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
 		const char* key = luaL_checkstring(L, 2);
 
-		if (strcmp(key, "Damage") == 0 || strcmp(key, "IsSun") == 0 || strcmp(key, "Collect") == 0) {
+		if (strcmp(key, "Damage") == 0 || strcmp(key, "IsSun") == 0 || strcmp(key, "Collect") == 0 ||
+			strcmp(key, "GetBodyReanim") == 0 || strcmp(key, "PlayBodyReanim") == 0 || strcmp(key, "PlayIdleAnim") == 0 ||
+			strcmp(key, "GetBodyReanimProgress") == 0 || strcmp(key, "SetBodyReanimRate") == 0 || strcmp(key, "GetBodyReanimRate") == 0 ||
+			strcmp(key, "IsAnimPlaying") == 0 || strcmp(key, "TrackExists") == 0 ||
+			strcmp(key, "GetBodyReanimLoopType") == 0 || strcmp(key, "GetBodyReanimLoopCount") == 0) {
 			lua_getmetatable(L, 1);
 			lua_getfield(L, -1, key);
 			return 1;
@@ -641,6 +646,256 @@ namespace
 		lua_setmetatable(L, -2);
 		lua_pushvalue(L, -1);
 		ud->selfRef = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+
+	// === Reanimation userdata ===
+	struct LuaReanimUD
+	{
+		Reanimation* reanim;
+	};
+
+	int Lua_ReanimIndex(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		const char* key = luaL_checkstring(L, 2);
+
+		if (!ud->reanim)
+		{
+			lua_pushnil(L);
+			return 1;
+		}
+
+		if (strcmp(key, "Play") == 0 || strcmp(key, "GetRate") == 0 || strcmp(key, "SetRate") == 0 ||
+			strcmp(key, "GetProgress") == 0 || strcmp(key, "SetProgress") == 0 ||
+			strcmp(key, "IsPlaying") == 0 || strcmp(key, "TrackExists") == 0 ||
+			strcmp(key, "GetLoopType") == 0 || strcmp(key, "GetLoopCount") == 0 ||
+			strcmp(key, "SetPosition") == 0 || strcmp(key, "OverrideScale") == 0 ||
+			strcmp(key, "ShowOnlyTrack") == 0)
+		{
+			lua_getmetatable(L, 1);
+			lua_getfield(L, -1, key);
+			return 1;
+		}
+
+		lua_pushnil(L);
+		return 1;
+	}
+
+	int Lua_ReanimPlay(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		const char* trackName = luaL_checkstring(L, 2);
+		int loopType = luaL_checkinteger(L, 3);
+		int blendTime = luaL_optinteger(L, 4, 0);
+		float animRate = (float)luaL_optnumber(L, 5, 0.0);
+		ud->reanim->PlayReanim(trackName, (ReanimLoopType)loopType, blendTime, animRate);
+		return 0;
+	}
+
+	int Lua_ReanimGetRate(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushnumber(L, 0); return 1; }
+		lua_pushnumber(L, ud->reanim->mAnimRate);
+		return 1;
+	}
+
+	int Lua_ReanimSetRate(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		ud->reanim->mAnimRate = (float)luaL_checknumber(L, 2);
+		return 0;
+	}
+
+	int Lua_ReanimGetProgress(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushnumber(L, 0); return 1; }
+		lua_pushnumber(L, ud->reanim->mAnimTime);
+		return 1;
+	}
+
+	int Lua_ReanimSetProgress(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		ud->reanim->mAnimTime = (float)luaL_checknumber(L, 2);
+		return 0;
+	}
+
+	int Lua_ReanimIsPlaying(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushboolean(L, 0); return 1; }
+		const char* trackName = luaL_checkstring(L, 2);
+		lua_pushboolean(L, ud->reanim->IsAnimPlaying(trackName) ? 1 : 0);
+		return 1;
+	}
+
+	int Lua_ReanimTrackExists(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushboolean(L, 0); return 1; }
+		const char* trackName = luaL_checkstring(L, 2);
+		lua_pushboolean(L, ud->reanim->TrackExists(trackName) ? 1 : 0);
+		return 1;
+	}
+
+	int Lua_ReanimGetLoopType(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushinteger(L, 0); return 1; }
+		lua_pushinteger(L, ud->reanim->mLoopType);
+		return 1;
+	}
+
+	int Lua_ReanimGetLoopCount(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) { lua_pushinteger(L, 0); return 1; }
+		lua_pushinteger(L, ud->reanim->mLoopCount);
+		return 1;
+	}
+
+	int Lua_ReanimSetPosition(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		float x = (float)luaL_checknumber(L, 2);
+		float y = (float)luaL_checknumber(L, 3);
+		ud->reanim->SetPosition(x, y);
+		return 0;
+	}
+
+	int Lua_ReanimOverrideScale(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		float sx = (float)luaL_checknumber(L, 2);
+		float sy = (float)luaL_optnumber(L, 3, sx);
+		ud->reanim->OverrideScale(sx, sy);
+		return 0;
+	}
+
+	int Lua_ReanimShowOnlyTrack(lua_State* L)
+	{
+		LuaReanimUD* ud = (LuaReanimUD*)luaL_checkudata(L, 1, "Game.Reanim");
+		if (!ud->reanim) return 0;
+		const char* trackName = luaL_checkstring(L, 2);
+		ud->reanim->ShowOnlyTrack(trackName);
+		return 0;
+	}
+
+	void PushReanimUD(lua_State* L, Reanimation* reanim)
+	{
+		if (!reanim) { lua_pushnil(L); return; }
+		LuaReanimUD* ud = (LuaReanimUD*)lua_newuserdata(L, sizeof(LuaReanimUD));
+		ud->reanim = reanim;
+		luaL_getmetatable(L, "Game.Reanim");
+		lua_setmetatable(L, -2);
+	}
+
+	// Plant entity reanimation methods
+	int Lua_EntityGetBodyReanim(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant)
+		{
+			lua_pushnil(L);
+			return 1;
+		}
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		PushReanimUD(L, reanim);
+		return 1;
+	}
+
+	int Lua_EntityPlayBodyReanim(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) return 0;
+		const char* trackName = luaL_checkstring(L, 2);
+		int loopType = luaL_checkinteger(L, 3);
+		int blendTime = luaL_optinteger(L, 4, 0);
+		float animRate = (float)luaL_optnumber(L, 5, 0.0);
+		ent->ptr.plant->PlayBodyReanim(trackName, (ReanimLoopType)loopType, blendTime, animRate);
+		return 0;
+	}
+
+	int Lua_EntityPlayIdleAnim(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) return 0;
+		float animRate = (float)luaL_optnumber(L, 2, 12.0);
+		ent->ptr.plant->PlayIdleAnim(animRate);
+		return 0;
+	}
+
+	int Lua_EntityGetBodyReanimProgress(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushnumber(L, 0); return 1; }
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushnumber(L, reanim ? reanim->mAnimTime : 0.0f);
+		return 1;
+	}
+
+	int Lua_EntitySetBodyReanimRate(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) return 0;
+		float rate = (float)luaL_checknumber(L, 2);
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		if (reanim) reanim->mAnimRate = rate;
+		return 0;
+	}
+
+	int Lua_EntityGetBodyReanimRate(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushnumber(L, 0); return 1; }
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushnumber(L, reanim ? reanim->mAnimRate : 0.0f);
+		return 1;
+	}
+
+	int Lua_EntityIsAnimPlaying(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushboolean(L, 0); return 1; }
+		const char* trackName = luaL_checkstring(L, 2);
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushboolean(L, reanim && reanim->IsAnimPlaying(trackName) ? 1 : 0);
+		return 1;
+	}
+
+	int Lua_EntityTrackExists(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushboolean(L, 0); return 1; }
+		const char* trackName = luaL_checkstring(L, 2);
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushboolean(L, reanim && reanim->TrackExists(trackName) ? 1 : 0);
+		return 1;
+	}
+
+	int Lua_EntityGetBodyReanimLoopType(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushinteger(L, 0); return 1; }
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushinteger(L, reanim ? (int)reanim->mLoopType : 0);
+		return 1;
+	}
+
+	int Lua_EntityGetBodyReanimLoopCount(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) { lua_pushinteger(L, 0); return 1; }
+		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
+		lua_pushinteger(L, reanim ? reanim->mLoopCount : 0);
+		return 1;
 	}
 
 	int Lua_UICreateDialog(lua_State* L)
@@ -1330,6 +1585,36 @@ namespace
 		lua_setfield(L, -2, "SetButtonLabel");
 		lua_setglobal(L, "Board");
 
+		// Reanim metatable
+		luaL_newmetatable(L, "Game.Reanim");
+		lua_pushcfunction(L, Lua_ReanimIndex);
+		lua_setfield(L, -2, "__index");
+		lua_pushcfunction(L, Lua_ReanimPlay);
+		lua_setfield(L, -2, "Play");
+		lua_pushcfunction(L, Lua_ReanimGetRate);
+		lua_setfield(L, -2, "GetRate");
+		lua_pushcfunction(L, Lua_ReanimSetRate);
+		lua_setfield(L, -2, "SetRate");
+		lua_pushcfunction(L, Lua_ReanimGetProgress);
+		lua_setfield(L, -2, "GetProgress");
+		lua_pushcfunction(L, Lua_ReanimSetProgress);
+		lua_setfield(L, -2, "SetProgress");
+		lua_pushcfunction(L, Lua_ReanimIsPlaying);
+		lua_setfield(L, -2, "IsPlaying");
+		lua_pushcfunction(L, Lua_ReanimTrackExists);
+		lua_setfield(L, -2, "TrackExists");
+		lua_pushcfunction(L, Lua_ReanimGetLoopType);
+		lua_setfield(L, -2, "GetLoopType");
+		lua_pushcfunction(L, Lua_ReanimGetLoopCount);
+		lua_setfield(L, -2, "GetLoopCount");
+		lua_pushcfunction(L, Lua_ReanimSetPosition);
+		lua_setfield(L, -2, "SetPosition");
+		lua_pushcfunction(L, Lua_ReanimOverrideScale);
+		lua_setfield(L, -2, "OverrideScale");
+		lua_pushcfunction(L, Lua_ReanimShowOnlyTrack);
+		lua_setfield(L, -2, "ShowOnlyTrack");
+		lua_pop(L, 1);
+
 		// Entity metatable
 		luaL_newmetatable(L, "Game.Entity");
 		lua_pushcfunction(L, Lua_EntityIndex);
@@ -1340,6 +1625,26 @@ namespace
 		lua_setfield(L, -2, "IsSun");
 		lua_pushcfunction(L, Lua_EntityCollect);
 		lua_setfield(L, -2, "Collect");
+		lua_pushcfunction(L, Lua_EntityGetBodyReanim);
+		lua_setfield(L, -2, "GetBodyReanim");
+		lua_pushcfunction(L, Lua_EntityPlayBodyReanim);
+		lua_setfield(L, -2, "PlayBodyReanim");
+		lua_pushcfunction(L, Lua_EntityPlayIdleAnim);
+		lua_setfield(L, -2, "PlayIdleAnim");
+		lua_pushcfunction(L, Lua_EntityGetBodyReanimProgress);
+		lua_setfield(L, -2, "GetBodyReanimProgress");
+		lua_pushcfunction(L, Lua_EntitySetBodyReanimRate);
+		lua_setfield(L, -2, "SetBodyReanimRate");
+		lua_pushcfunction(L, Lua_EntityGetBodyReanimRate);
+		lua_setfield(L, -2, "GetBodyReanimRate");
+		lua_pushcfunction(L, Lua_EntityIsAnimPlaying);
+		lua_setfield(L, -2, "IsAnimPlaying");
+		lua_pushcfunction(L, Lua_EntityTrackExists);
+		lua_setfield(L, -2, "TrackExists");
+		lua_pushcfunction(L, Lua_EntityGetBodyReanimLoopType);
+		lua_setfield(L, -2, "GetBodyReanimLoopType");
+		lua_pushcfunction(L, Lua_EntityGetBodyReanimLoopCount);
+		lua_setfield(L, -2, "GetBodyReanimLoopCount");
 		lua_pop(L, 1);
 
 		// Dialog metatable
