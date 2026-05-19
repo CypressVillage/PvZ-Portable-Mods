@@ -22,6 +22,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cmath>
 
 #if defined(PVZ_ENABLE_LUA)
 #include <lua.hpp>
@@ -368,6 +369,7 @@ namespace
 		const char* key = luaL_checkstring(L, 2);
 
 		if (strcmp(key, "Damage") == 0 || strcmp(key, "IsSun") == 0 || strcmp(key, "Collect") == 0 ||
+			strcmp(key, "DistanceTo") == 0 ||
 			strcmp(key, "GetBodyReanim") == 0 || strcmp(key, "PlayBodyReanim") == 0 || strcmp(key, "PlayIdleAnim") == 0 ||
 			strcmp(key, "GetBodyReanimProgress") == 0 || strcmp(key, "SetBodyReanimRate") == 0 || strcmp(key, "GetBodyReanimRate") == 0 ||
 			strcmp(key, "IsAnimPlaying") == 0 || strcmp(key, "TrackExists") == 0 ||
@@ -459,6 +461,41 @@ namespace
 		lua_setmetatable(L, -2);
 	}
 
+	int Lua_EntityDistanceTo(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		LuaEntity* other = (LuaEntity*)luaL_checkudata(L, 2, "Game.Entity");
+
+		auto getPos = [](LuaEntity* e, float& x, float& y) -> bool {
+			if (e->type == 0 && e->ptr.plant) {
+				x = static_cast<float>(e->ptr.plant->mX + 40);
+				y = static_cast<float>(e->ptr.plant->mY + 40);
+				return true;
+			}
+			if (e->type == 1 && e->ptr.zombie) {
+				x = e->ptr.zombie->mPosX;
+				y = e->ptr.zombie->mPosY;
+				return true;
+			}
+			if (e->type == 2 && e->ptr.coin) {
+				x = e->ptr.coin->mPosX;
+				y = e->ptr.coin->mPosY;
+				return true;
+			}
+			return false;
+		};
+
+		float ex, ey, ox, oy;
+		if (!getPos(ent, ex, ey) || !getPos(other, ox, oy)) {
+			lua_pushnumber(L, 0.0);
+			return 1;
+		}
+		float dx = ex - ox;
+		float dy = ey - oy;
+		lua_pushnumber(L, std::sqrt(dx * dx + dy * dy));
+		return 1;
+	}
+
 	// Board table
 	int Lua_BoardSpawnZombie(lua_State* L)
 	{
@@ -510,6 +547,132 @@ namespace
 			return 1;
 		}
 		lua_pushinteger(L, gLawnApp->mBoard->mCurrentWave);
+		return 1;
+	}
+
+	int Lua_BoardFindTargetZombie(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 0 || !ent->ptr.plant) {
+			lua_pushnil(L);
+			return 1;
+		}
+		Plant* plant = ent->ptr.plant;
+		Zombie* target = plant->FindTargetZombie(plant->mRow, PlantWeapon::WEAPON_PRIMARY);
+		PushEntity(L, target);
+		return 1;
+	}
+
+	int Lua_BoardGetZombiesInRow(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int row = luaL_checkinteger(L, 1);
+		if (row < 0 || row >= 6) { lua_newtable(L); return 1; }
+
+		lua_newtable(L);
+		int idx = 1;
+		Zombie* z = nullptr;
+		while (gLawnApp->mBoard->mZombies.IterateNext(z))
+		{
+			if (z->mRow == row && !z->mDead)
+			{
+				PushEntity(L, z);
+				lua_rawseti(L, -2, idx++);
+			}
+		}
+		return 1;
+	}
+
+	int Lua_BoardGetPlantsInRow(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int row = luaL_checkinteger(L, 1);
+		if (row < 0 || row >= 6) { lua_newtable(L); return 1; }
+
+		lua_newtable(L);
+		int idx = 1;
+		Plant* p = nullptr;
+		while (gLawnApp->mBoard->mPlants.IterateNext(p))
+		{
+			if (p->mRow == row && !p->mDead)
+			{
+				PushEntity(L, p);
+				lua_rawseti(L, -2, idx++);
+			}
+		}
+		return 1;
+	}
+
+	int Lua_BoardGetZombieAt(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int col = luaL_checkinteger(L, 1);
+		int row = luaL_checkinteger(L, 2);
+
+		int bestCol = -1;
+		Zombie* best = nullptr;
+		int bestDist = 999999;
+		Zombie* z = nullptr;
+		while (gLawnApp->mBoard->mZombies.IterateNext(z))
+		{
+			if (z->mRow != row || z->mDead) continue;
+			int zCol = gLawnApp->mBoard->PixelToGridX(z->mPosX + 40.0f, z->mPosY);
+			if (zCol == col)
+			{
+				int dist = std::abs((int)(z->mPosX + 40.0f) - gLawnApp->mBoard->GridToPixelX(col, row));
+				if (dist < bestDist)
+				{
+					bestDist = dist;
+					best = z;
+				}
+			}
+		}
+		PushEntity(L, best);
+		return 1;
+	}
+
+	int Lua_BoardGetPlantAt(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int col = luaL_checkinteger(L, 1);
+		int row = luaL_checkinteger(L, 2);
+		Plant* p = gLawnApp->mBoard->GetTopPlantAt(col, row, TOPPLANT_BUNGEE_ORDER);
+		PushEntity(L, p);
+		return 1;
+	}
+
+	int Lua_BoardGetAllZombies(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		lua_newtable(L);
+		int idx = 1;
+		Zombie* z = nullptr;
+		while (gLawnApp->mBoard->mZombies.IterateNext(z))
+		{
+			if (!z->mDead)
+			{
+				PushEntity(L, z);
+				lua_rawseti(L, -2, idx++);
+			}
+		}
+		return 1;
+	}
+
+	int Lua_BoardGetAllPlants(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		lua_newtable(L);
+		int idx = 1;
+		Plant* p = nullptr;
+		while (gLawnApp->mBoard->mPlants.IterateNext(p))
+		{
+			if (!p->mDead)
+			{
+				PushEntity(L, p);
+				lua_rawseti(L, -2, idx++);
+			}
+		}
 		return 1;
 	}
 
@@ -1575,6 +1738,20 @@ namespace
 		lua_setfield(L, -2, "SpawnPlant");
 		lua_pushcfunction(L, Lua_BoardGetWave);
 		lua_setfield(L, -2, "GetWave");
+		lua_pushcfunction(L, Lua_BoardFindTargetZombie);
+		lua_setfield(L, -2, "FindTargetZombie");
+		lua_pushcfunction(L, Lua_BoardGetZombiesInRow);
+		lua_setfield(L, -2, "GetZombiesInRow");
+		lua_pushcfunction(L, Lua_BoardGetPlantsInRow);
+		lua_setfield(L, -2, "GetPlantsInRow");
+		lua_pushcfunction(L, Lua_BoardGetZombieAt);
+		lua_setfield(L, -2, "GetZombieAt");
+		lua_pushcfunction(L, Lua_BoardGetPlantAt);
+		lua_setfield(L, -2, "GetPlantAt");
+		lua_pushcfunction(L, Lua_BoardGetAllZombies);
+		lua_setfield(L, -2, "GetAllZombies");
+		lua_pushcfunction(L, Lua_BoardGetAllPlants);
+		lua_setfield(L, -2, "GetAllPlants");
 		lua_pushcfunction(L, Lua_BoardAddButton);
 		lua_setfield(L, -2, "AddButton");
 		lua_pushcfunction(L, Lua_BoardRemoveButton);
@@ -1645,6 +1822,8 @@ namespace
 		lua_setfield(L, -2, "GetBodyReanimLoopType");
 		lua_pushcfunction(L, Lua_EntityGetBodyReanimLoopCount);
 		lua_setfield(L, -2, "GetBodyReanimLoopCount");
+		lua_pushcfunction(L, Lua_EntityDistanceTo);
+		lua_setfield(L, -2, "DistanceTo");
 		lua_pop(L, 1);
 
 		// Dialog metatable

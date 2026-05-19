@@ -131,29 +131,29 @@
 
 - 位置：`src/Mod/ModLua.cpp` — `Game.Reanim` 元表 + `Lua_Reanim*` 系列函数
 
-#### B. 目标查找 API — 暴露实体查询到 Lua
+#### B. 目标查找 API — 暴露实体查询到 Lua ✅
 
-- [ ] **`Board:FindTargetZombie(plant)`** → zombie_entity | nil
+- [x] **`Board:FindTargetZombie(plant)`** → zombie_entity | nil
   - 映射 C++ `Plant::FindTargetZombie(weaponType)`，为指定植物查找最近目标
-  - 位置：`src/Lawn/Plant.cpp:4801`
+  - 实现：`src/Mod/ModLua.cpp` — `Lua_BoardFindTargetZombie`
 
-- [ ] **`Board:GetZombiesInRow(row)`** → table of zombie_entity
-  - 遍历 `mZombies[]` 按行筛选，返回 Lua 数组
+- [x] **`Board:GetZombiesInRow(row)`** → table of zombie_entity
+  - 遍历 `mZombies` 按行筛选，返回 Lua 数组
 
-- [ ] **`Board:GetPlantsInRow(row)`** → table of plant_entity
+- [x] **`Board:GetPlantsInRow(row)`** → table of plant_entity
 
-- [ ] **`Board:GetZombieAt(col, row)`** → zombie_entity | nil
-  - 获取指定格子上的僵尸
+- [x] **`Board:GetZombieAt(col, row)`** → zombie_entity | nil
+  - 用 `PixelToGridX` 计算僵尸所在格子，取最接近格心的那个
 
-- [ ] **`Board:GetPlantAt(col, row)`** → plant_entity | nil
-  - 已在 TODO 中，移至此处
+- [x] **`Board:GetPlantAt(col, row)`** → plant_entity | nil
+  - 委托 `GetTopPlantAt(col, row, TOPPLANT_BUNGEE_ORDER)`
 
-- [ ] **`Board:GetAllZombies()`** → table of zombie_entity
+- [x] **`Board:GetAllZombies()`** → table of zombie_entity
 
-- [ ] **`Board:GetAllPlants()`** → table of plant_entity
+- [x] **`Board:GetAllPlants()`** → table of plant_entity
 
-- [ ] **`entity:DistanceTo(otherEntity)`** → float
-  - 像素距离计算
+- [x] **`entity:DistanceTo(otherEntity)`** → float
+  - 像素距离计算（支持 Plant/Zombie/Coin 实体）
 
 #### C. 投射物生成 API — 暴露发射系统到 Lua
 
