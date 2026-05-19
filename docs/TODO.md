@@ -24,31 +24,38 @@
 
 ### 常量表暴露 — 第一阶段（无 C++ 改动，纯 Lua 注册）
 
-- [ ] **Lua 侧注册 `PlantType` 常量表**
-  - 当前枚举值可通过 `ConstEnums.h` 获取
-  - 作为 Lua 只读全局表注册（`PEASHOOTER=0, SUNFLOWER=1, ...`）
+- [x] **Lua 侧注册 `PlantType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:820-872`
+  - 作为 Lua 只读全局表注册（`PEASHOOTER=0, SUNFLOWER=1, ..., IMITATER=48, NONE=-1`）
 
-- [ ] **Lua 侧注册 `ZombieType` 常量表**
-  - `NORMAL=0, FLAG=1, ..., BOSS=25`
+- [x] **Lua 侧注册 `ZombieType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:874-910`
+  - `NORMAL=0, FLAG=1, ..., REDEYE_GARGANTUAR=35`
 
-- [ ] **Lua 侧注册 `ProjectileType` 常量表**
+- [x] **Lua 侧注册 `ProjectileType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:912-929`
   - `PEA=0, SNOWPEA=1, ..., ZOMBIE_PEA=13`
 
-- [ ] **Lua 侧注册 `CoinType` 常量表**
-  - `NONE=0, ..., SUN=4, SMALLSUN=5, LARGESUN=6`
+- [x] **Lua 侧注册 `CoinType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:931-962`
+  - `NONE=0, ..., PRESENT_SURVIVAL_MODE=27`
 
-- [ ] **Lua 侧注册 `GameMode` 常量表**
-  - `ADVENTURE=0, SURVIVAL_NORMAL_STAGE_1=1, ..., CHALLENGE_FINAL_BOSS=39`
+- [x] **Lua 侧注册 `GameMode` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:964-1026`
+  - `ADVENTURE=0, SURVIVAL_NORMAL_STAGE_1=1, ..., INTRO=69`
 
-- [ ] **Lua 侧注册 `PlantSubClass` / `PlantState` / `ZombiePhase` / `ProjectileMotion` 常量表**
-  - 各状态枚举供实体 API 判定使用
+- [x] **Lua 侧注册 `PlantSubClass` / `PlantState` / `ZombiePhase` / `ProjectileMotion` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:1028-1157`
 
-- [ ] **Lua 侧注册 `DamageFlags` / `BackgroundType` / `HelmType` / `ShieldType` 常量表**
+- [x] **Lua 侧注册 `DamageFlags` / `BackgroundType` / `HelmType` / `ShieldType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:1159-1210`
 
-- [ ] **Lua 侧注册 `GridConstants` 游戏常量表**
-  - MAX_COLS=9, MAX_ROWS=6, BOARD_WIDTH=800, BOARD_HEIGHT=600
+- [x] **Lua 侧注册 `GridConstants` 游戏常量表**
+  - 位置：`src/Mod/ModLua.cpp:1222-1232`
+  - COLS=9, ROWS=6, BOARD_WIDTH=800, BOARD_HEIGHT=600, LAWN_XMIN=40, LAWN_YMIN=80, BOARD_OFFSET=220, SEEDBANK_MAX=10
 
-- [ ] **Lua 侧注册 `ReanimLoopType` 常量表**
+- [x] **Lua 侧注册 `ReanimLoopType` 常量表**
+  - 位置：`src/Mod/ModLua.cpp:1212-1220`
   - `LOOP=0, LOOP_FULL_LAST_FRAME=1, PLAY_ONCE=2, PLAY_ONCE_AND_HOLD=3, ...`
 
 ### 自定义植物行为 API（核心三大块）
