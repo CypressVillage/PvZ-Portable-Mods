@@ -26,6 +26,13 @@ public:
 	void CallOnGameStart();
 	void CallOnWaveStart(int waveIndex);
 	void CallOnPlantUpdate(class Plant* plant);
+	void CallOnPlantDie(class Plant* plant);
+	void CallOnZombieAttack(class Zombie* zombie, class Plant* plant);
+	void CallOnProjectileSpawn(class Projectile* proj);
+	void CallOnProjectileHit(class Projectile* proj, class Zombie* zombie);
+	void CallOnProjectileMiss(class Projectile* proj);
+	void CallOnCoinCollect(class Coin* coin);
+	void CallOnZombieReachHouse(class Zombie* zombie);
 
 private:
 	void* mState = nullptr;

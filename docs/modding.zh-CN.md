@@ -416,6 +416,13 @@ API：
 - `OnZombieDie`：僵尸死亡时触发。
 - `OnLevelEnd`：结算时触发。
 - `OnCoinSpawn`：掉落物（阳光/金币/其他）生成时触发。
+- `OnPlantDie`：植物死亡时触发。
+- `OnZombieAttack`：僵尸开始啃食植物时触发。
+- `OnProjectileSpawn`：投射物生成时触发。
+- `OnProjectileHit`：投射物命中僵尸时触发。
+- `OnProjectileMiss`：投射物飞出屏幕时触发。
+- `OnCoinCollect`：硬币/阳光被玩家收集时触发。
+- `OnZombieReachHouse`：僵尸进入房子时触发。
 
 涉及文件：
 - [src/LawnApp.cpp](src/LawnApp.cpp)

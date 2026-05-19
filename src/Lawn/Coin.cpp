@@ -36,6 +36,7 @@
 #include "../Sexy.TodLib/Reanimator.h"
 #include "../Sexy.TodLib/Attachment.h"
 #include "Widget/AchievementsScreen.h"
+#include "../Mod/ModLua.h"
 
 Coin::Coin()
 {
@@ -1058,6 +1059,8 @@ void Coin::TryAutoCollectAfterLevelAward()
 // GOTY @Patoke: 0x434DC0
 void Coin::Collect()
 {
+    gModLua.CallOnCoinCollect(this);
+
     if (mDead)
         return;
 

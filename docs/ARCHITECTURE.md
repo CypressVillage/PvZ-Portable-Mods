@@ -57,7 +57,7 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | | `dialog:SetTitle(text)` | 设置标题 |
 | | `dialog:SetBody(text)` | 设置正文 |
 
-- **事件钩子**：12 个生命周期回调
+- **事件钩子**：19 个生命周期回调
 
 | 钩子 | 触发时机 |
 |------|---------|
@@ -73,6 +73,13 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | `OnLevelEnd(isWin)` | 关卡结束 |
 | `OnCoinSpawn(coin)` | 硬币/阳光生成 |
 | `OnBoardButtonClick(btnId)` | 自定义按钮点击 |
+| `OnPlantDie(plant)` | 植物死亡 |
+| `OnZombieAttack(zombie, plant)` | 僵尸啃食植物 |
+| `OnProjectileSpawn(proj)` | 投射物生成 |
+| `OnProjectileHit(proj, zombie)` | 投射物命中僵尸 |
+| `OnProjectileMiss(proj)` | 投射物飞出屏幕 |
+| `OnCoinCollect(coin)` | 硬币/阳光被收集 |
+| `OnZombieReachHouse(zombie)` | 僵尸进入房子 |
 
 ### (3) ModRegistry — 数据注册表
 

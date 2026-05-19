@@ -233,13 +233,13 @@
 
 ### 关键新生命周期回调
 
-- [ ] **`OnPlantDie(plant)`** — 补丁位置：`Plant::Die()`
-- [ ] **`OnZombieAttack(zombie, plant)`** — 补丁位置：`Zombie::EatPlant()`
-- [ ] **`OnProjectileSpawn(proj)`** — 补丁位置：`Projectile::ProjectileInitialize()`
-- [ ] **`OnProjectileHit(proj, zombie)`** — 补丁位置：`Projectile::DoImpact()`
-- [ ] **`OnProjectileMiss(proj)`** — 补丁位置：`Projectile::Update()` 飞出检测
-- [ ] **`OnCoinCollect(coin)`** — 补丁位置：`Coin::Collect()`
-- [ ] **`OnZombieReachHouse(zombie)`** — 补丁位置：`Zombie::WalkIntoHouse()`
+- [x] **`OnPlantDie(plant)`** — 补丁位置：`Plant::Die()`
+- [x] **`OnZombieAttack(zombie, plant)`** — 补丁位置：`Zombie::EatPlant()`
+- [x] **`OnProjectileSpawn(proj)`** — 补丁位置：`Projectile::ProjectileInitialize()`
+- [x] **`OnProjectileHit(proj, zombie)`** — 补丁位置：`Projectile::DoImpact()`
+- [x] **`OnProjectileMiss(proj)`** — 补丁位置：`Projectile::Update()` 飞出检测
+- [x] **`OnCoinCollect(coin)`** — 补丁位置：`Coin::Collect()`
+- [x] **`OnZombieReachHouse(zombie)`** — 补丁位置：`Zombie::WalkIntoHouse()`
 
 ### Lua 辅助模块（可选但强烈推荐）
 

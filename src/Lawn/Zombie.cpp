@@ -6931,6 +6931,8 @@ void Zombie::StartMindControlled()
 
 void Zombie::EatPlant(Plant* thePlant)
 {
+    gModLua.CallOnZombieAttack(this, thePlant);
+
     if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN)
     {
         mPhaseCounter = 1;
@@ -9556,6 +9558,8 @@ void Zombie::UpdateZombieChimney()
 
 void Zombie::WalkIntoHouse()
 {
+    gModLua.CallOnZombieReachHouse(this);
+
     AttachmentDetachCrossFadeParticleType(mAttachmentID, ParticleEffect::PARTICLE_ZAMBONI_SMOKE, nullptr);
     mFromWave = Zombie::ZOMBIE_WAVE_WINNER;
     ReanimReenableClipping();

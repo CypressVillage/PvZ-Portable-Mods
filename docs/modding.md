@@ -241,6 +241,13 @@ function OnPlantAttack(plant, target) end
 function OnZombieDie(zombie) end
 function OnLevelEnd(is_win) end
 function OnCoinSpawn(coin) end
+function OnPlantDie(plant) end
+function OnZombieAttack(zombie, plant) end
+function OnProjectileSpawn(proj) end
+function OnProjectileHit(proj, zombie) end
+function OnProjectileMiss(proj) end
+function OnCoinCollect(coin) end
+function OnZombieReachHouse(zombie) end
 ```
 
 Callback parameters:
@@ -253,6 +260,13 @@ Notes:
 - `OnPlantUpdate(plant)` is called every frame for each mod plant (seedType >= 2000). Use sparingly to avoid performance impact.
 - `OnWaveStart(wave_index)` fires before the wave's zombies are spawned.
 - `OnGameStart()` fires at the beginning of gameplay, after `OnLevelStart`.
+- `OnPlantDie(plant)` fires when a plant is removed from the board.
+- `OnZombieAttack(zombie, plant)` fires when a zombie starts eating a plant.
+- `OnProjectileSpawn(proj)` fires when any projectile is created.
+- `OnProjectileHit(proj, zombie)` fires when a projectile hits a zombie.
+- `OnProjectileMiss(proj)` fires when a projectile flies off-screen.
+- `OnCoinCollect(coin)` fires when a coin/sun is collected by the player.
+- `OnZombieReachHouse(zombie)` fires when a zombie enters the player's house.
 
 Notes:
 - Callbacks are optional.

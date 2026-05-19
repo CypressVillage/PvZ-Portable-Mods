@@ -4961,6 +4961,8 @@ int Plant::DistanceToClosestZombie()
 
 void Plant::Die()
 {
+    gModLua.CallOnPlantDie(this);
+
     if (IsOnBoard() && mSeedType == SeedType::SEED_TANGLEKELP)
     {
         Zombie* aZombie = mBoard->ZombieTryToGet(mTargetZombieID);

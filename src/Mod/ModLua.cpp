@@ -2553,3 +2553,98 @@ void ModLua::CallOnPlantUpdate(Plant* plant)
 	(void)plant;
 #endif
 }
+
+void ModLua::CallOnPlantDie(Plant* plant)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, plant);
+	Lua_CallGlobal(L, "OnPlantDie", 1);
+#else
+	(void)plant;
+#endif
+}
+
+void ModLua::CallOnZombieAttack(Zombie* zombie, Plant* plant)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, zombie);
+	PushEntity(L, plant);
+	Lua_CallGlobal(L, "OnZombieAttack", 2);
+#else
+	(void)zombie;
+	(void)plant;
+#endif
+}
+
+void ModLua::CallOnProjectileSpawn(Projectile* proj)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, proj);
+	Lua_CallGlobal(L, "OnProjectileSpawn", 1);
+#else
+	(void)proj;
+#endif
+}
+
+void ModLua::CallOnProjectileHit(Projectile* proj, Zombie* zombie)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, proj);
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnProjectileHit", 2);
+#else
+	(void)proj;
+	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnProjectileMiss(Projectile* proj)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, proj);
+	Lua_CallGlobal(L, "OnProjectileMiss", 1);
+#else
+	(void)proj;
+#endif
+}
+
+void ModLua::CallOnCoinCollect(Coin* coin)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, coin);
+	Lua_CallGlobal(L, "OnCoinCollect", 1);
+#else
+	(void)coin;
+#endif
+}
+
+void ModLua::CallOnZombieReachHouse(Zombie* zombie)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr)
+		return;
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnZombieReachHouse", 1);
+#else
+	(void)zombie;
+#endif
+}

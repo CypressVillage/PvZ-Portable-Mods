@@ -33,6 +33,7 @@
 #include "../Sexy.TodLib/Attachment.h"
 #include "Widget/AchievementsScreen.h"
 #include "../Mod/ModRegistry.h"
+#include "../Mod/ModLua.h"
 #include "../SexyAppFramework/graphics/GLImage.h"
 #include "../SexyAppFramework/misc/ResourceManager.h"
 
@@ -64,6 +65,8 @@ Projectile::~Projectile()
 
 void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType)
 {
+	gModLua.CallOnProjectileSpawn(this);
+
 	int aGridX = mBoard->PixelToGridXKeepOnBoard(theX, theY);
 	mProjectileType = theProjectileType;
 	mPosX = theX;
@@ -271,6 +274,7 @@ void Projectile::CheckForCollision()
 
 	if (mPosX > WIDE_BOARD_WIDTH || mPosX + mWidth < 0.0f)
 	{
+		gModLua.CallOnProjectileMiss(this);
 		Die();
 		return;
 	}
@@ -831,6 +835,8 @@ void Projectile::PlayImpactSound(Zombie* theZombie)
 
 void Projectile::DoImpact(Zombie* theZombie)
 {
+	gModLua.CallOnProjectileHit(this, theZombie);
+
 	PlayImpactSound(theZombie);
 
 	if (IsSplashDamage(theZombie))
