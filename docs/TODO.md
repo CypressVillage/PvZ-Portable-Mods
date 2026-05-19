@@ -8,19 +8,19 @@
 
 ### 基础设施修复
 
-- [ ] **实现 `Game.GetMode()` Lua API 绑定**
-  - 位置：`src/Mod/ModLua.cpp` — `Lua_RegisterGameTable()`
-  - 文档均有提及但代码缺失，模组需运行时判断模式
+- [x] **实现 `Game.GetMode()` Lua API 绑定**
+  - 位置：`src/Mod/ModLua.cpp:725-730`
+  - 新加 `Lua_GameGetMode`，注册为 `Game.GetMode()`，返回 `gLawnApp->mGameMode`
 
-- [ ] **扩展 `ModZombieDef` 添加实体属性**
-  - 位置：`src/Mod/ModRegistry.h:32-36`
-  - 目前只有 `id`/`zombieType`，缺少血量、速度、伤害、动画名等
-  - 需同步扩展 `ModModeDef`、`ModPlantDef` 中缺失的字段
+- [x] **扩展 `ModZombieDef` 添加实体属性**
+  - 位置：`src/Mod/ModRegistry.h:32-36`，`src/Mod/ModLua.cpp:241-320`，`src/Lawn/Zombie.cpp:100-118`
+  - 新增 bodyHealth/headHealth/speed/damage/reanimationName/helm/shield/hasHead/hasArm/zombieName
+  - `GetZombieDefinition()` 现从 ModZombieDef 读取 Reanim 类型
 
-- [ ] **修复依赖排序：添加拓扑排序**
-  - 位置：`src/Mod/ModLoader.cpp:401-403`
-  - `dependencies` 字段已解析但未用于排序
-  - 需在 stable_sort 之前先做 DAG 拓扑排序
+- [x] **修复依赖排序：添加拓扑排序**
+  - 位置：`src/Mod/ModLoader.cpp:401-442`
+  - 实现 Kahn 算法，先按 dependencies 拓扑排序，再按 priority 稳定排序
+  - 检测循环依赖的 mod 会追加末尾并记录错误
 
 ### 常量表暴露 — 第一阶段（无 C++ 改动，纯 Lua 注册）
 

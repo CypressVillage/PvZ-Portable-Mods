@@ -250,6 +250,70 @@ namespace
 			def.id = lua_tostring(L, -1);
 		lua_pop(L, 1);
 
+		lua_getfield(L, 1, "bodyHealth");
+		if (lua_isinteger(L, -1))
+			def.bodyHealth = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "headHealth");
+		if (lua_isinteger(L, -1))
+			def.headHealth = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "speed");
+		if (lua_isnumber(L, -1))
+			def.speed = static_cast<float>(lua_tonumber(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "damage");
+		if (lua_isinteger(L, -1))
+			def.damage = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "reanimation");
+		if (lua_isstring(L, -1))
+		{
+			def.reanimationName = lua_tostring(L, -1);
+			if (!def.reanimationName.empty())
+				gModRegistry.RegisterDynamicReanim(def.reanimationName);
+		}
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "helmType");
+		if (lua_isinteger(L, -1))
+			def.helmType = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "helmHealth");
+		if (lua_isinteger(L, -1))
+			def.helmHealth = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "shieldType");
+		if (lua_isinteger(L, -1))
+			def.shieldType = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "shieldHealth");
+		if (lua_isinteger(L, -1))
+			def.shieldHealth = static_cast<int>(lua_tointeger(L, -1));
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "hasHead");
+		if (lua_isboolean(L, -1))
+			def.hasHead = lua_toboolean(L, -1) != 0;
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "hasArm");
+		if (lua_isboolean(L, -1))
+			def.hasArm = lua_toboolean(L, -1) != 0;
+		lua_pop(L, 1);
+
+		lua_getfield(L, 1, "name");
+		if (lua_isstring(L, -1))
+			def.zombieName = lua_tostring(L, -1);
+		lua_pop(L, 1);
+
 		std::string error;
 		if (gModRegistry.RegisterZombie(def, &error))
 		{
@@ -656,6 +720,15 @@ namespace
 		return 1;
 	}
 
+	int Lua_GameGetMode(lua_State* L)
+	{
+		if (gLawnApp)
+			lua_pushinteger(L, static_cast<int>(gLawnApp->mGameMode));
+		else
+			lua_pushinteger(L, -1);
+		return 1;
+	}
+
 	int Lua_GameGetMenuButtonRect(lua_State* L)
 	{
 		if (!gLawnApp || !gLawnApp->mBoard || !gLawnApp->mBoard->mMenuButton)
@@ -756,6 +829,8 @@ namespace
 		lua_setfield(L, -2, "SetSpeed");
 		lua_pushcfunction(L, Lua_GameGetSpeed);
 		lua_setfield(L, -2, "GetSpeed");
+		lua_pushcfunction(L, Lua_GameGetMode);
+		lua_setfield(L, -2, "GetMode");
 		lua_pushcfunction(L, Lua_GameGetMenuButtonRect);
 		lua_setfield(L, -2, "GetMenuButtonRect");
 		lua_pushcfunction(L, Lua_GameRegisterProjectile);

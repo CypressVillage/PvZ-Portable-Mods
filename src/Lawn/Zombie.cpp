@@ -102,7 +102,22 @@ ZombieDefinition& GetZombieDefinition(ZombieType theZombieType)
         static std::map<int, ZombieDefinition> sModZombieDefs;
         if (sModZombieDefs.find(static_cast<int>(theZombieType)) == sModZombieDefs.end())
         {
-            ZombieDefinition def = { theZombieType, ReanimationType::REANIM_NONE, 1, 1, 1, 10, "ModZombie" };
+            int reanimType = static_cast<int>(ReanimationType::REANIM_NONE);
+            int zombieValue = 1;
+            int pickWeight = 10;
+            const char* zombieName = "ModZombie";
+
+            const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(theZombieType));
+            if (modDef)
+            {
+                if (!modDef->zombieName.empty())
+                    zombieName = modDef->zombieName.c_str();
+                int resolvedReanim = gModRegistry.ResolveReanimationType(modDef->reanimationName);
+                if (resolvedReanim != static_cast<int>(ReanimationType::REANIM_NONE))
+                    reanimType = resolvedReanim;
+            }
+
+            ZombieDefinition def = { theZombieType, static_cast<ReanimationType>(reanimType), zombieValue, 1, 1, pickWeight, zombieName };
             sModZombieDefs[static_cast<int>(theZombieType)] = def;
         }
         return sModZombieDefs[static_cast<int>(theZombieType)];

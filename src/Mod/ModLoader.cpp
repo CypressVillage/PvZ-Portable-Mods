@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <map>
 #include <fstream>
 #include <sstream>
 
@@ -398,9 +399,74 @@ bool ModLoader::LoadAll()
 		}
 	}
 
-	std::stable_sort(mManifests.begin(), mManifests.end(), [](const ModManifest& a, const ModManifest& b) {
-		return a.priority < b.priority;
-	});
+	// Topological sort based on dependencies (Kahn's algorithm)
+	{
+		std::map<std::string, int> inDegree;
+		std::map<std::string, std::vector<std::string>> dependents;
+		std::map<std::string, const ModManifest*> manifestById;
+
+		for (const auto& m : mManifests)
+		{
+			inDegree[m.id] = 0;
+			manifestById[m.id] = &m;
+		}
+
+		for (const auto& m : mManifests)
+		{
+			for (const auto& dep : m.dependencies)
+			{
+				if (manifestById.find(dep) != manifestById.end())
+				{
+					inDegree[m.id]++;
+					dependents[dep].push_back(m.id);
+				}
+			}
+		}
+
+		std::vector<std::string> sorted;
+		{
+			std::vector<std::string> queue;
+			for (const auto& pair : inDegree)
+			{
+				if (pair.second == 0)
+					queue.push_back(pair.first);
+			}
+			while (!queue.empty())
+			{
+				std::string node = queue.back();
+				queue.pop_back();
+				sorted.push_back(node);
+				for (const auto& dep : dependents[node])
+				{
+					if (--inDegree[dep] == 0)
+						queue.push_back(dep);
+				}
+			}
+		}
+
+		// If cycle detected (some mods not sorted), append them unsorted
+		if (sorted.size() < mManifests.size())
+		{
+			for (const auto& pair : inDegree)
+			{
+				if (pair.second > 0 && std::find(sorted.begin(), sorted.end(), pair.first) == sorted.end())
+					sorted.push_back(pair.first);
+			}
+			mErrors.push_back("Circular dependency detected among mods");
+		}
+
+		// Reorder mManifests to match topological order, then stable_sort by priority within
+		std::stable_sort(mManifests.begin(), mManifests.end(),
+			[&sorted](const ModManifest& a, const ModManifest& b) {
+				auto aIt = std::find(sorted.begin(), sorted.end(), a.id);
+				auto bIt = std::find(sorted.begin(), sorted.end(), b.id);
+				int aOrder = static_cast<int>(aIt - sorted.begin());
+				int bOrder = static_cast<int>(bIt - sorted.begin());
+				if (aOrder != bOrder)
+					return aOrder < bOrder;
+				return a.priority < b.priority;
+			});
+	}
 
 	return mErrors.empty();
 }

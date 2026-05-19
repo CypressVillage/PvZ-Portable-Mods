@@ -33,6 +33,18 @@ struct ModZombieDef
 {
 	std::string id;
 	int zombieType = -1;
+	int bodyHealth = 100;
+	int headHealth = 100;
+	float speed = 1.0f;
+	int damage = 100;
+	std::string reanimationName;
+	int helmType = 0;
+	int helmHealth = 0;
+	int shieldType = 0;
+	int shieldHealth = 0;
+	bool hasHead = true;
+	bool hasArm = true;
+	std::string zombieName;
 };
 
 struct ModModeDef
