@@ -79,8 +79,9 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	mFrame = 0;
 	mNumFrames = 1;
 	mRow = theRow;
-	mCobTargetX = 0.0f;
-	mDamageRangeFlags = 0;
+    mCobTargetX = 0.0f;
+    mDamageOverride = -1;
+    mDamageRangeFlags = 0;
 	mDead = false;
 	mAttachmentID = AttachmentID::ATTACHMENTID_NULL;
 	mCobTargetRow = 0;
@@ -310,8 +311,8 @@ void Projectile::CheckForCollision()
 		Plant* aPlant = FindCollisionTargetPlant();
 		if (aPlant)
 		{
-			const ProjectileDefinition& aProjectileDef = GetProjectileDef();
-			aPlant->mPlantHealth -= aProjectileDef.mDamage;
+            int aDamage = mDamageOverride >= 0 ? mDamageOverride : GetProjectileDef().mDamage;
+            aPlant->mPlantHealth -= aDamage;
 			aPlant->mEatenFlashCountdown = std::max(aPlant->mEatenFlashCountdown, 25);
 
 			mApp->PlayFoley(FoleyType::FOLEY_SPLAT);
@@ -459,6 +460,7 @@ bool Projectile::IsZombieHitBySplash(Zombie* theZombie)
 void Projectile::DoSplashDamage(Zombie* theZombie)
 {
 	const ProjectileDefinition& aProjectileDef = GetProjectileDef();
+	int aDamage = mDamageOverride >= 0 ? mDamageOverride : aProjectileDef.mDamage;
 
 	int aZombiesGetSplashed = 0;
 	Zombie* aZombie = nullptr;
@@ -470,8 +472,8 @@ void Projectile::DoSplashDamage(Zombie* theZombie)
 		}
 	}
 
-	int aOriginalDamage = aProjectileDef.mDamage;
-	int aSplashDamage = aProjectileDef.mDamage / 3;
+	int aOriginalDamage = aDamage;
+	int aSplashDamage = aDamage / 3;
 	int aMaxSplashDamageAmount = aOriginalDamage * 7;
 	if (mProjectileType == ProjectileType::PROJECTILE_FIREBALL)
 	{
@@ -612,7 +614,7 @@ void Projectile::UpdateLobMotion()
 		}
 		else
 		{
-			aPlant->mPlantHealth -= GetProjectileDef().mDamage;
+			aPlant->mPlantHealth -= (mDamageOverride >= 0 ? mDamageOverride : GetProjectileDef().mDamage);
 			aPlant->mEatenFlashCountdown = std::max(aPlant->mEatenFlashCountdown, 25);
 			mApp->PlayFoley(FoleyType::FOLEY_SPLAT);
 			Die();
@@ -843,7 +845,7 @@ void Projectile::DoImpact(Zombie* theZombie)
 	else if (theZombie)
 	{
 		unsigned int aDamageFlags = GetDamageFlags(theZombie);
-		theZombie->TakeDamage(GetProjectileDef().mDamage, aDamageFlags);
+		theZombie->TakeDamage(mDamageOverride >= 0 ? mDamageOverride : GetProjectileDef().mDamage, aDamageFlags);
 	}
 
 	float aLastPosX = mPosX - mVelX;

@@ -1,6 +1,6 @@
 # Mod Framework — 待办清单
 
-> 评估日期：2026-05-19，框架完整性约 70%
+> 评估日期：2026-05-19，框架完整性约 75%
 
 ---
 
@@ -155,26 +155,26 @@
 - [x] **`entity:DistanceTo(otherEntity)`** → float
   - 像素距离计算（支持 Plant/Zombie/Coin 实体）
 
-#### C. 投射物生成 API — 暴露发射系统到 Lua
+#### C. 投射物生成 API — 暴露发射系统到 Lua ✅
 
-- [ ] **`Board:AddProjectile(x, y, row, projectileType)`** → proj_entity
+- [x] **`Board:AddProjectile(x, y, row, projectileType)`** → proj_entity
   - 映射 C++ `Board::AddProjectile(theX, theY, theRenderOrder, theRow, theProjectileType)`
   - 返回 Projectile 实体供后续操作
-  - 位置：`src/Lawn/Board.cpp:2414`
+  - 位置：`src/Mod/ModLua.cpp` — `Lua_BoardAddProjectile`
 
-- [ ] **`proj:SetDamage(amount)`**
-  - 设置伤害值
+- [x] **`proj:SetDamage(amount)`**
+  - 设置伤害值（写入 `mDamageOverride`，优先级高于定义伤害）
 
-- [ ] **`proj:SetVelocity(vx, vy, vz)`**
+- [x] **`proj:SetVelocity(vx, vy, vz)`**
   - 设置速度分量
 
-- [ ] **`proj:SetDamageFlags(flags)`**
+- [x] **`proj:SetDamageFlags(flags)`**
   - 设置伤害标记（冻结、穿透等），参考 `DamageFlags` 常量
 
-- [ ] **`proj:SetMotionType(motionType)`**
+- [x] **`proj:SetMotionType(motionType)`**
   - 设置弹道类型（直线、抛物线、跟踪等）
 
-- [ ] **`proj:SetTargetZombie(zombie)`**
+- [x] **`proj:SetTargetZombie(zombie)`**
   - 设置跟踪目标（用于跟踪弹）
 
 ### 现有问题修复（移至此处以便集中处理）
@@ -222,10 +222,10 @@
 - [ ] **扩展 Coin 实体方法**
   - `:GetValue()`, `:Die()`, `:StartFade()`
 
-- [ ] **新增 Projectile 实体类型（全新包装）**
+- [x] **新增 Projectile 实体类型（全新包装）**
   - 属性：`type`, `x`, `y`, `z`, `velX`, `velY`, `row`, `motionType`, `age`, `isDead`, `damage`, `rotation`
-  - 方法：`:Die()`, `:GetDamage()`, `:IsSplash()`
-  - 位置：`src/Mod/ModLua.cpp` — 新增 `ENTITY_TYPE_PROJECTILE=3` + PushEntity 重载
+  - 方法：`:SetDamage()`, `:SetVelocity()`, `:SetDamageFlags()`, `:SetMotionType()`, `:SetTargetZombie()`
+  - 位置：`src/Mod/ModLua.cpp` — `ENTITY_TYPE_PROJECTILE=3` + `PushEntity` 重载
 
 ### 关键新生命周期回调
 

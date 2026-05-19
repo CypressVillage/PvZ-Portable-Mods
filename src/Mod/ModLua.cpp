@@ -15,6 +15,7 @@
 #include "Sexy.TodLib/Reanimator.h"
 #include "../Lawn/Zombie.h"
 #include "../Lawn/Coin.h"
+#include "../Lawn/Projectile.h"
 #include "../Lawn/Widget/GameButton.h"
 #include "Sexy.TodLib/TodDebug.h"
 #include "SexyAppFramework/Common.h"
@@ -355,11 +356,12 @@ namespace
 
 	// Entity wrapper
 	struct LuaEntity {
-		int type; // 0 = plant, 1 = zombie, 2 = coin
+		int type; // 0 = plant, 1 = zombie, 2 = coin, 3 = projectile
 		union {
 			Plant* plant;
 			Zombie* zombie;
 			Coin* coin;
+			Projectile* projectile;
 		} ptr;
 	};
 
@@ -373,7 +375,9 @@ namespace
 			strcmp(key, "GetBodyReanim") == 0 || strcmp(key, "PlayBodyReanim") == 0 || strcmp(key, "PlayIdleAnim") == 0 ||
 			strcmp(key, "GetBodyReanimProgress") == 0 || strcmp(key, "SetBodyReanimRate") == 0 || strcmp(key, "GetBodyReanimRate") == 0 ||
 			strcmp(key, "IsAnimPlaying") == 0 || strcmp(key, "TrackExists") == 0 ||
-			strcmp(key, "GetBodyReanimLoopType") == 0 || strcmp(key, "GetBodyReanimLoopCount") == 0) {
+			strcmp(key, "GetBodyReanimLoopType") == 0 || strcmp(key, "GetBodyReanimLoopCount") == 0 ||
+			strcmp(key, "SetDamage") == 0 || strcmp(key, "SetVelocity") == 0 || strcmp(key, "SetDamageFlags") == 0 ||
+			strcmp(key, "SetMotionType") == 0 || strcmp(key, "SetTargetZombie") == 0) {
 			lua_getmetatable(L, 1);
 			lua_getfield(L, -1, key);
 			return 1;
@@ -391,6 +395,22 @@ namespace
 			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.coin->mType)); return 1; }
 			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 0); return 1; }
 			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; }
+		} else if (ent->type == 3 && ent->ptr.projectile) {
+			if (strcmp(key, "type") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.projectile->mProjectileType)); return 1; }
+			if (strcmp(key, "x") == 0) { lua_pushnumber(L, ent->ptr.projectile->mPosX); return 1; }
+			if (strcmp(key, "y") == 0) { lua_pushnumber(L, ent->ptr.projectile->mPosY); return 1; }
+			if (strcmp(key, "z") == 0) { lua_pushnumber(L, ent->ptr.projectile->mPosZ); return 1; }
+			if (strcmp(key, "row") == 0) { lua_pushinteger(L, ent->ptr.projectile->mRow); return 1; }
+			if (strcmp(key, "motionType") == 0) { lua_pushinteger(L, static_cast<int>(ent->ptr.projectile->mMotionType)); return 1; }
+			if (strcmp(key, "age") == 0) { lua_pushinteger(L, ent->ptr.projectile->mProjectileAge); return 1; }
+			if (strcmp(key, "hp") == 0) { lua_pushinteger(L, 1); return 1; }
+			if (strcmp(key, "id") == 0) { lua_pushinteger(L, 0); return 1; }
+			if (strcmp(key, "damage") == 0) { lua_pushinteger(L, ent->ptr.projectile->mDamageOverride >= 0 ? ent->ptr.projectile->mDamageOverride : ent->ptr.projectile->GetProjectileDef().mDamage); return 1; }
+			if (strcmp(key, "velX") == 0) { lua_pushnumber(L, ent->ptr.projectile->mVelX); return 1; }
+			if (strcmp(key, "velY") == 0) { lua_pushnumber(L, ent->ptr.projectile->mVelY); return 1; }
+			if (strcmp(key, "velZ") == 0) { lua_pushnumber(L, ent->ptr.projectile->mVelZ); return 1; }
+			if (strcmp(key, "isDead") == 0) { lua_pushboolean(L, ent->ptr.projectile->mDead ? 1 : 0); return 1; }
+			if (strcmp(key, "rotation") == 0) { lua_pushnumber(L, ent->ptr.projectile->mRotation); return 1; }
 		}
 		
 		lua_pushnil(L);
@@ -457,6 +477,15 @@ namespace
 		LuaEntity* ent = (LuaEntity*)lua_newuserdata(L, sizeof(LuaEntity));
 		ent->type = 2;
 		ent->ptr.coin = coin;
+		luaL_getmetatable(L, "Game.Entity");
+		lua_setmetatable(L, -2);
+	}
+
+	void PushEntity(lua_State* L, Projectile* projectile) {
+		if (!projectile) { lua_pushnil(L); return; }
+		LuaEntity* ent = (LuaEntity*)lua_newuserdata(L, sizeof(LuaEntity));
+		ent->type = 3;
+		ent->ptr.projectile = projectile;
 		luaL_getmetatable(L, "Game.Entity");
 		lua_setmetatable(L, -2);
 	}
@@ -673,6 +702,21 @@ namespace
 				lua_rawseti(L, -2, idx++);
 			}
 		}
+		return 1;
+	}
+
+	int Lua_BoardAddProjectile(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int x = luaL_checkinteger(L, 1);
+		int y = luaL_checkinteger(L, 2);
+		int row = luaL_checkinteger(L, 3);
+		int projType = luaL_checkinteger(L, 4);
+
+		if (row < 0 || row >= 6) { lua_pushnil(L); return 1; }
+
+		Projectile* p = gLawnApp->mBoard->AddProjectile(x, y, 0, row, static_cast<ProjectileType>(projType));
+		PushEntity(L, p);
 		return 1;
 	}
 
@@ -1059,6 +1103,56 @@ namespace
 		Reanimation* reanim = gLawnApp->ReanimationGet(ent->ptr.plant->mBodyReanimID);
 		lua_pushinteger(L, reanim ? reanim->mLoopCount : 0);
 		return 1;
+	}
+
+	int Lua_EntitySetDamage(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 3 || !ent->ptr.projectile) return 0;
+		int amount = luaL_checkinteger(L, 2);
+		ent->ptr.projectile->mDamageOverride = amount;
+		return 0;
+	}
+
+	int Lua_EntitySetVelocity(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 3 || !ent->ptr.projectile) return 0;
+		float vx = (float)luaL_checknumber(L, 2);
+		float vy = (float)luaL_checknumber(L, 3);
+		float vz = (float)luaL_optnumber(L, 4, 0.0);
+		ent->ptr.projectile->mVelX = vx;
+		ent->ptr.projectile->mVelY = vy;
+		ent->ptr.projectile->mVelZ = vz;
+		return 0;
+	}
+
+	int Lua_EntitySetDamageFlags(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 3 || !ent->ptr.projectile) return 0;
+		int flags = luaL_checkinteger(L, 2);
+		ent->ptr.projectile->mDamageRangeFlags = flags;
+		return 0;
+	}
+
+	int Lua_EntitySetMotionType(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 3 || !ent->ptr.projectile) return 0;
+		int motionType = luaL_checkinteger(L, 2);
+		ent->ptr.projectile->mMotionType = static_cast<ProjectileMotion>(motionType);
+		return 0;
+	}
+
+	int Lua_EntitySetTargetZombie(lua_State* L)
+	{
+		LuaEntity* ent = (LuaEntity*)luaL_checkudata(L, 1, "Game.Entity");
+		if (ent->type != 3 || !ent->ptr.projectile || !gLawnApp || !gLawnApp->mBoard) return 0;
+		LuaEntity* target = (LuaEntity*)luaL_checkudata(L, 2, "Game.Entity");
+		if (target->type != 1 || !target->ptr.zombie) return 0;
+		ent->ptr.projectile->mTargetZombieID = gLawnApp->mBoard->ZombieGetID(target->ptr.zombie);
+		return 0;
 	}
 
 	int Lua_UICreateDialog(lua_State* L)
@@ -1752,6 +1846,8 @@ namespace
 		lua_setfield(L, -2, "GetAllZombies");
 		lua_pushcfunction(L, Lua_BoardGetAllPlants);
 		lua_setfield(L, -2, "GetAllPlants");
+		lua_pushcfunction(L, Lua_BoardAddProjectile);
+		lua_setfield(L, -2, "AddProjectile");
 		lua_pushcfunction(L, Lua_BoardAddButton);
 		lua_setfield(L, -2, "AddButton");
 		lua_pushcfunction(L, Lua_BoardRemoveButton);
@@ -1824,6 +1920,16 @@ namespace
 		lua_setfield(L, -2, "GetBodyReanimLoopCount");
 		lua_pushcfunction(L, Lua_EntityDistanceTo);
 		lua_setfield(L, -2, "DistanceTo");
+		lua_pushcfunction(L, Lua_EntitySetDamage);
+		lua_setfield(L, -2, "SetDamage");
+		lua_pushcfunction(L, Lua_EntitySetVelocity);
+		lua_setfield(L, -2, "SetVelocity");
+		lua_pushcfunction(L, Lua_EntitySetDamageFlags);
+		lua_setfield(L, -2, "SetDamageFlags");
+		lua_pushcfunction(L, Lua_EntitySetMotionType);
+		lua_setfield(L, -2, "SetMotionType");
+		lua_pushcfunction(L, Lua_EntitySetTargetZombie);
+		lua_setfield(L, -2, "SetTargetZombie");
 		lua_pop(L, 1);
 
 		// Dialog metatable

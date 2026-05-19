@@ -66,6 +66,7 @@ public:
     float                   mRotation;
     float                   mRotationSpeed;
     bool                    mOnHighGround;
+    int32_t                 mDamageOverride;
     int32_t                 mDamageRangeFlags;
     int32_t                 mHitTorchwoodGridX;
     AttachmentID            mAttachmentID;
