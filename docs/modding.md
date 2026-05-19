@@ -206,6 +206,20 @@ Recommended paths inside `resources/`:
 | `Game.SaveModData(key, value)` | — | Persist a string KV pair for this mod |
 | `Game.LoadModData(key)` | string\|nil | Load a saved value; `nil` if not found |
 | `Game.GetMenuButtonRect()` | x, y, w, h | Position of the menu button in the board |
+| `Game.GetSun()` | int | Current sun count |
+| `Game.SetSun(amount)` | — | Set sun count |
+| `Game.GetTotalWaves()` | int | Total number of waves in level |
+| `Game.IsNight()` | bool | Level has night background |
+| `Game.HasPool()` | bool | Level has pool (includes fog) |
+| `Game.IsRoof()` | bool | Level has roof background |
+| `Game.IsFog()` | bool | Level has fog background |
+| `Game.SpawnSun(x, y [, value])` | Entity\|nil | Spawn a sun at pixel position (default value=50) |
+| `Game.SpawnCoin(x, y, coinType)` | Entity\|nil | Spawn a coin at pixel position |
+| `Game.PlayFoley(foleyType)` | — | Play a sound effect by FoleyType enum |
+| `Game.GetPlayerCoins()` | int | Total coins in player's wallet |
+| `Game.AddPlayerCoins(amount)` | — | Add coins to player's wallet |
+| `Game.Shake(x, y)` | — | Shake the screen by given intensity |
+| `Game.DisplayAdvice(text [, style])` | — | Show advice text (uses MessageStyle enum) |
 
 #### Board
 
@@ -214,6 +228,8 @@ Recommended paths inside `resources/`:
 | `Board.SpawnZombie(id, row)` | Entity\|nil | Spawn a zombie by string ID or integer type |
 | `Board.SpawnPlant(id, row, col)` | Entity\|nil | Plant at grid position by string ID or integer type |
 | `Board.GetWave()` | int | Current wave index |
+| `Board.Pause(bool)` | — | Pause or unpause the board |
+| `Board.IsPaused()` | bool | Whether the board is paused |
 | `Board.FindTargetZombie(plant)` | Entity\|nil | Nearest zombie target for a plant |
 | `Board.GetZombiesInRow(row)` | table | Array of zombie entities in a row |
 | `Board.GetPlantsInRow(row)` | table | Array of plant entities in a row |
@@ -387,6 +403,26 @@ function OnProjectileMiss(proj)     -- Entity: Projectile                       
 -- Coin events
 function OnCoinSpawn(coin)          -- Entity: Coin                                end
 function OnCoinCollect(coin)        -- Entity: Coin                                end
+function OnCoinExpire(coin)         -- Entity: Coin (faded out, about to be removed) end
+
+-- Plant events (extended)
+function OnPlantEaten(plant, zombie)    -- Entity: Plant, Zombie                   end
+function OnPlantProduce(plant)          -- Entity: Plant (sunflower/marigold output) end
+function OnPlantUpgrade(plant, oldType) -- Entity: Plant, int (imitater morph)     end
+
+-- Zombie events (extended)
+function OnZombieFrozen(zombie, isFrozen)    -- Entity: Zombie, bool               end
+function OnZombieButtered(zombie)             -- Entity: Zombie                     end
+function OnZombieMindControl(zombie)          -- Entity: Zombie                     end
+
+-- Wave events (extended)
+function OnFlagRaise(waveIndex)               -- int (flag wave raised)             end
+
+-- Mower events
+function OnMowerTriggered(row, mowerType)     -- int, int (LawnMowerType)           end
+
+-- Game state events
+function OnSunCountChange(oldAmount, newAmount) -- int, int                         end
 
 -- UI events
 function OnBoardButtonClick(button_id)                                             end
@@ -529,6 +565,8 @@ All game constants are registered as read-only global tables:
 | `ShieldType` | `NONE=0, DOOR=1, NEWSPAPER=2, LADDER=3` |
 | `ReanimLoopType` | `LOOP=0, PLAY_ONCE=2, PLAY_ONCE_AND_HOLD=3, ...` |
 | `GridConstants` | `COLS=9, ROWS=6, BOARD_WIDTH=800, BOARD_HEIGHT=600, LAWN_XMIN=40, LAWN_YMIN=80, BOARD_OFFSET=220, SEEDBANK_MAX=10` |
+| `MessageStyle` | `OFF=0, TUTORIAL_LEVEL1=1, ..., HINT_FAST=6, BIG_MIDDLE=12, ...` |
+| `FoleyType` | `SUN=0, SPLAT=1, ..., FROZEN=18, EXPLOSION=22, BUTTER=42, ...` |
 
 ## 8. Example Mods
 

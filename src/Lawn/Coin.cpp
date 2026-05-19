@@ -486,6 +486,7 @@ void Coin::UpdateFade()
         mFadeCount--;
         if (mFadeCount == 0)
         {
+            gModLua.CallOnCoinExpire(this);
             Die();
         }
     }

@@ -26,6 +26,7 @@
 #include "System/ReanimationLawn.h"
 #include "../Sexy.TodLib/TodFoley.h"
 #include "../Sexy.TodLib/Reanimator.h"
+#include "../Mod/ModLua.h"
 
 void LawnMower::LawnMowerInitialize(int theRow)
 {
@@ -380,6 +381,8 @@ void LawnMower::Die()
 
 void LawnMower::StartMower()
 {
+    gModLua.CallOnMowerTriggered(mRow, static_cast<int>(mMowerType));
+
     if (mMowerState == LawnMowerState::MOWER_TRIGGERED)
     {
         return;

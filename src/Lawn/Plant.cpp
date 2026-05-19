@@ -1086,6 +1086,8 @@ void Plant::UpdateProductionPlant()
                 mBoard->AddCoin(mX, mY, CoinType::COIN_SILVER, CoinMotion::COIN_MOTION_COIN);
             }
         }
+
+        gModLua.CallOnPlantProduce(this);
     }
 }
 
@@ -4423,8 +4425,10 @@ void Plant::DoSpecial()
 
 void Plant::ImitaterMorph()
 {
+    int oldType = static_cast<int>(mSeedType);
     Die();
     Plant* aPlant = mBoard->AddPlant(mPlantCol, mRow, mImitaterType, SeedType::SEED_IMITATER);
+    gModLua.CallOnPlantUpgrade(aPlant ? aPlant : this, oldType);
 
     FilterEffect aFilter = FilterEffect::FILTER_EFFECT_WASHED_OUT;
     if (mImitaterType == SeedType::SEED_HYPNOSHROOM || mImitaterType == SeedType::SEED_SQUASH || mImitaterType == SeedType::SEED_POTATOMINE ||

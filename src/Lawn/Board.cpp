@@ -5366,6 +5366,8 @@ void Board::UpdateSunSpawning()
 
 void Board::NextWaveComing()
 {
+	gModLua.CallOnFlagRaise(mCurrentWave);
+
 	if (mCurrentWave + 1 == mNumWaves)
 	{
 		if (!IsSurvivalStageWithRepick() && mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_LAST_STAND && !mApp->IsContinuousChallenge())
@@ -8669,14 +8671,15 @@ void Board::KeyChar(char theChar)
 // GOTY @Patoke: 0x41E6E0
 void Board::AddSunMoney(int theAmount)
 {
+	int oldAmount = mSunMoney;
 	mSunMoney += theAmount;
 	if (mSunMoney > 9990)
 	{
 		mSunMoney = 9990;
 	}
 	if (mSunMoney >= 8000)
-		// if ( !*(mApp->mPlayerInfo + 48) ) todo @Patoke: figure this out
 		ReportAchievement::GiveAchievement(mApp, SunnyDays, true);
+	gModLua.CallOnSunCountChange(oldAmount, mSunMoney);
 }
 
 int Board::CountSunBeingCollected()
@@ -8711,7 +8714,9 @@ bool Board::TakeSunMoney(int theAmount)
 {
 	if (CanTakeSunMoney(theAmount))
 	{
+		int oldAmount = mSunMoney;
 		mSunMoney -= theAmount;
+		gModLua.CallOnSunCountChange(oldAmount, mSunMoney);
 		return true;
 	}
 

@@ -33,6 +33,16 @@ public:
 	void CallOnProjectileMiss(class Projectile* proj);
 	void CallOnCoinCollect(class Coin* coin);
 	void CallOnZombieReachHouse(class Zombie* zombie);
+	void CallOnPlantEaten(class Plant* plant, class Zombie* zombie);
+	void CallOnPlantProduce(class Plant* plant);
+	void CallOnPlantUpgrade(class Plant* plant, int oldType);
+	void CallOnZombieFrozen(class Zombie* zombie, bool isFrozen);
+	void CallOnZombieButtered(class Zombie* zombie);
+	void CallOnZombieMindControl(class Zombie* zombie);
+	void CallOnCoinExpire(class Coin* coin);
+	void CallOnFlagRaise(int waveIndex);
+	void CallOnMowerTriggered(int row, int mowerType);
+	void CallOnSunCountChange(int oldAmount, int newAmount);
 
 private:
 	void* mState = nullptr;

@@ -1574,6 +1574,211 @@ namespace
 		return 4;
 	}
 
+	int Lua_GameGetSun(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			lua_pushinteger(L, gLawnApp->mBoard->mSunMoney);
+		}
+		else
+		{
+			lua_pushinteger(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameSetSun(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			int amount = luaL_checkinteger(L, 1);
+			gLawnApp->mBoard->mSunMoney = amount;
+			if (gLawnApp->mBoard->mSunMoney > 9990)
+				gLawnApp->mBoard->mSunMoney = 9990;
+		}
+		return 0;
+	}
+
+	int Lua_GameGetTotalWaves(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			lua_pushinteger(L, gLawnApp->mBoard->mNumWaves);
+		}
+		else
+		{
+			lua_pushinteger(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameIsNight(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			bool isNight = gLawnApp->mBoard->mBackground == BackgroundType::BACKGROUND_2_NIGHT;
+			lua_pushboolean(L, isNight ? 1 : 0);
+		}
+		else
+		{
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameHasPool(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			bool hasPool = gLawnApp->mBoard->mBackground == BackgroundType::BACKGROUND_3_POOL || gLawnApp->mBoard->mBackground == BackgroundType::BACKGROUND_4_FOG;
+			lua_pushboolean(L, hasPool ? 1 : 0);
+		}
+		else
+		{
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameIsRoof(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			bool isRoof = gLawnApp->mBoard->mBackground == BackgroundType::BACKGROUND_5_ROOF;
+			lua_pushboolean(L, isRoof ? 1 : 0);
+		}
+		else
+		{
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameIsFog(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			bool isFog = gLawnApp->mBoard->mBackground == BackgroundType::BACKGROUND_4_FOG;
+			lua_pushboolean(L, isFog ? 1 : 0);
+		}
+		else
+		{
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameSpawnSun(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int x = luaL_checkinteger(L, 1);
+		int y = luaL_checkinteger(L, 2);
+		int value = luaL_optinteger(L, 3, 50);
+
+		CoinType aSunType = CoinType::COIN_SUN;
+		if (value <= 15) aSunType = CoinType::COIN_SMALLSUN;
+		else if (value >= 75) aSunType = CoinType::COIN_LARGESUN;
+
+		Coin* coin = gLawnApp->mBoard->AddCoin(x, y, aSunType, CoinMotion::COIN_MOTION_FROM_SKY);
+		if (coin)
+			PushEntity(L, coin);
+		else
+			lua_pushnil(L);
+		return 1;
+	}
+
+	int Lua_GameSpawnCoin(lua_State* L)
+	{
+		if (!gLawnApp || !gLawnApp->mBoard) return 0;
+		int x = luaL_checkinteger(L, 1);
+		int y = luaL_checkinteger(L, 2);
+		int coinType = luaL_checkinteger(L, 3);
+
+		Coin* coin = gLawnApp->mBoard->AddCoin(x, y, static_cast<CoinType>(coinType), CoinMotion::COIN_MOTION_COIN);
+		if (coin)
+			PushEntity(L, coin);
+		else
+			lua_pushnil(L);
+		return 1;
+	}
+
+	int Lua_GamePlayFoley(lua_State* L)
+	{
+		if (!gLawnApp) return 0;
+		int foleyType = luaL_checkinteger(L, 1);
+		gLawnApp->PlayFoley(static_cast<FoleyType>(foleyType));
+		return 0;
+	}
+
+	int Lua_GameGetPlayerCoins(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mPlayerInfo)
+		{
+			lua_pushinteger(L, gLawnApp->mPlayerInfo->mCoins);
+		}
+		else
+		{
+			lua_pushinteger(L, 0);
+		}
+		return 1;
+	}
+
+	int Lua_GameAddPlayerCoins(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mPlayerInfo)
+		{
+			int amount = luaL_checkinteger(L, 1);
+			gLawnApp->mPlayerInfo->AddCoins(amount);
+		}
+		return 0;
+	}
+
+	int Lua_GameShake(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			int x = luaL_checkinteger(L, 1);
+			int y = luaL_checkinteger(L, 2);
+			gLawnApp->mBoard->ShakeBoard(x, y);
+		}
+		return 0;
+	}
+
+	int Lua_GameDisplayAdvice(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			const char* text = luaL_checkstring(L, 1);
+			int style = luaL_optinteger(L, 2, static_cast<int>(MessageStyle::MESSAGE_STYLE_HINT_FAST));
+			gLawnApp->mBoard->DisplayAdvice(text, static_cast<MessageStyle>(style), AdviceType::ADVICE_NONE);
+		}
+		return 0;
+	}
+
+	// Board API extensions
+	int Lua_BoardPause(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			bool pause = lua_toboolean(L, 1) != 0;
+			gLawnApp->mBoard->Pause(pause);
+		}
+		return 0;
+	}
+
+	int Lua_BoardIsPaused(lua_State* L)
+	{
+		if (gLawnApp && gLawnApp->mBoard)
+		{
+			lua_pushboolean(L, gLawnApp->mBoard->mPaused ? 1 : 0);
+		}
+		else
+		{
+			lua_pushboolean(L, 0);
+		}
+		return 1;
+	}
+
 	int Lua_BoardAddButton(lua_State* L)
 	{
 		if (!gLawnApp || !gLawnApp->mBoard) return 0;
@@ -2108,6 +2313,44 @@ namespace
 		lua_pushinteger(L, BOARD_OFFSET); lua_setfield(L, -2, "BOARD_OFFSET");
 		lua_pushinteger(L, SEEDBANK_MAX); lua_setfield(L, -2, "SEEDBANK_MAX");
 		lua_setglobal(L, "GridConstants");
+
+		// MessageStyle
+		lua_newtable(L);
+		lua_pushinteger(L, MESSAGE_STYLE_OFF); lua_setfield(L, -2, "OFF");
+		lua_pushinteger(L, MESSAGE_STYLE_TUTORIAL_LEVEL1); lua_setfield(L, -2, "TUTORIAL_LEVEL1");
+		lua_pushinteger(L, MESSAGE_STYLE_TUTORIAL_LEVEL1_STAY); lua_setfield(L, -2, "TUTORIAL_LEVEL1_STAY");
+		lua_pushinteger(L, MESSAGE_STYLE_TUTORIAL_LEVEL2); lua_setfield(L, -2, "TUTORIAL_LEVEL2");
+		lua_pushinteger(L, MESSAGE_STYLE_TUTORIAL_LATER); lua_setfield(L, -2, "TUTORIAL_LATER");
+		lua_pushinteger(L, MESSAGE_STYLE_TUTORIAL_LATER_STAY); lua_setfield(L, -2, "TUTORIAL_LATER_STAY");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_LONG); lua_setfield(L, -2, "HINT_LONG");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_FAST); lua_setfield(L, -2, "HINT_FAST");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_STAY); lua_setfield(L, -2, "HINT_STAY");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_TALL_FAST); lua_setfield(L, -2, "HINT_TALL_FAST");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_TALL_UNLOCKMESSAGE); lua_setfield(L, -2, "HINT_TALL_UNLOCKMESSAGE");
+		lua_pushinteger(L, MESSAGE_STYLE_HINT_TALL_LONG); lua_setfield(L, -2, "HINT_TALL_LONG");
+		lua_pushinteger(L, MESSAGE_STYLE_BIG_MIDDLE); lua_setfield(L, -2, "BIG_MIDDLE");
+		lua_pushinteger(L, MESSAGE_STYLE_BIG_MIDDLE_FAST); lua_setfield(L, -2, "BIG_MIDDLE_FAST");
+		lua_pushinteger(L, MESSAGE_STYLE_HOUSE_NAME); lua_setfield(L, -2, "HOUSE_NAME");
+		lua_setglobal(L, "MessageStyle");
+
+		// FoleyType
+		lua_newtable(L);
+		lua_pushinteger(L, FOLEY_SUN); lua_setfield(L, -2, "SUN");
+		lua_pushinteger(L, FOLEY_SPLAT); lua_setfield(L, -2, "SPLAT");
+		lua_pushinteger(L, FOLEY_LAWNMOWER); lua_setfield(L, -2, "LAWNMOWER");
+		lua_pushinteger(L, FOLEY_THROW); lua_setfield(L, -2, "THROW");
+		lua_pushinteger(L, FOLEY_SPAWN_SUN); lua_setfield(L, -2, "SPAWN_SUN");
+		lua_pushinteger(L, FOLEY_CHOMP); lua_setfield(L, -2, "CHOMP");
+		lua_pushinteger(L, FOLEY_PLANT); lua_setfield(L, -2, "PLANT");
+		lua_pushinteger(L, FOLEY_FROZEN); lua_setfield(L, -2, "FROZEN");
+		lua_pushinteger(L, FOLEY_EXPLOSION); lua_setfield(L, -2, "EXPLOSION");
+		lua_pushinteger(L, FOLEY_JALAPENO_IGNITE); lua_setfield(L, -2, "JALAPENO_IGNITE");
+		lua_pushinteger(L, FOLEY_CHERRYBOMB); lua_setfield(L, -2, "CHERRYBOMB");
+		lua_pushinteger(L, FOLEY_COIN); lua_setfield(L, -2, "COIN");
+		lua_pushinteger(L, FOLEY_BUTTER); lua_setfield(L, -2, "BUTTER");
+		lua_pushinteger(L, FOLEY_POOL_CLEANER); lua_setfield(L, -2, "POOL_CLEANER");
+		lua_pushinteger(L, NUM_FOLEY); lua_setfield(L, -2, "NUM_TYPES");
+		lua_setglobal(L, "FoleyType");
 	}
 
 	void Lua_RegisterGameTable(lua_State* L)
@@ -2128,6 +2371,34 @@ namespace
 		lua_setfield(L, -2, "GetMode");
 		lua_pushcfunction(L, Lua_GameGetMenuButtonRect);
 		lua_setfield(L, -2, "GetMenuButtonRect");
+		lua_pushcfunction(L, Lua_GameGetSun);
+		lua_setfield(L, -2, "GetSun");
+		lua_pushcfunction(L, Lua_GameSetSun);
+		lua_setfield(L, -2, "SetSun");
+		lua_pushcfunction(L, Lua_GameGetTotalWaves);
+		lua_setfield(L, -2, "GetTotalWaves");
+		lua_pushcfunction(L, Lua_GameIsNight);
+		lua_setfield(L, -2, "IsNight");
+		lua_pushcfunction(L, Lua_GameHasPool);
+		lua_setfield(L, -2, "HasPool");
+		lua_pushcfunction(L, Lua_GameIsRoof);
+		lua_setfield(L, -2, "IsRoof");
+		lua_pushcfunction(L, Lua_GameIsFog);
+		lua_setfield(L, -2, "IsFog");
+		lua_pushcfunction(L, Lua_GameSpawnSun);
+		lua_setfield(L, -2, "SpawnSun");
+		lua_pushcfunction(L, Lua_GameSpawnCoin);
+		lua_setfield(L, -2, "SpawnCoin");
+		lua_pushcfunction(L, Lua_GamePlayFoley);
+		lua_setfield(L, -2, "PlayFoley");
+		lua_pushcfunction(L, Lua_GameGetPlayerCoins);
+		lua_setfield(L, -2, "GetPlayerCoins");
+		lua_pushcfunction(L, Lua_GameAddPlayerCoins);
+		lua_setfield(L, -2, "AddPlayerCoins");
+		lua_pushcfunction(L, Lua_GameShake);
+		lua_setfield(L, -2, "Shake");
+		lua_pushcfunction(L, Lua_GameDisplayAdvice);
+		lua_setfield(L, -2, "DisplayAdvice");
 		lua_pushcfunction(L, Lua_GameRegisterProjectile);
 		lua_setfield(L, -2, "RegisterProjectile");
 		lua_pushcfunction(L, Lua_GameRegisterPlant);
@@ -2146,6 +2417,10 @@ namespace
 		lua_setfield(L, -2, "SpawnPlant");
 		lua_pushcfunction(L, Lua_BoardGetWave);
 		lua_setfield(L, -2, "GetWave");
+		lua_pushcfunction(L, Lua_BoardPause);
+		lua_setfield(L, -2, "Pause");
+		lua_pushcfunction(L, Lua_BoardIsPaused);
+		lua_setfield(L, -2, "IsPaused");
 		lua_pushcfunction(L, Lua_BoardFindTargetZombie);
 		lua_setfield(L, -2, "FindTargetZombie");
 		lua_pushcfunction(L, Lua_BoardGetZombiesInRow);
@@ -2742,5 +3017,135 @@ void ModLua::CallOnZombieReachHouse(Zombie* zombie)
 	Lua_CallGlobal(L, "OnZombieReachHouse", 1);
 #else
 	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnPlantEaten(Plant* plant, Zombie* zombie)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, plant);
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnPlantEaten", 2);
+#else
+	(void)plant;
+	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnPlantProduce(Plant* plant)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, plant);
+	Lua_CallGlobal(L, "OnPlantProduce", 1);
+#else
+	(void)plant;
+#endif
+}
+
+void ModLua::CallOnPlantUpgrade(Plant* plant, int oldType)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, plant);
+	lua_pushinteger(L, oldType);
+	Lua_CallGlobal(L, "OnPlantUpgrade", 2);
+#else
+	(void)plant;
+	(void)oldType;
+#endif
+}
+
+void ModLua::CallOnZombieFrozen(Zombie* zombie, bool isFrozen)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, zombie);
+	lua_pushboolean(L, isFrozen ? 1 : 0);
+	Lua_CallGlobal(L, "OnZombieFrozen", 2);
+#else
+	(void)zombie;
+	(void)isFrozen;
+#endif
+}
+
+void ModLua::CallOnZombieButtered(Zombie* zombie)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnZombieButtered", 1);
+#else
+	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnZombieMindControl(Zombie* zombie)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, zombie);
+	Lua_CallGlobal(L, "OnZombieMindControl", 1);
+#else
+	(void)zombie;
+#endif
+}
+
+void ModLua::CallOnCoinExpire(Coin* coin)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	PushEntity(L, coin);
+	Lua_CallGlobal(L, "OnCoinExpire", 1);
+#else
+	(void)coin;
+#endif
+}
+
+void ModLua::CallOnFlagRaise(int waveIndex)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	lua_pushinteger(L, waveIndex);
+	Lua_CallGlobal(L, "OnFlagRaise", 1);
+#else
+	(void)waveIndex;
+#endif
+}
+
+void ModLua::CallOnMowerTriggered(int row, int mowerType)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	lua_pushinteger(L, row);
+	lua_pushinteger(L, mowerType);
+	Lua_CallGlobal(L, "OnMowerTriggered", 2);
+#else
+	(void)row;
+	(void)mowerType;
+#endif
+}
+
+void ModLua::CallOnSunCountChange(int oldAmount, int newAmount)
+{
+#if defined(PVZ_ENABLE_LUA)
+	lua_State* L = static_cast<lua_State*>(mState);
+	if (L == nullptr) return;
+	lua_pushinteger(L, oldAmount);
+	lua_pushinteger(L, newAmount);
+	Lua_CallGlobal(L, "OnSunCountChange", 2);
+#else
+	(void)oldAmount;
+	(void)newAmount;
 #endif
 }

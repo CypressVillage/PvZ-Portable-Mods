@@ -1,8 +1,8 @@
 # Mod Framework — 待办清单
 
-> 评估日期：2026-05-19，框架完整性约 75%
+> 评估日期：2026-05-19，框架完整性约 85%
 > 
-> **近期目标阶段**：P5 — Lua 辅助模块体系（2026-05-19 起）
+> **近期目标阶段**：P7+P8 — Game/Board API 扩展 + 次要回调（2026-05-19 达成）
 
 ---
 
@@ -457,33 +457,33 @@
 
 ### Game API 扩展
 
-- [ ] **`Game.GetSun()` / `Game.SetSun(amount)`** — 阳光数
-- [ ] **`Game.GetTotalWaves()`** — 总波数
-- [ ] **`Game.IsNight()` / `Game.HasPool()` / `Game.IsRoof()` / `Game.IsFog()`** — 场地类型
-- [ ] **`Game.SpawnSun(x, y, value)`** — 生成阳光
-- [ ] **`Game.SpawnCoin(x, y, coinType)`** — 生成硬币
-- [ ] **`Game.PlayFoley(foleyType)`** — 播放音效
-- [ ] **`Game.GetPlayerCoins()` / `Game.AddPlayerCoins(amount)`** — 银币管理
-- [ ] **`Game.Shake(x, y)`** — 屏幕震动
-- [ ] **`Game.DisplayAdvice(text, style)`** — 提示文字
+- [x] **`Game.GetSun()` / `Game.SetSun(amount)`** — 阳光数
+- [x] **`Game.GetTotalWaves()`** — 总波数
+- [x] **`Game.IsNight()` / `Game.HasPool()` / `Game.IsRoof()` / `Game.IsFog()`** — 场地类型
+- [x] **`Game.SpawnSun(x, y, value)`** — 生成阳光
+- [x] **`Game.SpawnCoin(x, y, coinType)`** — 生成硬币
+- [x] **`Game.PlayFoley(foleyType)`** — 播放音效
+- [x] **`Game.GetPlayerCoins()` / `Game.AddPlayerCoins(amount)`** — 银币管理
+- [x] **`Game.Shake(x, y)`** — 屏幕震动
+- [x] **`Game.DisplayAdvice(text, style)`** — 提示文字
 
 ### Board API 扩展
 
-- [ ] **`Board.Pause(bool)` / `Board.IsPaused()`** — 暂停控制
-- [ ] **`Board.GetWave()`** — 当前波次（已实现，确认）
+- [x] **`Board.Pause(bool)` / `Board.IsPaused()`** — 暂停控制
+- [x] **`Board.GetWave()`** — 当前波次（已实现，确认）
 
 ### 次要新回调
 
-- [ ] **`OnPlantEaten(plant, zombie)`** — `Zombie::EatPlant()` 啃食时
-- [ ] **`OnPlantProduce(plant)`** — `Plant::UpdateProductionPlant()` 产出时
-- [ ] **`OnPlantUpgrade(plant, oldType)`** — `Plant::ImitaterMorph()` 升级时
-- [ ] **`OnZombieFrozen(zombie, isFrozen)`** — `Zombie::ApplyChill()`
-- [ ] **`OnZombieButtered(zombie)`** — `Zombie::ApplyButter()`
-- [ ] **`OnZombieMindControl(zombie)`** — `Zombie::StartMindControlled()`
-- [ ] **`OnCoinExpire(coin)`** — `Coin::Update()` 超时消失
-- [ ] **`OnFlagRaise(waveIndex)`** — `Board::NextWaveComing()` 旗帜升起
-- [ ] **`OnMowerTriggered(row, mowerType)`** — `LawnMower::StartMower()`
-- [ ] **`OnSunCountChange(oldAmount, newAmount)`** — `Board::SetSunMoney()`
+- [x] **`OnPlantEaten(plant, zombie)`** — `Zombie::EatPlant()` 啃食时
+- [x] **`OnPlantProduce(plant)`** — `Plant::UpdateProductionPlant()` 产出时
+- [x] **`OnPlantUpgrade(plant, oldType)`** — `Plant::ImitaterMorph()` 升级时
+- [x] **`OnZombieFrozen(zombie, isFrozen)`** — `Zombie::ApplyChill()`
+- [x] **`OnZombieButtered(zombie)`** — `Zombie::ApplyButter()`
+- [x] **`OnZombieMindControl(zombie)`** — `Zombie::StartMindControlled()`
+- [x] **`OnCoinExpire(coin)`** — `Coin::Update()` 超时消失
+- [x] **`OnFlagRaise(waveIndex)`** — `Board::NextWaveComing()` 旗帜升起
+- [x] **`OnMowerTriggered(row, mowerType)`** — `LawnMower::StartMower()`
+- [x] **`OnSunCountChange(oldAmount, newAmount)`** — `Board::SetSunMoney()`
 
 ---
 
@@ -521,6 +521,6 @@
 | **P5b** | **plant_helper 模块**：C++ `_timer` + SimpleAI + AutoShooter + TimedAction | ~1天 | ✅ 完成 |
 | **P5c** | **验证**：`_test_helpers` 端到端测试 | ~0.5天 | ✅ 完成 |
 | **P6** | 辅助模块 Phase 2（zombie_helper + projectile_helper + wave_helper + tween_helper + util_helper + ui_helper） | ~2天 | ❌ 待定 |
-| **P7** | Game/Board API 扩展（Sun、Coin、Foley、场地类型等） | ~1天 | ❌ 待定 |
-| **P8** | 次要回调 + UI 回调（OnPlantEaten、OnPause、OnSeedChooserOpen 等） | ~2天 | ❌ 待定 |
+| **P7** | Game/Board API 扩展（Sun、Coin、Foley、场地类型等） | ~1天 | ✅ 完成 |
+| **P8** | 次要回调 + UI 回调（OnPlantEaten、OnPause、OnSeedChooserOpen 等） | ~2天 | ✅ 中优先级完成（OnPlantEaten/Produce/Upgrade、OnZombieFrozen/Buttered/MindControl、OnCoinExpire、OnFlagRaise、OnMowerTriggered、OnSunCountChange） |
 | **P9** | 质量增强：测试套件、声音覆盖、资源覆盖 | ~2天 | ❌ 待定 |

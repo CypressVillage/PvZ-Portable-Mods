@@ -6889,6 +6889,7 @@ void Zombie::CheckForHighGround()
 
 void Zombie::StartMindControlled()
 {
+    gModLua.CallOnZombieMindControl(this);
     mApp->PlaySample(SOUND_MINDCONTROLLED);
     mMindControlled = true;
     mLastPortalX = -1;
@@ -6932,6 +6933,7 @@ void Zombie::StartMindControlled()
 void Zombie::EatPlant(Plant* thePlant)
 {
     gModLua.CallOnZombieAttack(this, thePlant);
+    gModLua.CallOnPlantEaten(thePlant, this);
 
     if (mZombiePhase == ZombiePhase::PHASE_DANCER_DANCING_IN)
     {
@@ -7431,6 +7433,8 @@ void Zombie::StopZombieSound()
 
 void Zombie::ApplyChill(bool theIsIceTrap)
 {
+    gModLua.CallOnZombieFrozen(this, true);
+
     if (!CanBeChilled())
         return;
 
@@ -8429,6 +8433,8 @@ void Zombie::RemoveButter()
 
 void Zombie::ApplyButter()
 {
+    gModLua.CallOnZombieButtered(this);
+
     if (!mHasHead || !CanBeFrozen())
         return;
 
