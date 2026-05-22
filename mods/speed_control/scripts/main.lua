@@ -16,6 +16,7 @@ function OnModInit()
 end
 
 function OnLevelStart(mode_id)
+    Game.Log("Level started, setting speed to " .. labels[idx])
     local x, y, w, h = Game.GetMenuButtonRect()
     Board.AddButton(BTN_ID, x, y + h + 2, w, 36, "Speed: " .. labels[idx])
     Game.SetSpeed(speeds[idx])

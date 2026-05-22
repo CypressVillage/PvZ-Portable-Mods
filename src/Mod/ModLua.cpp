@@ -2594,21 +2594,94 @@ namespace
 		lua_setglobal(L, "UI");
 	}
 
-	void Lua_CallGlobal(lua_State* L, const char* name, int argc)
+	const char* gCallbackNames[] = {
+		"OnLevelStart",
+		"OnZombieSpawn",
+		"OnZombieDie",
+		"OnPlantSpawn",
+		"OnPlantAttack",
+		"OnLevelEnd",
+		"OnBoardButtonClick",
+		"OnCoinSpawn",
+		"OnGameStart",
+		"OnWaveStart",
+		"OnPlantUpdate",
+		"OnPlantDie",
+		"OnZombieAttack",
+		"OnProjectileSpawn",
+		"OnProjectileHit",
+		"OnProjectileMiss",
+		"OnCoinCollect",
+		"OnZombieReachHouse",
+		"OnPlantEaten",
+		"OnPlantProduce",
+		"OnPlantUpgrade",
+		"OnZombieFrozen",
+		"OnZombieButtered",
+		"OnZombieMindControl",
+		"OnCoinExpire",
+		"OnFlagRaise",
+		"OnMowerTriggered",
+		"OnSunCountChange",
+		nullptr
+	};
+
+	void Lua_CallHandlers(lua_State* L, const char* name, int argc)
 	{
 		int base = lua_gettop(L) - argc;
-		lua_getglobal(L, name);
-		if (!lua_isfunction(L, -1))
+
+		lua_pushstring(L, "__pvz_handlers");
+		lua_gettable(L, LUA_REGISTRYINDEX);
+		if (lua_isnil(L, -1))
 		{
 			lua_settop(L, base);
 			return;
 		}
-		lua_insert(L, -1 - argc);
-		if (lua_pcall(L, argc, 0, 0) != 0)
+
+		lua_pushstring(L, name);
+		lua_gettable(L, -2);
+		if (lua_isnil(L, -1))
 		{
-			TodLog("Lua %s failed: %s", name, lua_tostring(L, -1));
-			lua_pop(L, 1);
+			lua_settop(L, base);
+			return;
 		}
+
+		int n = lua_rawlen(L, -1);
+		if (n == 0)
+		{
+			lua_settop(L, base);
+			return;
+		}
+
+		lua_newtable(L);
+		for (int i = 0; i < argc; i++)
+		{
+			lua_pushvalue(L, base + 1 + i);
+			lua_rawseti(L, -2, i + 1);
+		}
+
+		for (int i = 1; i <= n; i++)
+		{
+			lua_rawgeti(L, -2, i);
+			if (!lua_isfunction(L, -1))
+			{
+				lua_pop(L, 1);
+				continue;
+			}
+
+			for (int j = 1; j <= argc; j++)
+			{
+				lua_rawgeti(L, -2, j);
+			}
+
+			if (lua_pcall(L, argc, 0, 0) != 0)
+			{
+				TodLog("Lua %s handler #%d failed: %s", name, i, lua_tostring(L, -1));
+				lua_pop(L, 1);
+			}
+		}
+
+		lua_settop(L, base);
 	}
 
 	// ---- _timer C implementation (replaces _timer.lua) ----
@@ -2735,6 +2808,11 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 	if (L == nullptr)
 		return;
 
+	// Create handler table in registry
+	lua_pushstring(L, "__pvz_handlers");
+	lua_newtable(L);
+	lua_settable(L, LUA_REGISTRYINDEX);
+
 	for (const ModManifest& manifest : manifests)
 	{
 		if (manifest.entry.empty())
@@ -2777,6 +2855,41 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 		{
 			lua_pop(L, 1);
 		}
+
+		// Capture callback globals into multi-handler list
+		lua_pushstring(L, "__pvz_handlers");
+		lua_gettable(L, LUA_REGISTRYINDEX);
+
+		for (int ci = 0; gCallbackNames[ci]; ci++)
+		{
+			lua_getglobal(L, gCallbackNames[ci]);
+			if (!lua_isfunction(L, -1))
+			{
+				lua_pop(L, 1);
+				continue;
+			}
+
+			lua_pushstring(L, gCallbackNames[ci]);
+			lua_gettable(L, -3);
+			if (lua_isnil(L, -1))
+			{
+				lua_pop(L, 1);
+				lua_newtable(L);
+				lua_pushstring(L, gCallbackNames[ci]);
+				lua_pushvalue(L, -2);
+				lua_settable(L, -5);
+			}
+
+			int len = lua_rawlen(L, -1);
+			lua_pushvalue(L, -2);
+			lua_rawseti(L, -2, len + 1);
+			lua_pop(L, 2);
+
+			lua_pushnil(L);
+			lua_setglobal(L, gCallbackNames[ci]);
+		}
+
+		lua_pop(L, 1);
 	}
 #else
 	(void)manifests;
@@ -2790,7 +2903,7 @@ void ModLua::CallOnLevelStart(int gameMode)
 	if (L == nullptr)
 		return;
 	lua_pushinteger(L, gameMode);
-	Lua_CallGlobal(L, "OnLevelStart", 1);
+	Lua_CallHandlers(L, "OnLevelStart", 1);
 #else
 	(void)gameMode;
 #endif
@@ -2803,7 +2916,7 @@ void ModLua::CallOnZombieSpawn(Zombie* zombie)
 	if (L == nullptr)
 		return;
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnZombieSpawn", 1);
+	Lua_CallHandlers(L, "OnZombieSpawn", 1);
 #else
 	(void)zombie;
 #endif
@@ -2816,7 +2929,7 @@ void ModLua::CallOnZombieDie(Zombie* zombie)
 	if (L == nullptr)
 		return;
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnZombieDie", 1);
+	Lua_CallHandlers(L, "OnZombieDie", 1);
 #else
 	(void)zombie;
 #endif
@@ -2829,7 +2942,7 @@ void ModLua::CallOnPlantSpawn(Plant* plant)
 	if (L == nullptr)
 		return;
 	PushEntity(L, plant);
-	Lua_CallGlobal(L, "OnPlantSpawn", 1);
+	Lua_CallHandlers(L, "OnPlantSpawn", 1);
 #else
 	(void)plant;
 #endif
@@ -2843,7 +2956,7 @@ void ModLua::CallOnPlantAttack(Plant* plant, Zombie* target)
 		return;
 	PushEntity(L, plant);
 	PushEntity(L, target);
-	Lua_CallGlobal(L, "OnPlantAttack", 2);
+	Lua_CallHandlers(L, "OnPlantAttack", 2);
 #else
 	(void)plant;
 	(void)target;
@@ -2857,7 +2970,7 @@ void ModLua::CallOnLevelEnd(bool isWin)
 	if (L == nullptr)
 		return;
 	lua_pushboolean(L, isWin ? 1 : 0);
-	Lua_CallGlobal(L, "OnLevelEnd", 1);
+	Lua_CallHandlers(L, "OnLevelEnd", 1);
 #else
 	(void)isWin;
 #endif
@@ -2870,7 +2983,7 @@ void ModLua::CallOnCoinSpawn(Coin* coin)
 	if (L == nullptr)
 		return;
 	PushEntity(L, coin);
-	Lua_CallGlobal(L, "OnCoinSpawn", 1);
+	Lua_CallHandlers(L, "OnCoinSpawn", 1);
 #else
 	(void)coin;
 #endif
@@ -2883,7 +2996,7 @@ void ModLua::CallOnBoardButtonClick(int buttonId)
 	if (L == nullptr)
 		return;
 	lua_pushinteger(L, buttonId);
-	Lua_CallGlobal(L, "OnBoardButtonClick", 1);
+	Lua_CallHandlers(L, "OnBoardButtonClick", 1);
 #else
 	(void)buttonId;
 #endif
@@ -2895,7 +3008,7 @@ void ModLua::CallOnGameStart()
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr)
 		return;
-	Lua_CallGlobal(L, "OnGameStart", 0);
+	Lua_CallHandlers(L, "OnGameStart", 0);
 #endif
 }
 
@@ -2906,7 +3019,7 @@ void ModLua::CallOnWaveStart(int waveIndex)
 	if (L == nullptr)
 		return;
 	lua_pushinteger(L, waveIndex);
-	Lua_CallGlobal(L, "OnWaveStart", 1);
+	Lua_CallHandlers(L, "OnWaveStart", 1);
 #else
 	(void)waveIndex;
 #endif
@@ -2919,7 +3032,7 @@ void ModLua::CallOnPlantUpdate(Plant* plant)
 	if (L == nullptr)
 		return;
 	PushEntity(L, plant);
-	Lua_CallGlobal(L, "OnPlantUpdate", 1);
+	Lua_CallHandlers(L, "OnPlantUpdate", 1);
 #else
 	(void)plant;
 #endif
@@ -2932,7 +3045,7 @@ void ModLua::CallOnPlantDie(Plant* plant)
 	if (L == nullptr)
 		return;
 	PushEntity(L, plant);
-	Lua_CallGlobal(L, "OnPlantDie", 1);
+	Lua_CallHandlers(L, "OnPlantDie", 1);
 #else
 	(void)plant;
 #endif
@@ -2946,7 +3059,7 @@ void ModLua::CallOnZombieAttack(Zombie* zombie, Plant* plant)
 		return;
 	PushEntity(L, zombie);
 	PushEntity(L, plant);
-	Lua_CallGlobal(L, "OnZombieAttack", 2);
+	Lua_CallHandlers(L, "OnZombieAttack", 2);
 #else
 	(void)zombie;
 	(void)plant;
@@ -2960,7 +3073,7 @@ void ModLua::CallOnProjectileSpawn(Projectile* proj)
 	if (L == nullptr)
 		return;
 	PushEntity(L, proj);
-	Lua_CallGlobal(L, "OnProjectileSpawn", 1);
+	Lua_CallHandlers(L, "OnProjectileSpawn", 1);
 #else
 	(void)proj;
 #endif
@@ -2974,7 +3087,7 @@ void ModLua::CallOnProjectileHit(Projectile* proj, Zombie* zombie)
 		return;
 	PushEntity(L, proj);
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnProjectileHit", 2);
+	Lua_CallHandlers(L, "OnProjectileHit", 2);
 #else
 	(void)proj;
 	(void)zombie;
@@ -2988,7 +3101,7 @@ void ModLua::CallOnProjectileMiss(Projectile* proj)
 	if (L == nullptr)
 		return;
 	PushEntity(L, proj);
-	Lua_CallGlobal(L, "OnProjectileMiss", 1);
+	Lua_CallHandlers(L, "OnProjectileMiss", 1);
 #else
 	(void)proj;
 #endif
@@ -3001,7 +3114,7 @@ void ModLua::CallOnCoinCollect(Coin* coin)
 	if (L == nullptr)
 		return;
 	PushEntity(L, coin);
-	Lua_CallGlobal(L, "OnCoinCollect", 1);
+	Lua_CallHandlers(L, "OnCoinCollect", 1);
 #else
 	(void)coin;
 #endif
@@ -3014,7 +3127,7 @@ void ModLua::CallOnZombieReachHouse(Zombie* zombie)
 	if (L == nullptr)
 		return;
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnZombieReachHouse", 1);
+	Lua_CallHandlers(L, "OnZombieReachHouse", 1);
 #else
 	(void)zombie;
 #endif
@@ -3027,7 +3140,7 @@ void ModLua::CallOnPlantEaten(Plant* plant, Zombie* zombie)
 	if (L == nullptr) return;
 	PushEntity(L, plant);
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnPlantEaten", 2);
+	Lua_CallHandlers(L, "OnPlantEaten", 2);
 #else
 	(void)plant;
 	(void)zombie;
@@ -3040,7 +3153,7 @@ void ModLua::CallOnPlantProduce(Plant* plant)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr) return;
 	PushEntity(L, plant);
-	Lua_CallGlobal(L, "OnPlantProduce", 1);
+	Lua_CallHandlers(L, "OnPlantProduce", 1);
 #else
 	(void)plant;
 #endif
@@ -3053,7 +3166,7 @@ void ModLua::CallOnPlantUpgrade(Plant* plant, int oldType)
 	if (L == nullptr) return;
 	PushEntity(L, plant);
 	lua_pushinteger(L, oldType);
-	Lua_CallGlobal(L, "OnPlantUpgrade", 2);
+	Lua_CallHandlers(L, "OnPlantUpgrade", 2);
 #else
 	(void)plant;
 	(void)oldType;
@@ -3067,7 +3180,7 @@ void ModLua::CallOnZombieFrozen(Zombie* zombie, bool isFrozen)
 	if (L == nullptr) return;
 	PushEntity(L, zombie);
 	lua_pushboolean(L, isFrozen ? 1 : 0);
-	Lua_CallGlobal(L, "OnZombieFrozen", 2);
+	Lua_CallHandlers(L, "OnZombieFrozen", 2);
 #else
 	(void)zombie;
 	(void)isFrozen;
@@ -3080,7 +3193,7 @@ void ModLua::CallOnZombieButtered(Zombie* zombie)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr) return;
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnZombieButtered", 1);
+	Lua_CallHandlers(L, "OnZombieButtered", 1);
 #else
 	(void)zombie;
 #endif
@@ -3092,7 +3205,7 @@ void ModLua::CallOnZombieMindControl(Zombie* zombie)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr) return;
 	PushEntity(L, zombie);
-	Lua_CallGlobal(L, "OnZombieMindControl", 1);
+	Lua_CallHandlers(L, "OnZombieMindControl", 1);
 #else
 	(void)zombie;
 #endif
@@ -3104,7 +3217,7 @@ void ModLua::CallOnCoinExpire(Coin* coin)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr) return;
 	PushEntity(L, coin);
-	Lua_CallGlobal(L, "OnCoinExpire", 1);
+	Lua_CallHandlers(L, "OnCoinExpire", 1);
 #else
 	(void)coin;
 #endif
@@ -3116,7 +3229,7 @@ void ModLua::CallOnFlagRaise(int waveIndex)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr) return;
 	lua_pushinteger(L, waveIndex);
-	Lua_CallGlobal(L, "OnFlagRaise", 1);
+	Lua_CallHandlers(L, "OnFlagRaise", 1);
 #else
 	(void)waveIndex;
 #endif
@@ -3129,7 +3242,7 @@ void ModLua::CallOnMowerTriggered(int row, int mowerType)
 	if (L == nullptr) return;
 	lua_pushinteger(L, row);
 	lua_pushinteger(L, mowerType);
-	Lua_CallGlobal(L, "OnMowerTriggered", 2);
+	Lua_CallHandlers(L, "OnMowerTriggered", 2);
 #else
 	(void)row;
 	(void)mowerType;
@@ -3143,7 +3256,7 @@ void ModLua::CallOnSunCountChange(int oldAmount, int newAmount)
 	if (L == nullptr) return;
 	lua_pushinteger(L, oldAmount);
 	lua_pushinteger(L, newAmount);
-	Lua_CallGlobal(L, "OnSunCountChange", 2);
+	Lua_CallHandlers(L, "OnSunCountChange", 2);
 #else
 	(void)oldAmount;
 	(void)newAmount;
