@@ -213,6 +213,7 @@ target_compile_definitions(pvz-portable PRIVATE
 	$<$<BOOL:${PVZ_ENABLE_LUA}>:PVZ_ENABLE_LUA>
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
+set_target_properties(pvz-portable PROPERTIES CXX_EXTENSIONS OFF)
 
 if (LOW_MEMORY)
 	target_compile_definitions(pvz-portable PRIVATE LOW_MEMORY)
