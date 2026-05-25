@@ -244,5 +244,9 @@ void TodAssertInitForApp()
 	strcpy(gLogFileName + strlen(gLogFileName), "log.txt");
 	TOD_ASSERT(strlen(gLogFileName) < 512);
 
+	{
+		std::ofstream f(gLogFileName, std::ios::trunc | std::ios::binary);
+	}
+
 	TodLog("Started %d\n", static_cast<uint64_t>(time(nullptr)));
 }
