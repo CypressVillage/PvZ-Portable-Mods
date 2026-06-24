@@ -2,6 +2,8 @@
 
 This document describes how to add custom plants to PvZ-Portable via the mod system.
 
+Implementation status: verified against the C++ source on 2026-06-24. Custom plants are registered from Lua; JSON data files are not used. External reanim definitions use the engine's element-based Reanim XML format, not attribute-style XML.
+
 ## 1. Overview
 
 The custom plant system allows mod authors to:
@@ -11,7 +13,7 @@ The custom plant system allows mod authors to:
 - Have plants automatically appear in the Almanac and Seed Chooser UI
 - Support pagination when the number of plants exceeds the vanilla limit of 49
 
-Vanilla plants use `SeedType` IDs from `0` to `52`. Mod plants are automatically assigned IDs starting from `2000`.
+The standard almanac/seed chooser plant set uses `SeedType` IDs `0` through `48` (`SEED_IMITATER`). Additional special internal seed values exist, but mod plants are automatically assigned IDs starting from `2000`.
 
 ## 2. Mod Package Layout
 
@@ -76,7 +78,7 @@ Only `id` is required. All other fields have defaults.
 | `projectileType` | string or int | `0` | Projectile ID string (registered via `Game.RegisterProjectile`) or raw integer type |
 | `reanimation` | string | *(none)* | Vanilla reanim path to reuse, e.g. `"reanim/FirePea.reanim"` |
 | `reanimFile` | string | *(none)* | External reanim file path (relative to mod root), e.g. `"resources/reanim/custom.xml"` |
-| `image` | string | *(none)* | Custom static image path (relative to mod root), e.g. `"resources/images/my_plant.png"`. Used as seed packet icon when no reanimation is set. |
+| `image` | string | *(none)* | Custom static image path resolved through resource roots, usually relative to the mod's `resources/` directory, e.g. `"images/my_plant.png"`. Used as seed packet/almanac art when no reanimation is set. |
 | `description` | string | *(none)* | Almanac description text displayed in the plant's Almanac entry |
 
 ### Animation Selection
@@ -131,7 +133,7 @@ Game.RegisterPlant({
     id = "static_plant",
     name = "Static Plant",
     cost = 50,
-    image = "resources/images/static_plant.png"
+    image = "images/static_plant.png"
 })
 ```
 
@@ -166,26 +168,28 @@ end
 
 Custom animation files use the same XML format as the vanilla reanim system. The file is parsed by the game's built-in `DefinitionCompileAndLoad` pipeline.
 
-**Important**: Reanim XML files do NOT have a root wrapping element. They consist of one or more `<track>` elements at the top level. Do NOT include `<?xml?>` declarations.
+**Important**: Reanim XML files do NOT have a root wrapping element. They consist of one or more `<track>` elements at the top level, plus optional `<fps>`. Do NOT include `<?xml?>` declarations. The current parser reads fields as child elements, so use `<name>`, `<x>`, `<f>`, etc.; do not use attribute-style forms like `<track name="anim_idle">` or `<t f="0"/>`.
 
 ### Structure
 
 ```xml
-<track name="anim_idle">
-  <t f="0" x="0" y="0" sx="1" sy="1" a="1"/>
-  <t f="40" y="-3" sy="1.03"/>
-  <t f="80" x="0" y="0" sx="1" sy="1"/>
+<track>
+  <name>anim_idle</name>
+  <t><f>0</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy><a>1</a></t>
+  <t><f>40</f><y>-3</y><sy>1.03</sy></t>
+  <t><f>80</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
 </track>
-<track name="anim_shooting">
-  <t f="0" x="0" y="0" sx="1" sy="1"/>
-  <t f="8" y="3" sx="1.06" sy="0.94"/>
-  <t f="16" x="0" y="0" sx="1" sy="1"/>
+<track>
+  <name>anim_shooting</name>
+  <t><f>0</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
+  <t><f>8</f><y>3</y><sx>1.06</sx><sy>0.94</sy></t>
+  <t><f>16</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
 </track>
 ```
 
 ### Track Element
 
-`<track name="...">` defines an animation track (a named sequence of keyframes).
+`<track><name>...</name>...</track>` defines an animation track (a named sequence of keyframes).
 
 Common track names used by the engine:
 
@@ -197,9 +201,9 @@ Common track names used by the engine:
 
 ### Transform Element (`<t>`)
 
-Each `<t>` element is a keyframe transform. Attributes:
+Each `<t>` element is a keyframe transform. Child elements:
 
-| Attribute | Type | Description |
+| Element | Type | Description |
 |-----------|------|-------------|
 | `f` | float | Frame number (keyframe time position) |
 | `x` | float | X translation offset |
@@ -213,7 +217,7 @@ Each `<t>` element is a keyframe transform. Attributes:
 | `font` | string | Font reference |
 | `text` | string | Text content |
 
-Attributes are optional on non-first keyframes. Missing values are inherited from the previous keyframe.
+Elements are optional on non-first keyframes. Missing values are inherited from the previous keyframe.
 
 ### FPS
 
@@ -221,30 +225,33 @@ The default animation FPS is `12.0`. To override, add a `<fps>` element:
 
 ```xml
 <fps>15.0</fps>
-<track name="anim_idle">
+<track>
+  <name>anim_idle</name>
   ...
 </track>
 ```
 
 ### Image References
 
-To reference images in keyframes, use the `i` attribute:
+To reference images in keyframes, use the `i` element:
 
 ```xml
-<track name="anim_idle">
-  <t f="0" i="images/my_plant_frame1"/>
-  <t f="10" i="images/my_plant_frame2"/>
-  <t f="20" i="images/my_plant_frame1"/>
+<track>
+  <name>anim_idle</name>
+  <t><f>0</f><i>IMAGE_REANIM_MY_PLANT_FRAME1</i></t>
+  <t><f>10</f><i>IMAGE_REANIM_MY_PLANT_FRAME2</i></t>
+  <t><f>20</f><i>IMAGE_REANIM_MY_PLANT_FRAME1</i></t>
 </track>
 ```
 
-Images are loaded from the mod's `resources/` directory.
+Images referenced with `IMAGE_REANIM_...` are resolved through the engine's resource lookup paths such as `reanim/` and `images/`, including the mod's registered `resources/` directory.
 
 ## 6. Almanac & Seed Chooser Pagination
 
 When the total number of plants (vanilla 49 + mod plants) exceeds one page, both the Almanac and the Seed Chooser automatically show pagination controls (`<` and `>` buttons).
 
-- Each page displays up to 48 plants (6 rows x 8 columns)
+- The Almanac displays up to 49 plant slots per page.
+- The Seed Chooser displays 40 or 48 slots per page depending on whether the current layout has 7 rows; page stepping is still based on the vanilla 49-entry indexing scheme.
 - Page navigation is only visible when there are enough plants to require multiple pages
 - The `<` button is disabled on the first page; the `>` button is disabled on the last page
 
@@ -307,15 +314,17 @@ end
 ### resources/reanim/custom_pea.xml (custom animation)
 
 ```xml
-<track name="anim_idle">
-  <t f="0" x="0" y="0" sx="1" sy="1" a="1"/>
-  <t f="40" y="-2" sy="1.02"/>
-  <t f="80" x="0" y="0" sx="1" sy="1"/>
+<track>
+  <name>anim_idle</name>
+  <t><f>0</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy><a>1</a></t>
+  <t><f>40</f><y>-2</y><sy>1.02</sy></t>
+  <t><f>80</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
 </track>
-<track name="anim_shooting">
-  <t f="0" x="0" y="0" sx="1" sy="1"/>
-  <t f="10" y="3" sx="1.05" sy="0.95"/>
-  <t f="20" x="0" y="0" sx="1" sy="1"/>
+<track>
+  <name>anim_shooting</name>
+  <t><f>0</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
+  <t><f>10</f><y>3</y><sx>1.05</sx><sy>0.95</sy></t>
+  <t><f>20</f><x>0</x><y>0</y><sx>1</sx><sy>1</sy></t>
 </track>
 ```
 
@@ -336,7 +345,7 @@ mods/demo_plant/
 | Problem | Cause | Solution |
 |---------|-------|----------|
 | Plant doesn't appear in Almanac | `id` field missing or duplicate | Ensure `id` is unique and non-empty |
-| Game crashes on startup | Reanim XML has `<?xml?>` header or root wrapping element | Remove XML declaration and root wrapper; use bare `<track>` elements |
+| Game crashes or dynamic reanim fails on startup | Reanim XML has `<?xml?>` header, root wrapping element, or attribute-style fields | Remove XML declaration/root wrapper; use bare `<track>` elements with child fields like `<name>` and `<t><f>0</f></t>` |
 | Custom animation fails to load | Invalid XML syntax or missing file | Check the game log for "Failed to load dynamic reanim" messages |
 | Plant is invisible | No animation assigned | Add `reanimation` or `reanimFile` field |
 | Vanilla animation name not found | Path doesn't match reanim table entry | Use exact paths from Section 4 (e.g. `reanim/FirePea.reanim`) |

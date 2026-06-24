@@ -1,8 +1,10 @@
 # Mod Framework — 待办清单
 
-> 评估日期：2026-05-19，框架完整性约 85%
+> 源码核对日期：2026-06-24。当前框架可编译并已实现 Lua 注册、资源覆盖、事件回调、ModRegistry、ModSave、PlantHelper 与 UI Dialog；本文仍保留历史任务记录，完成项不等于 API 稳定承诺。
 > 
 > **近期目标阶段**：P7+P8 — Game/Board API 扩展 + 次要回调（2026-05-19 达成）
+>
+> 当前已知限制：JSON 数据表加载、热重载、依赖版本约束、缺失依赖失败处理、重复 manifest id 检测、可靠 priority 冲突排序、每个 Mod 独立 Lua 环境尚未实现。
 
 ---
 
@@ -19,10 +21,11 @@
   - 新增 bodyHealth/headHealth/speed/damage/reanimationName/helm/shield/hasHead/hasArm/zombieName
   - `GetZombieDefinition()` 现从 ModZombieDef 读取 Reanim 类型
 
-- [x] **修复依赖排序：添加拓扑排序**
+- [x] **添加依赖拓扑排序（仍有限制）**
   - 位置：`src/Mod/ModLoader.cpp:401-442`
-  - 实现 Kahn 算法，先按 dependencies 拓扑排序，再按 priority 稳定排序
+  - 实现 Kahn 算法，对已存在 dependencies 做拓扑排序
   - 检测循环依赖的 mod 会追加末尾并记录错误
+  - 限制：缺失依赖不报错；重复 manifest id 不严格拒绝；`priority` 当前不能可靠作为覆盖/冲突排序依据
 
 ### 常量表暴露 — 第一阶段（无 C++ 改动，纯 Lua 注册）
 

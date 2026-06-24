@@ -1,10 +1,12 @@
 # PvZ Reanim 骨骼动画系统 —— 以豌豆射手为例
 
+实现状态：本文已于 2026-06-24 对照 `src/Sexy.TodLib/Definition.cpp`、`src/Sexy.TodLib/Reanimator.cpp` 和 Mod 注册代码核对。当前 Reanim XML 使用元素式字段，不使用 XML 属性字段。
+
 ## 概述
 
-PvZ 使用 **Reanim XML** 格式的骨骼动画。每个动画由多个 **骨骼轨道（Track）** 组成，每个轨道以 <t>（Transform）关键帧序列驱动一个身体部件的独立 PNG 图片。
+PvZ 使用 **Reanim XML** 格式的骨骼动画。每个动画由多个 **骨骼轨道（Track）** 组成，每个轨道以 `<t>`（Transform）关键帧序列驱动一个身体部件的独立 PNG 图片。
 
-动画文件存放在 `reanim/` 目录，配套的部件 PNG 也放在 `reanim/` 下，通过 `i` 属性引用。
+动画文件存放在 `reanim/` 目录，配套的部件 PNG 也放在 `reanim/` 下，通过 `<i>...</i>` 子元素引用。
 
 ---
 
@@ -12,9 +14,10 @@ PvZ 使用 **Reanim XML** 格式的骨骼动画。每个动画由多个 **骨骼
 
 ### 规则
 
-- **无 XML 声明**（`<?xml ...?>`）—— 解析器会崩溃
+- **无 XML 声明**（`<?xml ...?>`）—— 当前定义解析器期望直接读取定义元素，声明可能导致解析失败
 - **无根元素** —— 顶层直接是 `<track>` 列表
 - **无 BOM** —— 必须是纯 UTF-8
+- **使用元素字段** —— 写成 `<f>0</f>`、`<x>10</x>`，不要写成 `<t f="0" x="10"/>`
 
 ### 顶层元素
 
@@ -38,7 +41,7 @@ PvZ 使用 **Reanim XML** 格式的骨骼动画。每个动画由多个 **骨骼
 
 ### `<t>`（Transform/关键帧）元素
 
-| 属性 | C++ 字段 | 类型 | 默认 | 说明 |
+| 子元素 | C++ 字段 | 类型 | 默认 | 说明 |
 |------|----------|------|------|------|
 | `x` | `mTransX` | float | 继承上一帧 | X 偏移（像素） |
 | `y` | `mTransY` | float | 继承 | Y 偏移（像素） |
@@ -52,7 +55,7 @@ PvZ 使用 **Reanim XML** 格式的骨骼动画。每个动画由多个 **骨骼
 | `font` | `mFont` | font | 继承 | 字体资源 |
 | `text` | `mText` | string | 继承 | 渲染的文字 |
 
-**空 `<t></t>`**：继承上一关键帧的所有属性（简化重复数据）。
+**空 `<t></t>`**：继承上一关键帧的所有字段（简化重复数据）。
 
 `<f>-1</f>`：**隐藏帧** —— 该轨道不渲染任何内容。
 
@@ -89,10 +92,10 @@ result = start + factor * (end - start)
 
 ## 三、图片引用与加载
 
-XML 中的 `i` 属性使用资源 ID 字符串：
+XML 中的 `i` 子元素使用资源 ID 字符串：
 
 ```xml
-<t i="IMAGE_REANIM_PEASHOOTER_BACKLEAF"/>
+<t><i>IMAGE_REANIM_PEASHOOTER_BACKLEAF</i></t>
 ```
 
 引擎按以下顺序解析：
@@ -104,7 +107,7 @@ XML 中的 `i` 属性使用资源 ID 字符串：
 | `IMAGE_REANIM_` | **`reanim/`** | `reanim/PEASHOOTER_BACKLEAF` → 实际加载 `PeaShooter_backleaf.png` |
 | `IMAGE_REANIM_` | `images/` | `images/PEASHOOTER_BACKLEAF` |
 
-因此 `i="IMAGE_REANIM_PEASHOOTER_BACKLEAF"` 最终加载的文件是 `reanim/PeaShooter_backleaf.png`。
+因此 `<i>IMAGE_REANIM_PEASHOOTER_BACKLEAF</i>` 最终加载的文件是 `reanim/PeaShooter_backleaf.png`。
 
 ---
 
@@ -310,7 +313,7 @@ Game.RegisterPlant({
 1. **制作部件 PNG**：每个身体部件保存为独立的透明 PNG（不要合并成 spritesheet）
 2. **编写 `.reanim` 文件**：参考 `PeaShooterSingle.reanim` 的结构
 3. **确保至少包含**：`anim_idle` 轨道（引擎至少需要这个）
-4. **图片 ID 引用**：`i="IMAGE_REANIM_MYPLANT_HEAD"` → 引擎会加载 `reanim/MYPLANT_HEAD.png`
+4. **图片 ID 引用**：`<i>IMAGE_REANIM_MYPLANT_HEAD</i>` → 引擎会按资源查找路径搜索 `reanim/MYPLANT_HEAD`、`images/MYPLANT_HEAD` 等资源
 5. **mod 中路径解析**：`reanimFile` 相对于 mod 根目录，图片也在 mod 的 `resources/` 下解析
 
 ### 最小示例

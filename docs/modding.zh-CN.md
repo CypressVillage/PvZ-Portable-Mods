@@ -1,12 +1,14 @@
-# PvZ-Portable Mod 制作规范 (Draft v0.1)
+# PvZ-Portable Mod 制作规范（当前实现版）
 
-本文定义 PvZ-Portable 的 Lua Mod 体系。目标是新增植物、僵尸与模式，同时保持跨平台与存档兼容。
+本文描述 PvZ-Portable 当前已经实现的 Lua Mod 体系。目标是新增植物、僵尸与模式，同时保持跨平台与存档兼容。
+
+实现状态：已于 2026-06-24 对照 C++ 源码核对。当前可用管线是 `mod.json` + Lua 注册 API + `resources/` 资源覆盖；`data/plants.json`、`data/zombies.json` 等 JSON 数据表尚未由引擎加载。
 
 ## 1. 设计目标
 
 - 跨平台：桌面、移动、主机、WASM 都可用（不依赖 JIT）。
 - 可控：脚本错误不影响主程序稳定性。
-- 数据优先：数值与资源走数据表，脚本负责行为扩展。
+- Lua 优先：内容通过 Lua API 注册，资源通过 `resources/` 提供或覆盖。
 - 兼容：原版存档不变，Mod 数据独立保存。
 
 ## 2. 目录与包结构
@@ -15,12 +17,6 @@
 mods/
   <mod_id>/
     mod.json
-    data/
-      plants.json
-      zombies.json
-      modes.json
-      projectiles.json
-      strings.json
     scripts/
       main.lua
       <optional>.lua
@@ -48,53 +44,44 @@ mods/
   "description": "Adds a new plant and zombie",
   "priority": 100,
   "dependencies": ["base"],
-  "entry": "scripts/main.lua",
-  "data": {
-    "plants": ["data/plants.json"],
-    "zombies": ["data/zombies.json"],
-    "modes": ["data/modes.json"],
-    "projectiles": ["data/projectiles.json"],
-    "strings": ["data/strings.json"]
-  }
+  "entry": "scripts/main.lua"
 }
 ```
 
 字段说明：
-- `priority`：数值越大越后加载，覆盖权更高。
-- `dependencies`：依赖的 Mod id。
+- `priority`：当前会被解析，但实际排序主要由依赖拓扑顺序决定；不要依赖它解决冲突。
+- `dependencies`：依赖的 Mod id。当前只会对已存在的依赖建立顺序关系，缺失依赖不会导致加载失败。
 - `entry`：Lua 入口脚本。
-- `data`：数据表列表，可缺省。
+- `data`：未实现。植物、僵尸、模式、投射物请在 Lua 中用 `Game.Register*` 注册。
 
 ## 4. 加载顺序
 
-1) 扫描 `mods/` 并解析 `mod.json`
-2) 校验 id 与重复
-3) 依赖拓扑排序，再按 `priority` 稳定排序
-4) 对每个 Mod：
-   - 注册资源覆盖根
-   - 读取数据表并注册新内容
-   - 执行 Lua `entry`，调用 `OnModInit`
+1) 扫描 `mods/` 并解析 `mod.json`。
+2) 对已加载的依赖做拓扑排序。
+3) 执行每个 Mod 的 Lua `entry`，并调用 `OnModInit`。
+4) 在资源 XML 解析前注册每个 Mod 的 `resources/` 覆盖目录。
 
-冲突策略：后加载覆盖先加载，同时输出日志。
+冲突与限制：
+- `ModLoader` 当前没有严格拒绝重复的 manifest id。
+- 植物、僵尸、模式、投射物的重复注册 id 会被 `ModRegistry` 拒绝，不会后加载覆盖先加载。
+- 所有 Mod 共享一个 Lua 全局环境。入口加载后会捕获回调列表，但全局变量/函数仍可能互相覆盖；建议尽量使用 `local`。
 
-## 5. 数据表规范
+## 5. Lua 数据注册
 
-所有表为数组。未知字段会被忽略。
+当前所有 Mod 内容都通过 Lua API 注册，不读取 JSON 数据表。
 
-### 5.1 plants.json
+### 5.1 植物
 
-每个文件定义一株植物。可在 `mod.json` 的 `data.plants` 中列出多个植物定义文件。
-
-```json
-{
-  "id": "fire_pea",
-  "name": "Fire Pea",
-  "cost": 200,
-  "cooldown": 750,
-  "subClass": 1,
-  "launchRate": 90,
-  "reanimation": "reanim/FirePea.reanim"
-}
+```lua
+Game.RegisterPlant({
+  id = "fire_pea",
+  name = "Fire Pea",
+  cost = 200,
+  cooldown = 750,
+  subClass = 1,
+  launchRate = 90,
+  reanimation = "reanim/FirePea.reanim"
+})
 ```
 
 必填字段：
@@ -116,81 +103,56 @@ mods/
 保留范围：
 - Mod 植物的 SeedType ID 从 `2000` 起自动分配。
 
-### 5.2 zombies.json
+### 5.2 僵尸
 
-```json
-[
-  {
-    "id": "conehead_fast",
-    "zombie_type": 3001,
-    "name_key": "CONEHEAD_FAST_NAME",
-    "desc_key": "CONEHEAD_FAST_DESC",
-    "hp": 600,
-    "speed": "fast",
-    "damage": 100,
-    "animation": {
-      "reanim": "REANIM_CONEHEAD_ZOMBIE",
-      "atlas": "reanim/conehead_fast.atlas"
-    },
-    "ui": {
-      "almanac_image": "IMAGE_ALMANAC_CONEHEAD_FAST"
-    }
-  }
-]
+```lua
+Game.RegisterZombie({
+  id = "conehead_fast",
+  name = "Conehead Fast",
+  bodyHealth = 600,
+  headHealth = 100,
+  speed = 1.2,
+  damage = 100,
+  reanimation = "reanim/Zombie.reanim",
+  helmType = HelmType.TRAFFIC_CONE,
+  helmHealth = 370
+})
 ```
 
-必填字段：`id`、`zombie_type`、`hp`、`speed`
+必填字段：`id`
 
-建议保留范围：
-- `zombie_type` >= 3000 为 Mod 专用
+保留范围：
+- Mod 僵尸的 ZombieType ID 从 `3000` 起自动分配。
 
-### 5.3 projectiles.json
+### 5.3 投射物
 
-```json
-[
-  {
-    "id": "pea_plus",
-    "damage": 20,
-    "speed": 7.5,
-    "image": "IMAGE_PROJECTILE_PEA_PLUS"
-  }
-]
+```lua
+Game.RegisterProjectile({
+  id = "pea_plus",
+  damage = 20,
+  speed = 7.5,
+  image = "IMAGE_PROJECTILE_PEA_PLUS"
+})
 ```
 
-### 5.4 modes.json
+### 5.4 模式
 
-```json
-[
-  {
-    "id": "rush_mode",
-    "name_key": "RUSH_MODE_TITLE",
-    "desc_key": "RUSH_MODE_DESC",
-    "base_mode": "SURVIVAL",
-    "flags": {
-      "fast_zombies": true,
-      "no_lawnmowers": true
-    },
-    "waves": [
-      { "time": 30, "zombies": ["zombie_basic", "conehead_fast"] }
-    ]
-  }
-]
+```lua
+Game.RegisterMode({
+  id = "rush_mode",
+  name = "Rush Mode",
+  page = 0,
+  row = 0,
+  col = 0,
+  iconIndex = 0
+})
 ```
 
-必填字段：`id`、`base_mode`
+必填字段：`id`
 
-### 5.5 strings.json
+### 5.5 字符串
 
-```json
-{
-  "PEA_SHOOTER_PLUS_NAME": "Pea Shooter Plus",
-  "PEA_SHOOTER_PLUS_DESC": "Shoots stronger peas.",
-  "CONEHEAD_FAST_NAME": "Conehead Sprinter",
-  "CONEHEAD_FAST_DESC": "Faster but still tough."
-}
-```
-
-字符串也可以放在 `resources/properties/default.xml`。
+当前字符串覆盖使用 `resources/properties/default.xml`。`strings.json` 尚未实现。
 
 ## 6. 资源覆盖规则
 
@@ -237,6 +199,7 @@ mods/
 
 `Dialog`（对话框 userdata，由 `UI.CreateDialog` 或 `UI.ShowMessage` 返回）:
 - `dialog:AddButton(text, callback)` — 添加按钮，`callback` 为 Lua 函数闭包，按钮被点击时调用，调用后对话框自动关闭
+- `dialog:AddLabel(text, x, y)` — 添加静态文本标签
 - `dialog:Close()` — 手动关闭并销毁对话框
 - `dialog:SetTitle(text)` — 动态修改对话框标题
 - `dialog:SetBody(text)` — 动态修改对话框正文
@@ -319,47 +282,50 @@ API：
 
 ## 10. 热重载 (开发模式)
 
-- 仅用于开发调试。
-- 可重载数据表、资源与 Lua。
-- 建议回到主菜单或重开关卡。
+未实现。可作为未来开发调试功能：
+- 重载 Lua 脚本与资源。
+- 建议只允许在主菜单或重开关卡后生效。
+- 避免在关卡中热替换已有实体。
 
 ## 11. 错误处理
 
 - 清单缺失或非法：跳过该 Mod 并记录错误。
-- 数据表字段错误：跳过该条记录。
-- Lua 异常：记录日志并禁用该回调。
+- Lua 入口或回调异常：记录日志并继续运行其他回调。
 
 ## 12. 版本与兼容
 
-- 该规范版本为 `schema_version = 1`。
-- `mod.json` 可选字段：
+- 未实现。当前加载器只把 `version` 当作字符串读取，不进行 schema/version 校验。
+- 未来可能支持 `mod.json` 字段：
 
 ```json
 "schema_version": 1
 ```
 
-若版本高于引擎支持，应提示警告。
+当前不会因为 schema 版本较高而提示警告。
 
 ## 13. 后续可扩展项
 
-- ~~自定义 UI 面板~~（已部分实现：`UI.CreateDialog` / `UI.ShowMessage`，支持按钮与 Lua 闭包回调；待扩展：文本标签、输入框等控件）
+- ~~自定义 UI 面板~~（已部分实现：`UI.CreateDialog` / `UI.ShowMessage`，支持按钮、文本标签与 Lua 闭包回调；待扩展：输入框等控件）
+- JSON 数据表注册植物、僵尸、投射物、模式与字符串
+- 每个 Mod 独立 Lua 环境或模块隔离
 - 事件优先级与过滤器
 - Mod 依赖版本范围
 - 关卡编辑器与离线打包工具
 
-## 14. 引擎接入点与最小改动清单
+## 14. 引擎接入点与现状
 
-本节给出在现有工程中落地的接入点与最小改动路径，优先保证跨平台稳定。
+本节记录当前源码中的接入点。早期设计中的 JSON 数据表加载尚未实现。
 
 ### 14.1 资源与字符串加载接入点
 
 - 资源 XML 入口：在 [src/LawnApp.cpp](src/LawnApp.cpp) 中调用 `mResourceManager->ParseResourcesFile("properties/resources.xml")`。
 - 字符串加载入口：在 [src/LawnApp.cpp](src/LawnApp.cpp) 中的加载线程调用 `TodStringListLoad` 与 `LoadProperties`。
 
-建议流程：
-1) 在 `ParseResourcesFile` 前注册 Mod 资源目录叠加层。
-2) 在 `LoadProperties` 之前追加加载 Mod 的 `resources/properties/default.xml` 与 `strings.json`。
-3) `resources.xml` 的扩展字段仍由原流程处理，保持兼容。
+当前流程：
+1) `LawnApp::Init()` 扫描并加载 Mod 清单，执行 Lua 入口。
+2) `ParseResourcesFile` 前注册每个 Mod 的 `resources/` 目录叠加层。
+3) `LoadingThreadProc()` 中加载 Mod 的 `resources/properties/default.xml`。
+4) `strings.json` 尚未实现。
 
 ### 14.2 资源覆盖实现建议
 
@@ -378,17 +344,17 @@ API：
 
 现有保存路径由 `GetAppDataPath` 统一生成，入口在 [src/SexyAppFramework/Common.cpp](src/SexyAppFramework/Common.cpp)。
 
-建议新增：
+当前实现：
 - `modsave/` 目录作为 Mod 额外数据区。
 - 保持 `userdata/` 不变，保证原版存档兼容。
 
 ### 14.4 启动流程接入
 
-建议在应用初始化时加载 Mod：
+当前应用初始化时加载 Mod：
 
 1) 在 `SexyAppBase::Init()` 后、`LawnApp::Init()` 前完成 Mod 扫描与清单解析。
 2) 在 `LawnApp::Init()` 中资源加载之前注册 Mod 资源根。
-3) 在 `LoadingThreadProc()` 中加载 Mod 字符串覆盖与数据表。
+3) 在 `LoadingThreadProc()` 中加载 Mod 字符串覆盖。
 
 涉及文件：
 - [src/main.cpp](src/main.cpp)
@@ -399,7 +365,7 @@ API：
 
 ### 15.1 绑定层建议
 
-- 使用 Lua 5.4 + `sol2` 或原生 C API。
+- 使用 Lua 5.4 + 原生 C API。
 - 在引擎侧构建轻量包装对象：`Game`、`Board`、`Entity`。
 - 绑定函数必须是纯 ASCII 接口，避免 Unicode 名称。
 
@@ -433,14 +399,14 @@ API：
 
 ## 16. 数据注册流程（植物/僵尸/模式）
 
-推荐流程：
-1) 加载 `plants.json`/`zombies.json`/`modes.json` 为内存表。
-2) 将 Mod 定义注册到全局注册表，使用 `id` 作为主键。
-3) 将注册表与现有枚举/数组索引建立映射，避免侵入式改枚举值。
+当前流程：
+1) Lua 入口调用 `Game.RegisterPlant` / `Game.RegisterZombie` / `Game.RegisterMode` / `Game.RegisterProjectile`。
+2) `ModRegistry` 使用 `id` 作为主键，分配运行时 id。
+3) 游戏逻辑通过 `ModRegistry` 查询运行时定义，避免侵入式改枚举值。
 
-建议新增结构：
-- `PlantDefRegistry`、`ZombieDefRegistry`、`ModeDefRegistry`
-- 为 Mod 内容分配运行时 id，并维护 `mod_id -> runtime_id` 反查
+已实现结构：
+- `ModRegistry`
+- 为 Mod 内容分配运行时 id，并维护注册 id 与运行时 id 的反查
 
 注意点：
 - 原生枚举保持不变，Mod id 走动态映射。
@@ -448,10 +414,10 @@ API：
 
 ## 17. 资源与字符串覆盖的落地顺序
 
-推荐加载顺序：
+当前加载顺序：
 1) `LawnStrings.txt`（原版）
 2) 原版 `properties/default.xml` 与 `properties/Layout.xml`
-3) Mod `strings.json`
+3) `ModRegistry` 注入植物名称/描述字符串
 4) Mod `resources/properties/default.xml`
 
 说明：后加载覆盖前加载。
@@ -459,16 +425,19 @@ API：
 ## 18. Mod 加载器的最小职责
 
 - 扫描 `mods/` 目录并解析 `mod.json`
-- 校验 id 与依赖
-- 排序与冲突处理
-- 注册资源根
-- 加载数据表
+- 对已存在依赖做拓扑排序
+- 记录循环依赖错误
+- 资源根注册由 `LawnApp` 根据 manifest 完成
 - 初始化 Lua VM 并执行入口脚本
 
 建议日志输出：
 - 解析成功/失败、依赖缺失、字段缺失、覆盖冲突
 
+当前限制：缺失依赖、重复 manifest id、priority 冲突策略尚未严格处理。
+
 ## 19. 开发模式热重载建议
+
+未实现。未来可考虑：
 
 - 提供命令行参数 `-moddev` 打开热重载
 - 仅允许在主菜单或关卡外重载
@@ -479,7 +448,7 @@ API：
 
 1) Mod 扫描与清单解析
 2) 资源覆盖与字符串覆盖
-3) 数据表注册与查询
+3) Lua 注册与注册表查询
 4) Lua 入口与 `OnModInit` 回调
 5) 事件回调最小集合（Spawn/Die/LevelStart/LevelEnd）
 6) `modsave/` 独立存档

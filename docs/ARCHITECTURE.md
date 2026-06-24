@@ -1,4 +1,6 @@
-# PvZ-Portable Mod 框架架构
+# PvZ-Portable Mod 框架架构（当前实现）
+
+本文档已于 2026-06-24 对照源码核对。当前实现以 `mod.json` 清单、Lua 注册 API、`resources/` 覆盖和 `ModRegistry` 动态注册为核心；JSON 数据表加载、热重载、依赖版本约束和每个 Mod 独立 Lua 环境尚未实现。
 
 ## 一、Mod 框架组成部分
 
@@ -18,8 +20,10 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 
 - 扫描 `mods/<mod_id>/mod.json` 清单文件
 - 解析 `ModManifest`（id, name, version, priority, dependencies, entry）
-- **依赖排序**：按 dependencies 拓扑排序 + priority 稳定排序
-- **字符串覆盖**：加载所有 Mod 的 `properties/default.xml`
+- **依赖排序**：对已存在的 dependencies 做拓扑排序；循环依赖会记录错误并追加末尾
+- **priority 限制**：字段会被解析，但当前排序主要由拓扑顺序决定，不能可靠用于覆盖冲突处理
+- **未实现限制**：缺失依赖不会导致加载失败，重复 manifest id 不会被严格拒绝
+- **字符串覆盖**：加载所有 Mod 的 `resources/properties/default.xml`，并注入已注册 Mod 植物的名称/描述字符串
 
 ### (2) ModLua — Lua 虚拟机与 API
 
@@ -33,7 +37,13 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | | `LoadModData(key)` | 加载 Mod 数据 |
 | | `SetSpeed(multiplier)` | 设置游戏速度 |
 | | `GetSpeed()` | 获取游戏速度 |
+| | `GetMode()` | 获取当前游戏模式 |
 | | `GetMenuButtonRect()` | 获取菜单按钮位置 |
+| | `GetSun()` / `SetSun(amount)` | 读取/设置阳光 |
+| | `GetTotalWaves()` | 获取总波数 |
+| | `IsNight()` / `HasPool()` / `IsRoof()` / `IsFog()` | 当前场景查询 |
+| | `SpawnSun(x, y, value)` / `SpawnCoin(x, y, type)` | 生成掉落物 |
+| | `PlayFoley(type)` / `DisplayAdvice(text, style)` | 音效与提示 |
 | | `RegisterProjectile(def)` | 注册自定义投射物 |
 | | `RegisterPlant(def)` | 注册自定义植物 |
 | | `RegisterZombie(def)` | 注册自定义僵尸 |
@@ -41,14 +51,22 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | `Board` | `SpawnZombie(id_or_type, row)` | 生成僵尸 |
 | | `SpawnPlant(id_or_type, row, col)` | 放置植物 |
 | | `GetWave()` | 获取当前波次 |
+| | `Pause(bool)` / `IsPaused()` | 暂停控制 |
+| | `FindTargetZombie(plant)` | 为植物查找目标 |
+| | `GetZombiesInRow(row)` / `GetPlantsInRow(row)` | 行内实体查询 |
+| | `GetZombieAt(col,row)` / `GetPlantAt(col,row)` | 格子实体查询 |
+| | `GetAllZombies()` / `GetAllPlants()` | 全局实体查询 |
+| | `AddProjectile(x,y,row,type)` | 生成投射物 |
 | | `AddButton(id, x, y, w, h, label)` | 添加自定义按钮 |
 | | `RemoveButton(id)` | 移除按钮 |
 | | `SetButtonVisible(id, visible)` | 设置按钮可见性 |
 | | `SetButtonLabel(id, label)` | 设置按钮标签 |
 | `Entity` | `entity.type` / `entity.hp` / `entity.id` | 属性只读访问（`id` 返回 Mod 注册字符串） |
 | | `entity:Damage(amount)` | 造成伤害 |
+| | `entity:DistanceTo(other)` | 实体距离 |
 | | `entity:IsSun()` | 是否为阳光 |
 | | `entity:Collect()` | 收集（硬币） |
+| | 植物/僵尸/投射物扩展方法 | 动画、状态、伤害、速度、目标等控制 |
 | `UI` | `CreateDialog({title, body, modal})` | 创建自定义对话框 |
 | | `ShowMessage(title, body)` | 显示消息框 |
 | `Dialog` | `dialog:AddButton(text, callback)` | 添加按钮 |
@@ -57,7 +75,7 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | | `dialog:SetTitle(text)` | 设置标题 |
 | | `dialog:SetBody(text)` | 设置正文 |
 
-- **事件钩子**：19 个生命周期回调
+- **事件钩子**：当前源码注册 26 个回调名
 
 | 钩子 | 触发时机 |
 |------|---------|
@@ -80,19 +98,32 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | `OnProjectileMiss(proj)` | 投射物飞出屏幕 |
 | `OnCoinCollect(coin)` | 硬币/阳光被收集 |
 | `OnZombieReachHouse(zombie)` | 僵尸进入房子 |
+| `OnPlantEaten(plant, zombie)` | 植物被啃食 |
+| `OnPlantProduce(plant)` | 植物产出 |
+| `OnPlantUpgrade(plant, oldType)` | 植物升级/变形 |
+| `OnZombieFrozen(zombie, isFrozen)` | 僵尸冻结/冰冻 |
+| `OnZombieButtered(zombie)` | 僵尸被黄油命中 |
+| `OnZombieMindControl(zombie)` | 僵尸被魅惑 |
+| `OnCoinExpire(coin)` | 掉落物过期 |
+| `OnFlagRaise(waveIndex)` | 旗帜波提示 |
+| `OnMowerTriggered(row, mowerType)` | 小推车触发 |
+| `OnSunCountChange(oldAmount, newAmount)` | 阳光数量改变 |
+
+- **Lua 环境限制**：所有 Mod 当前共享同一个 Lua VM 和全局环境。入口脚本执行后会捕获全局回调到内部 handler 表，但全局变量和辅助函数仍可能相互覆盖。
 
 ### (3) ModRegistry — 数据注册表
 
 - **运行时 ID 映射**：Mod 植物 `seedType >= 2000`，僵尸 `zombieType >= 3000`，模式 `baseMode >= 5000`，投射物 `projectileType >= 4000`（自动分配）
 - **注册类型**：
   - `ModPlantDef` — id, seedType, seedCost, refreshTime, subClass, launchRate, projectileType, plantName, reanimationName, imageName
-  - `ModZombieDef` — id, zombieType
+  - `ModZombieDef` — id, zombieType, bodyHealth, headHealth, speed, damage, reanimationName, helm/shield, hasHead/hasArm, zombieName
   - `ModModeDef` — id, baseMode, challengePage/Row/Col/IconIndex/Name
   - `ModProjectileDef` — id, damage, speed, imageName, projectileType
   - `ModModeChallengeDef` — baseMode, page, row, col, iconIndex, name（供 ChallengeScreen 动态渲染）
 - **反向查询**：`FindByRuntimeId()` 支持运行时 ID → Mod 定义的反查
 - **动态 Reanim**：`RegisterDynamicReanim()` 支持外部 reanim XML 注册
 - **图鉴集成**：`GetTotalAlmanacPlants()` / `GetAlmanacPlantAt()` 与图鉴联动
+- **冲突策略**：重复注册 id 会失败并记录错误，不会后加载覆盖先加载
 
 ### (4) ModJson — JSON 共享模块
 
@@ -140,6 +171,8 @@ mods/<mod_id>/
 │   └── properties/
 │       └── default.xml                # 属性文件覆盖（字符串本地化）
 ```
+
+当前不会读取 `data/plants.json`、`data/zombies.json`、`data/modes.json`、`data/projectiles.json` 或 `strings.json`。
 
 ## 四、修改了原项目的哪些部分
 

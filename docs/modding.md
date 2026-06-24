@@ -1,14 +1,16 @@
-# PvZ-Portable Modding Specification (Draft v0.1)
+# PvZ-Portable Modding Specification (Current Implementation)
 
-This document defines a practical mod system for PvZ-Portable with Lua scripting and data-driven content.
+This document describes the currently implemented mod system for PvZ-Portable with Lua scripting and resource overrides.
 The goal is to enable new plants, new zombies, and new modes while keeping cross-platform compatibility.
+
+Implementation status: verified against the C++ source on 2026-06-24. The implemented content path is `mod.json` + Lua registration APIs + `resources/`; JSON data tables such as `data/plants.json` are not loaded by the current engine.
 
 ## 1. Design Goals
 
 - Cross-platform: must work on desktop, mobile, consoles, and WASM without JIT.
 - Deterministic: mods should not destabilize core gameplay.
-- Data-first: content should be defined in data tables, scripts add behavior.
-- Safe fallback: missing data or script errors should fail gracefully.
+- Lua-first: content is registered through Lua APIs; resources can be supplied through `resources/`.
+- Safe fallback: missing resources or script errors should fail gracefully.
 - Save compatibility: preserve original saves, store mod data separately.
 
 ## 2. Mod Package Layout
@@ -19,12 +21,6 @@ All mods live under the game resource root:
 mods/
   <mod_id>/
     mod.json
-    data/
-      plants.json
-      zombies.json
-      modes.json
-      projectiles.json
-      strings.json
     scripts/
       main.lua
       <optional>.lua
@@ -54,36 +50,28 @@ Minimal schema:
   "description": "Adds a new plant and zombie",
   "priority": 100,
   "dependencies": ["base"],
-  "entry": "scripts/main.lua",
-  "data": {
-    "plants": ["data/plants.json"],
-    "zombies": ["data/zombies.json"],
-    "modes": ["data/modes.json"],
-    "projectiles": ["data/projectiles.json"],
-    "strings": ["data/strings.json"]
-  }
+  "entry": "scripts/main.lua"
 }
 ```
 
 Fields:
-- `priority`: higher loads later and overrides earlier content.
-- `dependencies`: list of mod ids required before loading this mod.
-- `entry`: Lua entry file executed after data/asset registration.
-- `data`: optional lists of data tables. Missing sections are allowed.
+- `priority`: parsed by the loader, but the current implementation primarily preserves dependency/topological order; do not rely on it for conflict resolution.
+- `dependencies`: list of mod ids that should load before this mod when present. Missing dependencies are not currently treated as fatal errors.
+- `entry`: Lua entry file executed during mod initialization; use `OnModInit()` to register content.
+- `data`: not implemented. Define plants, zombies, modes, and projectiles in Lua with `Game.Register*` APIs.
 
 ## 4. Loading Order
 
-1) Scan `mods/` and parse all `mod.json`
-2) Validate ids, detect duplicates
-3) Topological sort by dependencies; stable sort by `priority`
-4) For each mod:
-   - Register its resource root (overlay)
-   - Load data tables and register new content
-   - Run Lua `entry` and call `OnModInit`
+1) Scan `mods/` and parse all `mod.json` files.
+2) Topologically order loaded mods by dependencies that are also present.
+3) Run each Lua `entry` and call its `OnModInit`.
+4) Register each mod's `resources/` directory as a resource overlay before resource files are parsed.
 
-Conflicts:
-- If two mods define the same `id`, the later mod overrides by default.
-- The loader should log overrides with mod ids and file paths.
+Conflicts and limitations:
+- Duplicate manifest ids are not currently rejected by `ModLoader`.
+- Duplicate plant, zombie, mode, or projectile ids are rejected by `ModRegistry`; later registrations do not override earlier ones.
+- All mod scripts share one Lua global state. Callbacks are captured per mod after loading, but global variables/functions can still collide. Prefer `local` variables and uniquely named globals.
+- Script errors in entries and callbacks are logged and do not intentionally crash the game.
 
 ## 5. Data Registration via Lua
 
@@ -710,8 +698,8 @@ Access via Lua:
 
 ## 10. Hot Reload (Developer Mode)
 
-Optional developer-only feature:
-- Reload data tables, resources, and Lua scripts.
+Not implemented. Possible future developer-only feature:
+- Reload Lua scripts and resource indexes.
 - Require returning to title or restarting level.
 - Avoid hot patching in-flight entities.
 
@@ -723,18 +711,20 @@ Optional developer-only feature:
 
 ## 12. Versioning
 
-- This document defines `mod_schema_version = 1`.
-- Mods may optionally set:
+- Not implemented. The current loader ignores schema/version gating beyond parsing the `version` string from `mod.json`.
+- A future schema field may look like:
 
 ```json
 "schema_version": 1
 ```
 
-The loader should warn if a mod uses a newer schema.
+The loader does not currently warn if a mod uses a newer schema.
 
 ## 13. Future Extensions (Non-Blocking)
 
 - ~~Custom UI panels for mods~~ (implemented: `UI.CreateDialog` / `UI.ShowMessage` with buttons and `Dialog:AddLabel`)
+- JSON data tables for plants, zombies, projectiles, modes, and strings
+- Per-mod Lua environments or module isolation
 - Modular event filters and priorities
 - Network-safe mod validation for competitive modes
 - Dependency version ranges
