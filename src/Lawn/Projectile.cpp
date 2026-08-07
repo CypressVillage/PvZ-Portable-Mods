@@ -65,8 +65,6 @@ Projectile::~Projectile()
 
 void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, int theRow, ProjectileType theProjectileType)
 {
-	gModLua.CallOnProjectileSpawn(this);
-
 	int aGridX = mBoard->PixelToGridXKeepOnBoard(theX, theY);
 	mProjectileType = theProjectileType;
 	mPosX = theX;
@@ -158,6 +156,7 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	mAnimCounter = 0;
 	mX = static_cast<int>(mPosX);
 	mY = static_cast<int>(mPosY);
+	gModLua.CallOnProjectileSpawn(this);
 }
 
 Plant* Projectile::FindCollisionTargetPlant()
@@ -268,14 +267,13 @@ void Projectile::CheckForCollision()
 {
 	if (mMotionType == ProjectileMotion::MOTION_PUFF && mProjectileAge >= 75)
 	{
-		Die();
+		DieAsMiss();
 		return;
 	}
 
 	if (mPosX > WIDE_BOARD_WIDTH || mPosX + mWidth < 0.0f)
 	{
-		gModLua.CallOnProjectileMiss(this);
-		Die();
+		DieAsMiss();
 		return;
 	}
 
@@ -296,7 +294,7 @@ void Projectile::CheckForCollision()
 
 	if (mProjectileType == ProjectileType::PROJECTILE_STAR && (mPosY > 600.0f || mPosY < 0.0f))
 	{
-		Die();
+		DieAsMiss();
 		return;
 	}
 
@@ -1201,6 +1199,9 @@ void Projectile::DrawShadow(Graphics* g)
 
 void Projectile::Die()
 {
+	if (mDead)
+		return;
+
 	mDead = true;
 
 	if (mProjectileType == ProjectileType::PROJECTILE_PUFF || mProjectileType == ProjectileType::PROJECTILE_SNOWPEA)
@@ -1212,6 +1213,15 @@ void Projectile::Die()
 	{
 		AttachmentDie(mAttachmentID);
 	}
+}
+
+void Projectile::DieAsMiss()
+{
+	if (mDead)
+		return;
+
+	gModLua.CallOnProjectileMiss(this);
+	Die();
 }
 
 Rect Projectile::GetProjectileRect()

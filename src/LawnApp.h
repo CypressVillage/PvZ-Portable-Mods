@@ -90,6 +90,7 @@ public:
 	bool							mRegisterResourcesLoaded;
 	bool							mTodCheatKeys;
 	GameMode						mGameMode;
+	int							mActiveModMode;
 	GameScenes						mGameScene;
 	bool							mLoadingZombiesThreadCompleted;
 	bool							mFirstTimeGameSelector;
@@ -183,7 +184,7 @@ public:
 	void							StartPlaying();
 	bool							TryLoadGame();
 	void							NewGame();
-	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame);
+	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame, int theModMode = -1);
 	void							ShowGameSelector();
 	void							KillGameSelector();
 	void							ShowAwardScreen(AwardType theAwardType, bool theShowAchievements); // @Patoke: add argument
@@ -205,6 +206,7 @@ public:
 	virtual Dialog*					DoDialog(int theDialogId, bool isModal, const std::string& theDialogHeader, const std::string& theDialogLines, const std::string& theDialogFooter, int theButtonMode);
 	virtual Dialog*					DoDialogDelay(int theDialogId, bool isModal, const std::string& theDialogHeader, const std::string& theDialogLines, const std::string& theDialogFooter, int theButtonMode);
 	virtual void					Shutdown();
+	virtual void					ShutdownHook();
 	virtual void					Init();
 	virtual void					Start();
 	virtual Dialog*					NewDialog(int theDialogId, bool isModal, const std::string& theDialogHeader, const std::string& theDialogLines, const std::string& theDialogFooter, int theButtonMode);

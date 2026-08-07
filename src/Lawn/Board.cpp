@@ -364,6 +364,7 @@ void Board::TryToSaveGame()
 bool Board::NeedSaveGame()
 {
 	return 
+		mApp->mActiveModMode < 0 &&
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ICE && 
 		mApp->mGameMode != GameMode::GAMEMODE_UPSELL && 
 		mApp->mGameMode != GameMode::GAMEMODE_INTRO && 

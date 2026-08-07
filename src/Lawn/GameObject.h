@@ -36,6 +36,7 @@ class GameObject
 public:
 	LawnApp*                        mApp;
 	Board*                          mBoard;
+	uintptr_t                       mModEntitySerial;
     int32_t                         mX;
     int32_t                         mY;
     int32_t                         mWidth;

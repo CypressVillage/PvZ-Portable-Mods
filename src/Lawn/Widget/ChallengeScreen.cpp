@@ -701,7 +701,8 @@ void ChallengeScreen::ButtonDepress(int theId)
 	if (aModMode >= 0 && aModMode < static_cast<int>(mModChallengeDefs.size()))
 	{
 		mApp->KillChallengeScreen();
-		mApp->PreNewGame((GameMode)mModChallengeDefs[aModMode].baseMode, true);
+		mApp->PreNewGame((GameMode)mModChallengeDefs[aModMode].baseMode, true,
+			mModChallengeDefs[aModMode].runtimeModeId);
 		return;
 	}
 

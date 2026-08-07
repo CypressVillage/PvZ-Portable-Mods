@@ -5,6 +5,7 @@
     "libopenmpt",
     "libpng",
     "libvorbis",
+    "lua",
     "mpg123",
     {
       "name": "sdl2",

@@ -8,6 +8,7 @@
 #include "../LawnApp.h"
 #include "../Lawn/Widget/GameButton.h"
 #include "../Resources.h"
+#include <algorithm>
 
 #if defined(PVZ_ENABLE_LUA)
 #include <lua.hpp>
@@ -15,19 +16,27 @@
 
 int LuaProxyDialog::sNextDialogId = LuaProxyDialog::DIALOG_MOD_BASE;
 
+namespace
+{
+	std::vector<LuaProxyDialog*> gLuaProxyDialogs;
+}
+
 LuaProxyDialog::LuaProxyDialog(LawnApp* theApp, const std::string& title, const std::string& body, bool modal) :
 	LawnDialog(theApp, sNextDialogId++, modal, title, body, "", BUTTONS_NONE),
 	mDestroyed(false),
 	mInManager(false),
-	mLuaState(nullptr)
+	mLuaState(nullptr),
+	mLuaHandle(nullptr)
 {
+	gLuaProxyDialogs.push_back(this);
 	mDrawStandardBack = true;
 	CalcSize(0, 0);
 }
 
 LuaProxyDialog::~LuaProxyDialog()
 {
-	ReleaseRefs();
+	InvalidateLuaBinding();
+	gLuaProxyDialogs.erase(std::remove(gLuaProxyDialogs.begin(), gLuaProxyDialogs.end(), this), gLuaProxyDialogs.end());
 	for (auto* btn : mButtonWidgets)
 		delete btn;
 	mButtonWidgets.clear();
@@ -50,6 +59,64 @@ void LuaProxyDialog::AddLuaButton(const std::string& text, int luaRef)
 void LuaProxyDialog::SetLuaState(lua_State* L)
 {
 	mLuaState = L;
+#if defined(PVZ_ENABLE_LUA)
+	lua_getglobal(L, "__mod_id");
+	if (lua_isstring(L, -1))
+		mModId = lua_tostring(L, -1);
+	lua_pop(L, 1);
+	lua_getglobal(L, "__mod_root");
+	if (lua_isstring(L, -1))
+		mModRoot = lua_tostring(L, -1);
+	lua_pop(L, 1);
+#endif
+}
+
+void LuaProxyDialog::BindLuaHandle(LuaDialogHandle* handle)
+{
+	mLuaHandle = handle;
+}
+
+void LuaProxyDialog::InvalidateLuaBinding()
+{
+	if (mDestroyed && !mLuaState && !mLuaHandle)
+		return;
+
+	mDestroyed = true;
+	LuaDialogHandle* handle = mLuaHandle;
+	mLuaHandle = nullptr;
+	if (handle)
+		handle->dialog = nullptr;
+
+	ReleaseRefs();
+
+#if defined(PVZ_ENABLE_LUA)
+	if (mLuaState && handle && handle->selfRef != LUA_NOREF)
+	{
+		int selfRef = handle->selfRef;
+		handle->selfRef = LUA_NOREF;
+		luaL_unref(mLuaState, LUA_REGISTRYINDEX, selfRef);
+	}
+#endif
+	mLuaState = nullptr;
+}
+
+void LuaProxyDialog::Close()
+{
+	LawnApp* app = mApp;
+	int dialogId = mId;
+	InvalidateLuaBinding();
+	if (app)
+		app->KillDialog(dialogId);
+}
+
+void LuaProxyDialog::InvalidateAll(lua_State* L)
+{
+	std::vector<LuaProxyDialog*> dialogs = gLuaProxyDialogs;
+	for (LuaProxyDialog* dialog : dialogs)
+	{
+		if (dialog->mLuaState == L)
+			dialog->InvalidateLuaBinding();
+	}
 }
 
 void LuaProxyDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
@@ -65,8 +132,7 @@ void LuaProxyDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
 	mInManager = false;
 	for (auto* btn : mButtonWidgets)
 		RemoveWidget(btn);
-	mDestroyed = true;
-	ReleaseRefs();
+	InvalidateLuaBinding();
 	LawnDialog::RemovedFromManager(theWidgetManager);
 }
 
@@ -109,6 +175,12 @@ void LuaProxyDialog::ButtonDepress(int theId)
 			if (entry.id == theId && entry.luaRef != LUA_NOREF)
 			{
 				lua_State* L = static_cast<lua_State*>(mLuaState);
+				lua_getglobal(L, "__mod_id");
+				lua_getglobal(L, "__mod_root");
+				lua_pushlstring(L, mModId.c_str(), mModId.size());
+				lua_setglobal(L, "__mod_id");
+				lua_pushlstring(L, mModRoot.c_str(), mModRoot.size());
+				lua_setglobal(L, "__mod_root");
 				lua_rawgeti(L, LUA_REGISTRYINDEX, entry.luaRef);
 				bool shouldClose = true;
 				if (lua_isfunction(L, -1))
@@ -129,13 +201,14 @@ void LuaProxyDialog::ButtonDepress(int theId)
 				{
 					lua_pop(L, 1);
 				}
+				lua_pushvalue(L, -2);
+				lua_setglobal(L, "__mod_id");
+				lua_pushvalue(L, -1);
+				lua_setglobal(L, "__mod_root");
+				lua_pop(L, 2);
 
 				if (shouldClose)
-				{
-					LawnApp* app = mApp;
-					int dialogId = mId;
-					app->KillDialog(dialogId);
-				}
+					Close();
 				return;
 			}
 		}

@@ -22,10 +22,19 @@
 #include "GameObject.h"
 #include "../LawnApp.h"
 
+namespace
+{
+	uintptr_t gNextModEntitySerial = 0;
+}
+
 GameObject::GameObject()
 {
 	mApp = gLawnApp;
 	mBoard = gLawnApp->mBoard;
+	do
+	{
+		mModEntitySerial = ++gNextModEntitySerial;
+	} while (mModEntitySerial == 0);
 	mX = 0;
 	mY = 0;
 	mWidth = 0;

@@ -50,6 +50,7 @@ struct ModZombieDef
 struct ModModeDef
 {
 	std::string id;
+	int runtimeModeId = -1;
 	int baseMode = -1;
 	int challengePage = 1;
 	int challengeRow = 0;
@@ -69,6 +70,7 @@ struct ModProjectileDef
 
 struct ModModeChallengeDef
 {
+	int runtimeModeId;
 	int baseMode;
 	int page;
 	int row;
@@ -94,7 +96,7 @@ public:
 
 	const ModPlantDef* FindPlantByRuntimeId(int seedType) const;
 	const ModZombieDef* FindZombieByRuntimeId(int zombieType) const;
-	const ModModeDef* FindModeByRuntimeId(int baseMode) const;
+	const ModModeDef* FindModeByRuntimeId(int runtimeModeId) const;
 	const ModProjectileDef* FindProjectileByRuntimeId(int projectileType) const;
 
 	const std::vector<std::string>& GetErrors() const;
@@ -106,7 +108,8 @@ public:
 	std::vector<ModModeChallengeDef> GetModeChallengeDefs() const;
 
 	void BuildReanimNameMap();
-	unsigned int RegisterDynamicReanim(const std::string& reanimFilePath);
+	void QueueDynamicReanim(const std::string& reanimFilePath);
+	void FinalizeDynamicReanims();
 	void InjectPlantStringOverrides(Sexy::SexyAppBase* app);
 
 private:
@@ -126,6 +129,7 @@ private:
 	int mNextModeType = 5000;
 	int mNextProjectileType = 4000;
 	std::map<std::string, int> mReanimNameMap;
+	std::map<std::string, unsigned int> mDynamicReanims;
 	std::vector<std::string> mErrors;
 };
 

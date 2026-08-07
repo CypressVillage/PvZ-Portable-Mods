@@ -36,6 +36,7 @@ jobs:
           libopenmpt \
           libpng \
           libvorbis \
+          lua \
           mpg123 \
           ninja \
           sdl2-compat \
@@ -55,8 +56,9 @@ jobs:
       run: |
         sudo -u builder bash -lc '
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DPVZ_ENABLE_LUA=ON -DBUILD_TESTING=ON
           cmake --build build
+          ctest --test-dir build --output-on-failure
 
           mkdir -p dist
           cp build/pvz-portable dist/

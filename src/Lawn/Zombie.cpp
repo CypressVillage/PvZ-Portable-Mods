@@ -108,14 +108,15 @@ ZombieDefinition& GetZombieDefinition(ZombieType theZombieType)
             const char* zombieName = "ModZombie";
 
             const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(theZombieType));
-            if (modDef)
-            {
-                if (!modDef->zombieName.empty())
-                    zombieName = modDef->zombieName.c_str();
-                int resolvedReanim = gModRegistry.ResolveReanimationType(modDef->reanimationName);
-                if (resolvedReanim != static_cast<int>(ReanimationType::REANIM_NONE))
-                    reanimType = resolvedReanim;
-            }
+            TOD_ASSERT(modDef != nullptr);
+            if (!modDef)
+                return gZombieDefs[ZombieType::ZOMBIE_NORMAL];
+
+            if (!modDef->zombieName.empty())
+                zombieName = modDef->zombieName.c_str();
+            int resolvedReanim = gModRegistry.ResolveReanimationType(modDef->reanimationName);
+            if (resolvedReanim != static_cast<int>(ReanimationType::REANIM_NONE))
+                reanimType = resolvedReanim;
 
             ZombieDefinition def = { theZombieType, static_cast<ReanimationType>(reanimType), zombieValue, 1, 1, pickWeight, zombieName };
             sModZombieDefs[static_cast<int>(theZombieType)] = def;
@@ -136,7 +137,8 @@ Zombie::Zombie()
 // GOTY @Patoke: 0x5329A0
 void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Zombie* theParentZombie, int theFromWave)
 {
-    TOD_ASSERT(theType >= 0 && theType <= ZombieType::NUM_ZOMBIE_TYPES);
+    TOD_ASSERT((theType >= 0 && theType < ZombieType::NUM_ZOMBIE_TYPES) ||
+        (static_cast<int>(theType) >= 3000 && gModRegistry.FindZombieByRuntimeId(static_cast<int>(theType)) != nullptr));
 
     mFromWave = theFromWave;
     mRow = theRow;
@@ -857,6 +859,13 @@ void Zombie::ZombieInitialize(int theRow, ZombieType theType, bool theVariant, Z
         mFlyingHealth /= 4;
     }
 
+	if (const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(mZombieType)))
+	{
+		mBodyHealth = modDef->bodyHealth + (modDef->hasHead ? modDef->headHealth : 0);
+		mHasHead = modDef->hasHead;
+		mHasArm = modDef->hasArm;
+    }
+
     UpdateAnimSpeed();
     if (mVariant)
     {
@@ -1201,6 +1210,11 @@ void Zombie::PickRandomSpeed()
         {
             mAnimTicksPerFrame = 15;
         }
+    }
+
+    if (const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(mZombieType)))
+    {
+        mVelX *= modDef->speed;
     }
 
     UpdateAnimSpeed();
@@ -3805,7 +3819,9 @@ void Zombie::UpdateDamageStates(unsigned int theDamageFlags)
         DropArm(theDamageFlags);
     }
 
-    if (mHasHead && mBodyHealth < mBodyMaxHealth / 3)
+    const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(mZombieType));
+    int aHeadDropHealth = modDef ? modDef->headHealth : mBodyMaxHealth / 3;
+    if (mHasHead && mBodyHealth < aHeadDropHealth)
     {
         DropHead(theDamageFlags);
         DropLoot();
@@ -6991,23 +7007,26 @@ void Zombie::EatPlant(Plant* thePlant)
     if (mChilledCounter > 0 && mZombieAge % 2 == 1)
         return;
 
+    const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(mZombieType));
+    int aDamagePerEat = modDef ? DAMAGE_PER_EAT * modDef->damage / 100 : DAMAGE_PER_EAT;
+
     if (mApp->IsIZombieLevel() && thePlant->mSeedType == SeedType::SEED_SUNFLOWER)
     {
         int aStageBeforeChew = thePlant->mPlantHealth / 40;
-        int aStageAfterChew = (thePlant->mPlantHealth - DAMAGE_PER_EAT) / 40;
-        if (aStageAfterChew < aStageBeforeChew || thePlant->mPlantHealth - DAMAGE_PER_EAT <= 0)  // 若本次啃食令植物血量下降了至少 1 个阶段
+        int aStageAfterChew = (thePlant->mPlantHealth - aDamagePerEat) / 40;
+        if (aStageAfterChew < aStageBeforeChew || thePlant->mPlantHealth - aDamagePerEat <= 0)  // 若本次啃食令植物血量下降了至少 1 个阶段
         {
             mBoard->AddCoin(thePlant->mX, thePlant->mY, CoinType::COIN_SUN, CoinMotion::COIN_MOTION_FROM_PLANT);
         }
     }
 
-    thePlant->mPlantHealth -= DAMAGE_PER_EAT;
+    thePlant->mPlantHealth -= aDamagePerEat;
     thePlant->mRecentlyEatenCountdown = 50;
     if (mApp->IsIZombieLevel() && mJustGotShotCounter < -500)
     {
         if (thePlant->mSeedType == SeedType::SEED_WALLNUT || thePlant->mSeedType == SeedType::SEED_TALLNUT || thePlant->mSeedType == SeedType::SEED_PUMPKINSHELL)
         {
-            thePlant->mPlantHealth -= DAMAGE_PER_EAT;
+            thePlant->mPlantHealth -= aDamagePerEat;
         }
     }
 
@@ -7031,7 +7050,9 @@ void Zombie::EatPlant(Plant* thePlant)
 
 void Zombie::EatZombie(Zombie* theZombie)
 {
-    theZombie->TakeDamage(DAMAGE_PER_EAT, 9U);
+    const ModZombieDef* modDef = gModRegistry.FindZombieByRuntimeId(static_cast<int>(mZombieType));
+    int aDamagePerEat = modDef ? DAMAGE_PER_EAT * modDef->damage / 100 : DAMAGE_PER_EAT;
+    theZombie->TakeDamage(aDamagePerEat, 9U);
     StartEating();
     if (theZombie->mBodyHealth <= 0)
     {

@@ -7,6 +7,7 @@
 #ifndef __MODTIMER_H__
 #define __MODTIMER_H__
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -23,9 +24,12 @@ public:
 		int interval;
 		bool isRepeat;
 		int callbackRef;
+		std::string modId;
+		std::string modRoot;
 	};
 
-	int New(void* parentPtr, int frames, int callbackRef, bool isRepeat, int interval);
+	int New(void* parentPtr, int frames, int callbackRef, bool isRepeat, int interval,
+		const std::string& modId, const std::string& modRoot);
 	bool Cancel(int id, lua_State* L);
 	void CancelAll(void* parentPtr, lua_State* L);
 	void TickAll(void* parentPtr, lua_State* L);

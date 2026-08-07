@@ -163,6 +163,7 @@ LawnApp::LawnApp()
 	mLastLevelStats = new LevelStats();
 	mFirstTimeGameSelector = true;
 	mGameMode = GameMode::GAMEMODE_ADVENTURE;
+	mActiveModMode = -1;
 	mEasyPlantingCheat = false;
 	mAutoEnable3D = true;
 	Tod_SWTri_AddAllDrawTriFuncs();
@@ -185,6 +186,8 @@ LawnApp::LawnApp()
 
 LawnApp::~LawnApp()
 {
+	gModLua.Shutdown();
+
 	while (!mDialogMap.empty())
 	{
 		KillDialog(mDialogMap.begin()->first);
@@ -325,9 +328,12 @@ void LawnApp::Shutdown()
 	}
 
 	if (!mShutdown)
-	{
 		SexyAppBase::Shutdown();
-	}
+}
+
+void LawnApp::ShutdownHook()
+{
+	gModLua.Shutdown();
 }
 
 // GOTY @Patoke : 0x452640
@@ -345,7 +351,7 @@ void LawnApp::KillBoard()
 	KillSeedChooserScreen();
 	if (mBoard)
 	{
-		if (mPlayerInfo && (
+		if (mPlayerInfo && mActiveModMode < 0 && (
 			mBoardResult == BoardResult::BOARDRESULT_WON ||
 			mBoardResult == BoardResult::BOARDRESULT_LOST ||
 			mBoardResult == BoardResult::BOARDRESULT_RESTART ||
@@ -431,7 +437,7 @@ bool LawnApp::WriteCurrentUserConfig()
 }
 
 // GOTY @Patoke: 0x452820
-void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
+void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame, int theModMode)
 {
 	//if (NeedRegister())
 	//{
@@ -440,13 +446,17 @@ void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
 	//}
 
 	mGameMode = theGameMode;
-	if (theLookForSavedGame && TryLoadGame())
+	mActiveModMode = theModMode;
+	if (theLookForSavedGame && mActiveModMode < 0 && TryLoadGame())
 		return;
 
-	std::string aFileName = GetSavedGameName(mGameMode, mPlayerInfo->mId);
-	EraseFile(aFileName);
-	std::string aLegacyFileName = GetLegacySavedGameName(mGameMode, mPlayerInfo->mId);
-	EraseFile(aLegacyFileName);
+	if (mActiveModMode < 0)
+	{
+		std::string aFileName = GetSavedGameName(mGameMode, mPlayerInfo->mId);
+		EraseFile(aFileName);
+		std::string aLegacyFileName = GetLegacySavedGameName(mGameMode, mPlayerInfo->mId);
+		EraseFile(aLegacyFileName);
+	}
 	NewGame();
 }
 
@@ -466,7 +476,7 @@ void LawnApp::StartPlaying()
 {
 	KillSeedChooserScreen();
 	mBoard->StartLevel();
-	gModLua.CallOnLevelStart(static_cast<int>(mGameMode));
+	gModLua.CallOnLevelStart(mActiveModMode >= 0 ? mActiveModMode : static_cast<int>(mGameMode));
 	gModLua.CallOnGameStart();
 	mGameScene = GameScenes::SCENE_PLAYING;
 }
@@ -483,6 +493,9 @@ bool LawnApp::SaveFileExists()
 // GOTY @Patoke: 0x452A50
 bool LawnApp::TryLoadGame()
 {
+	if (mActiveModMode >= 0)
+		return false;
+
 	std::string aSaveName = GetSavedGameName(mGameMode, mPlayerInfo->mId);
 	std::string aLegacySaveName = GetLegacySavedGameName(mGameMode, mPlayerInfo->mId);
 	mMusic->StopAllMusic();
@@ -1077,7 +1090,7 @@ void LawnApp::FinishRestartConfirmDialog()
 	KillDialog(Dialogs::DIALOG_RESTARTCONFIRM);
 	KillBoard();
 
-	PreNewGame(mGameMode, false);
+	PreNewGame(mGameMode, false, mActiveModMode);
 }
 
 void LawnApp::DoCheatDialog()
@@ -1103,7 +1116,7 @@ void LawnApp::FinishCheatDialog(bool isYes)
 	{
 		mMusic->StopAllMusic();
 		mBoardResult = BoardResult::BOARDRESULT_CHEAT;
-		PreNewGame(mGameMode, false);
+		PreNewGame(mGameMode, false, mActiveModMode);
 	}
 }
 
@@ -1290,16 +1303,20 @@ void LawnApp::Init()
 	{
 		TodLog("Mod loader reported errors");
 	}
-	if (gModLua.Init())
-		gModLua.RunEntries(gModLoader.GetManifests());
 
 	Sexy::ClearResourceRoots();
 	for (const ModManifest& manifest : gModLoader.GetManifests())
 	{
 		std::filesystem::path modResources = Sexy::PathFromU8(manifest.rootPath) / "resources";
-		if (std::filesystem::exists(modResources))
+		std::error_code error;
+		if (std::filesystem::exists(modResources, error))
 			Sexy::AddResourceRoot(Sexy::PathToU8(modResources));
+		else if (error)
+			TodLog("Failed to inspect Mod resource directory %s: %s", Sexy::PathToU8(modResources).c_str(), error.message().c_str());
 	}
+
+	if (gModLua.Init())
+		gModLua.RunEntries(gModLoader.GetManifests());
 
 	// if (!mResourceManager->ParseResourcesFile(Sexy::GetResourcePath("properties/resources.xml")))
 	if (!mResourceManager->ParseResourcesFile("properties/resources.xml"))
@@ -1377,6 +1394,7 @@ void LawnApp::Init()
 
 	ReanimatorLoadDefinitions(gLawnReanimationArray, ReanimationType::NUM_REANIMS);
 	gModRegistry.BuildReanimNameMap();
+	gModRegistry.FinalizeDynamicReanims();
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_SPROUT, true);
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_ZOMBIEHEAD, true);
 
@@ -1561,7 +1579,7 @@ void LawnApp::CheckForGameEnd()
 		}
 		else
 		{
-			PreNewGame(mGameMode, false);
+			PreNewGame(mGameMode, false, mActiveModMode);
 		}
 	}
 	else if (IsSurvivalMode())

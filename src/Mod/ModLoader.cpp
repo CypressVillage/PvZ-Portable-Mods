@@ -12,10 +12,22 @@
 #include "Sexy.TodLib/TodDebug.h"
 #include <algorithm>
 #include <filesystem>
+#include <map>
 
 using namespace Sexy;
 
 ModLoader gModLoader;
+
+bool ModIsValidId(const std::string& id)
+{
+	if (id.empty())
+		return false;
+
+	return std::all_of(id.begin(), id.end(), [](unsigned char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+	});
+}
 
 bool ModLoader::LoadAll()
 {
@@ -23,33 +35,63 @@ bool ModLoader::LoadAll()
 	mErrors.clear();
 
 	std::string modsRoot = GetResourcePath("mods");
-	printf("LOOKING FOR MODS AT: %s\n", modsRoot.c_str());
 	std::filesystem::path rootPath = PathFromU8(modsRoot);
-	if (!std::filesystem::exists(rootPath)) {
-		printf("MODS FOLDER DOES NOT EXIST!\n");
-	} else {
-		printf("MODS FOLDER EXISTS.\n");
-		for (const auto& entry : std::filesystem::directory_iterator(rootPath)) {
-			printf("FOUND ENTRY: %s\n", entry.path().string().c_str());
-		}
+	std::error_code error;
+	bool rootExists = std::filesystem::exists(rootPath, error);
+	if (error)
+	{
+		mErrors.push_back("Failed to inspect Mods directory " + modsRoot + ": " + error.message());
+		return false;
 	}
-	if (!std::filesystem::exists(rootPath))
+	if (!rootExists)
 	{
 		return true;
 	}
 
 	bool allSuccess = true;
-	for (const auto& entry : std::filesystem::directory_iterator(rootPath))
+	std::filesystem::directory_iterator entry(rootPath, error);
+	std::filesystem::directory_iterator end;
+	if (error)
 	{
-		if (!entry.is_directory())
+		mErrors.push_back("Failed to read Mods directory " + modsRoot + ": " + error.message());
+		return false;
+	}
+	while (entry != end)
+	{
+		const std::filesystem::directory_entry current = *entry;
+		entry.increment(error);
+		if (error)
+		{
+			mErrors.push_back("Failed while reading Mods directory " + modsRoot + ": " + error.message());
+			allSuccess = false;
+			break;
+		}
+
+		bool isDirectory = current.is_directory(error);
+		if (error)
+		{
+			mErrors.push_back("Failed to inspect Mod entry " + PathToU8(current.path()) + ": " + error.message());
+			allSuccess = false;
+			error.clear();
+			continue;
+		}
+		if (!isDirectory)
 			continue;
 
-		std::filesystem::path manifestPath = entry.path() / "mod.json";
-		if (!std::filesystem::exists(manifestPath))
+		std::filesystem::path manifestPath = current.path() / "mod.json";
+		bool manifestExists = std::filesystem::exists(manifestPath, error);
+		if (error)
+		{
+			mErrors.push_back("Failed to inspect Mod manifest " + PathToU8(manifestPath) + ": " + error.message());
+			allSuccess = false;
+			error.clear();
+			continue;
+		}
+		if (!manifestExists)
 			continue;
 
 		std::string manifestPathStr = PathToU8(manifestPath);
-		std::string modRootStr = PathToU8(entry.path());
+		std::string modRootStr = PathToU8(current.path());
 		if (!LoadManifestFromFile(manifestPathStr, modRootStr))
 		{
 			TodLog("Mod manifest failed: %s", manifestPathStr.c_str());
@@ -84,47 +126,44 @@ bool ModLoader::LoadAll()
 
 		std::vector<std::string> sorted;
 		{
-			std::vector<std::string> queue;
+			std::vector<std::string> ready;
 			for (const auto& pair : inDegree)
 			{
 				if (pair.second == 0)
-					queue.push_back(pair.first);
+					ready.push_back(pair.first);
 			}
-			while (!queue.empty())
+			auto readyBefore = [&manifestById](const std::string& a, const std::string& b) {
+				const ModManifest* aManifest = manifestById.at(a);
+				const ModManifest* bManifest = manifestById.at(b);
+				if (aManifest->priority != bManifest->priority)
+					return aManifest->priority < bManifest->priority;
+				return a < b;
+			};
+			while (!ready.empty())
 			{
-				std::string node = queue.back();
-				queue.pop_back();
+				std::sort(ready.begin(), ready.end(), readyBefore);
+				std::string node = ready.front();
+				ready.erase(ready.begin());
 				sorted.push_back(node);
 				for (const auto& dep : dependents[node])
 				{
 					if (--inDegree[dep] == 0)
-						queue.push_back(dep);
+						ready.push_back(dep);
 				}
 			}
 		}
 
-		// If cycle detected (some mods not sorted), append them unsorted
+		// Cyclic Mods cannot be loaded in a dependency-safe order.
 		if (sorted.size() < mManifests.size())
 		{
-			for (const auto& pair : inDegree)
-			{
-				if (pair.second > 0 && std::find(sorted.begin(), sorted.end(), pair.first) == sorted.end())
-					sorted.push_back(pair.first);
-			}
 			mErrors.push_back("Circular dependency detected among mods");
 		}
 
-		// Reorder mManifests to match topological order, then stable_sort by priority within
-		std::stable_sort(mManifests.begin(), mManifests.end(),
-			[&sorted](const ModManifest& a, const ModManifest& b) {
-				auto aIt = std::find(sorted.begin(), sorted.end(), a.id);
-				auto bIt = std::find(sorted.begin(), sorted.end(), b.id);
-				int aOrder = static_cast<int>(aIt - sorted.begin());
-				int bOrder = static_cast<int>(bIt - sorted.begin());
-				if (aOrder != bOrder)
-					return aOrder < bOrder;
-				return a.priority < b.priority;
-			});
+		std::vector<ModManifest> ordered;
+		ordered.reserve(sorted.size());
+		for (const std::string& id : sorted)
+			ordered.push_back(*manifestById.at(id));
+		mManifests = std::move(ordered);
 	}
 
 	return mErrors.empty();
@@ -179,12 +218,35 @@ bool ModLoader::LoadManifestFromFile(const std::string& manifestPath, const std:
 		mErrors.push_back(manifestPath + ": " + error);
 		return false;
 	}
-	ModJsonGetObjectString(root, "name", manifest.name, false, error);
-	ModJsonGetObjectString(root, "version", manifest.version, false, error);
-	ModJsonGetObjectString(root, "author", manifest.author, false, error);
-	ModJsonGetObjectString(root, "description", manifest.description, false, error);
-	ModJsonGetObjectString(root, "entry", manifest.entry, false, error);
-	ModJsonGetObjectInt(root, "priority", manifest.priority, false, error);
+	if (!ModIsValidId(manifest.id))
+	{
+		mErrors.push_back(manifestPath + ": id may contain only letters, digits, '.', '_', and '-'");
+		return false;
+	}
+	for (const ModManifest& loaded : mManifests)
+	{
+		if (loaded.id == manifest.id)
+		{
+			mErrors.push_back(manifestPath + ": duplicate Mod id '" + manifest.id + "' (already loaded from " + loaded.rootPath + ")");
+			return false;
+		}
+	}
+
+	auto readString = [&](const char* key, std::string& value) {
+		if (ModJsonGetObjectString(root, key, value, false, error))
+			return true;
+		mErrors.push_back(manifestPath + ": " + error);
+		return false;
+	};
+	if (!readString("name", manifest.name) || !readString("version", manifest.version) ||
+		!readString("author", manifest.author) || !readString("description", manifest.description) ||
+		!readString("entry", manifest.entry))
+		return false;
+	if (!ModJsonGetObjectInt(root, "priority", manifest.priority, false, error))
+	{
+		mErrors.push_back(manifestPath + ": " + error);
+		return false;
+	}
 
 	auto depIt = root.objectValue.find("dependencies");
 	if (depIt != root.objectValue.end())
@@ -195,11 +257,17 @@ bool ModLoader::LoadManifestFromFile(const std::string& manifestPath, const std:
 			mErrors.push_back(manifestPath + ": dependencies: " + error);
 			return false;
 		}
+		for (const std::string& dependency : deps)
+		{
+			if (!ModIsValidId(dependency))
+			{
+				mErrors.push_back(manifestPath + ": invalid dependency id '" + dependency + "'");
+				return false;
+			}
+		}
 		manifest.dependencies = deps;
 	}
 
 	mManifests.push_back(std::move(manifest));
 	return true;
 }
-
-

@@ -46,4 +46,6 @@ private:
 
 extern ModLoader gModLoader;
 
+bool ModIsValidId(const std::string& id);
+
 #endif

@@ -161,13 +161,14 @@ Before building on PC, ensure you have the necessary dependencies installed:
 - **Audio**: `libopenmpt`, `libogg`, `libvorbis`, `mpg123`
 - **Image**: `libpng`, `libjpeg-turbo`
 - **Windowing/Input**: `SDL2`
+- **Optional Lua Mod framework**: Lua 5.4 or a compatible newer development package discoverable by CMake (`PVZ_ENABLE_LUA=ON`)
 
 ### Arch Linux
 
 You can install the required dependencies using the following command:
 
 ```bash
-sudo pacman -S --needed base-devel cmake libjpeg-turbo libogg libopenmpt libpng libvorbis mpg123 ninja sdl2-compat
+sudo pacman -S --needed base-devel cmake libjpeg-turbo libogg libopenmpt libpng libvorbis lua mpg123 ninja sdl2-compat
 ```
 
 ### Debian/Ubuntu
@@ -175,7 +176,7 @@ sudo pacman -S --needed base-devel cmake libjpeg-turbo libogg libopenmpt libpng 
 You can install the required dependencies using the following command:
 
 ```bash
-sudo apt install cmake ninja-build libogg-dev libjpeg-dev libopenmpt-dev libpng-dev libvorbis-dev libmpg123-dev libsdl2-dev
+sudo apt install cmake ninja-build libogg-dev libjpeg-dev libopenmpt-dev libpng-dev libvorbis-dev libmpg123-dev libsdl2-dev liblua5.4-dev
 ```
 
 ### Windows (MSYS2 UCRT64)
@@ -183,7 +184,7 @@ sudo apt install cmake ninja-build libogg-dev libjpeg-dev libopenmpt-dev libpng-
 You can install the required dependencies using the following command:
 
 ```bash
-pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libjpeg-turbo mingw-w64-ucrt-x86_64-libopenmpt mingw-w64-ucrt-x86_64-libogg mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-libvorbis mingw-w64-ucrt-x86_64-mpg123 mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-SDL2
+pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libjpeg-turbo mingw-w64-ucrt-x86_64-libopenmpt mingw-w64-ucrt-x86_64-libogg mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-libvorbis mingw-w64-ucrt-x86_64-lua mingw-w64-ucrt-x86_64-mpg123 mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-SDL2
 ```
 
 ### macOS (Homebrew)
@@ -191,7 +192,7 @@ pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-
 You can install the required dependencies using [Homebrew](https://brew.sh/) with the following command:
 
 ```bash
-brew install cmake dylibbundler jpeg-turbo libogg libopenmpt libpng libvorbis mpg123 ninja sdl2
+brew install cmake dylibbundler jpeg-turbo libogg libopenmpt libpng libvorbis lua mpg123 ninja sdl2
 ```
 
 ## Build Instructions
@@ -205,6 +206,16 @@ cmake -G Ninja -B build
 ```bash
 cmake --build build
 ```
+
+Lua mods are disabled by default. To build the Mod framework, configure with:
+
+```bash
+cmake -G Ninja -B build -DPVZ_ENABLE_LUA=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+When running from `build/`, ensure the runtime resource path can see `mods/`, for example with `ln -s ../mods build/mods` on Unix-like systems.
 
 ### Performance Optimization
 
@@ -231,6 +242,7 @@ You can customize the game features by adding options to the first `cmake` comma
 | `DO_FIX_BUGS` | `OFF` | Apply community fixes for "bugs" of official 1.2.0.1073 GOTY Edition.[^1] However, these "bugs" are usually **considered "features"** by many players. |
 | `CONSOLE` | `OFF`<br>(`ON` if `CMAKE_BUILD_TYPE` is `Debug`) | Show a console window (Windows only). |
 | `BUILD_STATIC` | `OFF` | Link statically to create a standalone executable (Windows with MinGW-based toolchains only). Use a vcpkg `-static` triplet for MSVC instead. |
+| `PVZ_ENABLE_LUA` | `OFF` | Enable the Lua Mod framework. Requires Lua 5.4 or a compatible newer development package. Emscripten builds reject this option. |
 
 [^1]: Current `DO_FIX_BUGS` includes the following fixes:
     - Fix bungee zombie duplicate sun/item drop in I, Zombie mode.

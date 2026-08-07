@@ -11,6 +11,13 @@
 #include <vector>
 
 struct lua_State;
+class LuaProxyDialog;
+
+struct LuaDialogHandle
+{
+	LuaProxyDialog* dialog;
+	int selfRef;
+};
 
 class LuaProxyDialog : public LawnDialog
 {
@@ -38,6 +45,10 @@ public:
 	void AddLuaButton(const std::string& text, int luaRef);
 	void AddLuaLabel(const std::string& text, int x, int y);
 	void SetLuaState(lua_State* L);
+	void BindLuaHandle(LuaDialogHandle* handle);
+	void InvalidateLuaBinding();
+	void Close();
+	static void InvalidateAll(lua_State* L);
 
 	virtual void AddedToManager(Sexy::WidgetManager* theWidgetManager);
 	virtual void RemovedFromManager(Sexy::WidgetManager* theWidgetManager);
@@ -50,6 +61,9 @@ public:
 	bool mDestroyed;
 	bool mInManager;
 	lua_State* mLuaState;
+	LuaDialogHandle* mLuaHandle;
+	std::string mModId;
+	std::string mModRoot;
 	std::vector<ButtonEntry> mButtons;
 	std::vector<LawnStoneButton*> mButtonWidgets;
 	std::vector<LabelEntry> mLabels;

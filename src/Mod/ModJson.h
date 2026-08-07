@@ -49,7 +49,7 @@ private:
 	bool StartsWith(const char* text) const;
 	void SkipWhitespace();
 
-	const std::string& mInput;
+	std::string mInput;
 	size_t mPos = 0;
 };
 

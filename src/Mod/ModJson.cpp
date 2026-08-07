@@ -388,65 +388,20 @@ std::string ModJsonSerializeMap(const std::map<std::string, std::string>& data)
 bool ModJsonDeserializeMap(const std::string& json, std::map<std::string, std::string>& outMap)
 {
 	outMap.clear();
-
-	auto trim = [](const std::string& s) -> std::string {
-		size_t start = 0;
-		while (start < s.size() && (s[start] == ' ' || s[start] == '\t' || s[start] == '\r' || s[start] == '\n'))
-			start++;
-		size_t end = s.size();
-		while (end > start && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\r' || s[end - 1] == '\n'))
-			end--;
-		return s.substr(start, end - start);
-	};
-
-	std::string content = trim(json);
-	if (content.empty() || content[0] != '{')
+	ModJsonParser parser(json);
+	ModJsonValue root;
+	std::string error;
+	if (!parser.Parse(root, error) || root.type != ModJsonType::Object)
 		return false;
 
-	size_t pos = 1;
-	while (pos < content.size() && content[pos] != '}')
+	for (const auto& [key, value] : root.objectValue)
 	{
-		while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r' || content[pos] == ','))
-			pos++;
-
-		if (pos >= content.size() || content[pos] == '}')
-			break;
-
-		if (content[pos] != '"')
+		if (value.type != ModJsonType::String)
+		{
+			outMap.clear();
 			return false;
-		pos++;
-
-		size_t keyStart = pos;
-		while (pos < content.size() && content[pos] != '"')
-		{
-			if (content[pos] == '\\') pos++;
-			pos++;
 		}
-		if (pos >= content.size()) return false;
-		std::string key = ModJsonUnescape(content.substr(keyStart, pos - keyStart));
-		pos++;
-
-		while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r'))
-			pos++;
-		if (pos >= content.size() || content[pos] != ':') return false;
-		pos++;
-
-		while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r'))
-			pos++;
-		if (pos >= content.size() || content[pos] != '"') return false;
-		pos++;
-
-		size_t valStart = pos;
-		while (pos < content.size() && content[pos] != '"')
-		{
-			if (content[pos] == '\\') pos++;
-			pos++;
-		}
-		if (pos >= content.size()) return false;
-		std::string value = ModJsonUnescape(content.substr(valStart, pos - valStart));
-		pos++;
-
-		outMap[key] = value;
+		outMap[key] = value.stringValue;
 	}
 
 	return true;

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.5...4.0)
 
 project(pvz-portable LANGUAGES C CXX ASM)
 
+include(CTest)
+
 option(BUILD_STATIC "Static link for a standalone exe (Windows, non-MSVC)" OFF)
 if(BUILD_STATIC)
 	if(WIN32 AND NOT MSVC)
@@ -30,7 +32,7 @@ if(MSVC)
 	endif()
 endif()
 
-file(GLOB SOURCES
+file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/*.cpp
 	src/Mod/*.cpp
 	src/SexyAppFramework/*.cpp
@@ -135,6 +137,10 @@ option(CONSOLE "Show console on Windows" ${WIN_CONSOLE_DEFAULT})
 option(DO_FIX_BUGS "Define DO_FIX_BUGS macro (Community fixes for original game bugs of 1.2.0.1073 GOTY Edition)" OFF)
 option(PVZ_ENABLE_LUA "Enable Lua mod scripting" OFF)
 
+if(EMSCRIPTEN AND PVZ_ENABLE_LUA)
+	message(FATAL_ERROR "PVZ_ENABLE_LUA is not supported with Emscripten")
+endif()
+
 if(EMSCRIPTEN)
 	list(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/CMake")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_LIBPNG=1 -sUSE_LIBJPEG=1 -sUSE_OGG=1 -sUSE_VORBIS=1 -sUSE_MPG123=1")
@@ -187,9 +193,6 @@ if(BUILD_STATIC AND TARGET SDL2::SDL2-static)
 	_pvz_patch_sdl2_iface_libs(SDL2_mixer_ext_Static)
 endif()
 
-# Copy built-in Lua helper scripts alongside the binary (for runtime loading via GetResourcePath)
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/src/Mod/Scripts/ DESTINATION ${CMAKE_BINARY_DIR}/ModScripts/)
-
 # Android requires a shared library loaded by SDLActivity; other platforms use an executable.
 if(ANDROID)
 	add_library(pvz-portable SHARED ${SOURCES})
@@ -214,6 +217,12 @@ target_compile_definitions(pvz-portable PRIVATE
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
 set_target_properties(pvz-portable PROPERTIES CXX_EXTENSIONS OFF)
+add_custom_command(TARGET pvz-portable POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+		${CMAKE_CURRENT_SOURCE_DIR}/src/Mod/Scripts
+		${CMAKE_BINARY_DIR}/ModScripts
+	COMMENT "Copying built-in Lua helper scripts"
+)
 
 if (LOW_MEMORY)
 	target_compile_definitions(pvz-portable PRIVATE LOW_MEMORY)
@@ -261,10 +270,14 @@ else()
 		Threads::Threads
 	)
 	if (PVZ_ENABLE_LUA)
-		find_package(Lua REQUIRED)
+		find_package(Lua 5.4 REQUIRED)
 		target_include_directories(pvz-portable PRIVATE ${LUA_INCLUDE_DIR})
 		target_link_libraries(pvz-portable PRIVATE ${LUA_LIBRARIES})
 	endif()
+endif()
+
+if(BUILD_TESTING AND PVZ_ENABLE_LUA AND NOT CMAKE_CROSSCOMPILING)
+	add_subdirectory(tests)
 endif()
 
 if (WIN32)

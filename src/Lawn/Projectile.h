@@ -84,6 +84,7 @@ public:
     void                    Draw(Graphics* g);
     void                    DrawShadow(Graphics* g);
     void                    Die();
+    void                    DieAsMiss();
     void                    DoImpact(Zombie* theZombie);
     void                    UpdateMotion();
     void                    CheckForCollision();

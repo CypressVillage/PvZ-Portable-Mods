@@ -12,12 +12,13 @@ Unlike typical command-line applications, PvZ-Portable does not print most of it
 ## 2. Mod Development & Data
 - **Mod Directory:** The engine looks for the `mods` folder in the resource path. If you are running the game from the `build` directory, make sure you symlink the `mods` directory (`ln -s ../mods ./mods`) so the engine can find it.
 - **Mod Save Data:** When a mod calls `Game.SaveModData("key", "value")`, the data is saved in a dedicated folder separate from the main user data.
-  - **Location (Linux):** `~/.local/share/io.github.wszqkzqk/PvZPortable/modsave/<mod_id>.txt`
+  - **Location (Linux):** `~/.local/share/io.github.wszqkzqk/PvZPortable/modsave/<mod_id>.json`
+  - Runtime handlers, Mod timers, and Lua dialog callbacks restore the owning Mod context before save access.
 - **Mod Loading Verification:** If you suspect a mod isn't loading but the game doesn't crash, check the `modsave` folder. If the mod writes default save data on `OnModInit` or `OnLevelStart`, the presence of its save file proves the Lua script executed successfully.
 
 ## 3. CMake & Compilation Macros
 The behavior of the engine heavily depends on CMake flags defined in `CMakeCache.txt`.
-- `PVZ_ENABLE_LUA=ON` : Required for loading Lua mods.
+- `PVZ_ENABLE_LUA=ON` : Required for loading Lua mods. Install the platform Lua development package before configuring.
 - `PVZ_DEBUG=ON` (and the `_PVZ_DEBUG` C++ macro) : Enables debug logging, assertions, and hidden features/cheats.
 - **Building:** Use `cd build && ninja` (or `make`) to recompile after changing C++ source code.
 

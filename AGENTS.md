@@ -8,17 +8,18 @@ A cross-platform community reimplementation of Plants vs. Zombies GOTY Edition (
 
 **User intent**: Develop a Lua-based Mod framework, delivered as the `mods/` system with C++ scaffolding under `src/Mod/`.
 
-**Current verified status (2026-06-24)**: The Lua Mod framework is real and builds with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
+**Current verified status (2026-08-07)**: The stabilized Lua Mod framework builds and passes CTest in both Debug and Release with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
 
 ---
 
 ## Build System
 
 - **C++ standard**: C++20
-- **Build**: `cmake -G Ninja -B build -DPVZ_ENABLE_LUA=ON -DCMAKE_BUILD_TYPE=Release && cmake --build build`
+- **Build and test**: `cmake -G Ninja -B build -DPVZ_ENABLE_LUA=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release && cmake --build build && ctest --test-dir build --output-on-failure`
 - **Key CMake options**: `PVZ_ENABLE_LUA=ON`, `PVZ_DEBUG=ON`, `DO_FIX_BUGS=ON`, `LIMBO_PAGE=ON`
 - **Rebuild after C++ changes**: `cd build && ninja`
-- **Last verified local build**: `cmake --build build` succeeded on 2026-06-24 with `PVZ_ENABLE_LUA=ON`, `CMAKE_BUILD_TYPE=Release`
+- **Lua requirement**: Lua 5.4 or a compatible newer version; Lua-enabled Emscripten builds are explicitly unsupported
+- **Last verified local builds**: Debug and Release builds plus `pvz.mod` CTest passed on 2026-08-07 with `PVZ_ENABLE_LUA=ON`
 
 ---
 
@@ -40,19 +41,25 @@ src/
     ModRegistry.h/.cpp     — dynamic data registry (plants/zombies/modes/projectiles)
     ModSave.h/.cpp         — per-mod KV persistence (modsave/<id>.json)
     LuaProxyDialog.h/.cpp  — Lua-created dialog proxy
+tests/
+  mod_core_tests.cpp       — JSON, loader, ModSave, and Lua helper tests
+  plant_helper_tests.lua   — PlantHelper behavior tests
 ```
 
 Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 4000`; mode IDs: `>= 5000`. All auto-assigned on registration.
 
 Current Mod system limitations to remember:
-- `priority` is parsed but cannot be relied on for conflict/override ordering.
+- `priority` deterministically orders dependency-ready Mods by ascending value and id, but does not provide override/conflict semantics.
 - Missing dependencies are not fatal; only dependencies that exist are used for topological ordering.
-- Duplicate manifest ids are not strictly rejected by `ModLoader`.
+- Invalid and duplicate manifest ids are rejected; circularly dependent Mods are reported and omitted.
 - Duplicate plant/zombie/mode/projectile registration ids are rejected by `ModRegistry`; later mods do not override earlier registrations.
-- All mods currently share one Lua VM/global environment. Entry callbacks are captured after each mod loads, but globals can still collide; prefer `local` in examples and docs.
+- All mods currently share one Lua VM/global environment. Captured handlers, timers, and dialogs restore their owning Mod context, but ordinary globals can still collide; prefer `local` in examples and docs.
 - Hot reload, dependency version constraints, schema gating, JSON data tables, and per-mod Lua environments are not implemented.
+- Custom modes map to a vanilla `baseMode` for engine rules and intentionally do not use vanilla mid-level save slots or create progression/achievement records.
+- Custom zombie health, speed, damage, body state, name, and Reanim are applied; helmet and shield equipment is rejected until safe attachment/track semantics are implemented.
+- Vanilla mid-level saves serialize dynamic entity types as numeric IDs, so changing enabled Mods or registration order can invalidate those references.
 - Reanim XML uses element-style fields (`<track><name>...</name>`, `<t><f>0</f></t>`), not attribute-style XML (`<track name="...">`, `<t f="0"/>`).
-- For mod resource images, paths normally resolve through registered `resources/` roots; use paths like `images/foo.png`, while `reanimFile` is relative to the mod root such as `resources/reanim/foo.reanim`.
+- External Reanims are queued during Lua registration and finalized after resource roots and the base Reanimator initialize. Image paths resolve through registered `resources/` roots, while `reanimFile` is relative to the Mod root, such as `resources/reanim/foo.reanim`.
 
 ---
 

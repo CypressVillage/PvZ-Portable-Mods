@@ -5,6 +5,7 @@
  */
 
 #include "ModRegistry.h"
+#include "../ConstEnums.h"
 #include "../SexyAppFramework/SexyAppBase.h"
 #include "../Sexy.TodLib/Reanimator.h"
 
@@ -34,6 +35,8 @@ void ModRegistry::Reset()
 	mNextZombieType = 3000;
 	mNextModeType = 5000;
 	mNextProjectileType = 4000;
+	mReanimNameMap.clear();
+	mDynamicReanims.clear();
 	mErrors.clear();
 }
 
@@ -60,6 +63,21 @@ bool ModRegistry::RegisterZombie(const ModZombieDef& def, std::string* outError)
 {
 	if (!ValidateId(def.id, outError))
 		return false;
+	if (def.bodyHealth <= 0 || def.headHealth < 0 || def.speed <= 0.0f || def.damage < 0)
+	{
+		if (outError)
+			*outError = "Zombie definition contains invalid health, speed, or damage values";
+		mErrors.push_back("Invalid zombie definition: " + def.id);
+		return false;
+	}
+	if (def.helmType != static_cast<int>(HelmType::HELMTYPE_NONE) || def.helmHealth != 0 ||
+		def.shieldType != static_cast<int>(ShieldType::SHIELDTYPE_NONE) || def.shieldHealth != 0)
+	{
+		if (outError)
+			*outError = "Custom zombie helmet and shield equipment is not supported";
+		mErrors.push_back("Unsupported zombie equipment: " + def.id);
+		return false;
+	}
 	if (mZombies.find(def.id) != mZombies.end())
 	{
 		if (outError)
@@ -79,6 +97,14 @@ bool ModRegistry::RegisterMode(const ModModeDef& def, std::string* outError)
 {
 	if (!ValidateId(def.id, outError))
 		return false;
+	if (def.baseMode < static_cast<int>(GameMode::GAMEMODE_ADVENTURE) ||
+		def.baseMode >= static_cast<int>(GameMode::NUM_GAME_MODES))
+	{
+		if (outError)
+			*outError = "Mode baseMode must reference a vanilla game mode";
+		mErrors.push_back("Invalid baseMode for mode: " + def.id);
+		return false;
+	}
 	if (mModes.find(def.id) != mModes.end())
 	{
 		if (outError)
@@ -87,10 +113,10 @@ bool ModRegistry::RegisterMode(const ModModeDef& def, std::string* outError)
 		return false;
 	}
 	ModModeDef storedDef = def;
-	if (storedDef.baseMode < 0)
-		storedDef.baseMode = mNextModeType++;
+	if (storedDef.runtimeModeId < 0)
+		storedDef.runtimeModeId = mNextModeType++;
 	mModes[def.id] = storedDef;
-	mRuntimeModes[storedDef.baseMode] = storedDef;
+	mRuntimeModes[storedDef.runtimeModeId] = storedDef;
 	return true;
 }
 
@@ -153,9 +179,9 @@ const ModZombieDef* ModRegistry::FindZombieByRuntimeId(int zombieType) const
 	return it == mRuntimeZombies.end() ? nullptr : &it->second;
 }
 
-const ModModeDef* ModRegistry::FindModeByRuntimeId(int baseMode) const
+const ModModeDef* ModRegistry::FindModeByRuntimeId(int runtimeModeId) const
 {
-	auto it = mRuntimeModes.find(baseMode);
+	auto it = mRuntimeModes.find(runtimeModeId);
 	return it == mRuntimeModes.end() ? nullptr : &it->second;
 }
 
@@ -173,7 +199,7 @@ std::vector<ModModeChallengeDef> ModRegistry::GetModeChallengeDefs() const
 		const ModModeDef& def = pair.second;
 		if (!def.challengeName.empty())
 		{
-			out.push_back({ def.baseMode, def.challengePage, def.challengeRow, def.challengeCol,
+			out.push_back({ def.runtimeModeId, def.baseMode, def.challengePage, def.challengeRow, def.challengeCol,
 				def.challengeIconIndex, def.challengeName });
 		}
 	}
@@ -248,16 +274,33 @@ int ModRegistry::ResolveReanimationType(const std::string& reanimName) const
 	return static_cast<int>(ReanimationType::REANIM_NONE);
 }
 
-unsigned int ModRegistry::RegisterDynamicReanim(const std::string& reanimFilePath)
+void ModRegistry::QueueDynamicReanim(const std::string& reanimFilePath)
 {
-	auto it = mReanimNameMap.find(reanimFilePath);
-	if (it != mReanimNameMap.end())
-		return it->second;
+	if (!reanimFilePath.empty())
+		mDynamicReanims.emplace(reanimFilePath, 0);
+}
 
-	unsigned int dynamicIndex = ReanimatorRegisterDynamic(reanimFilePath.c_str(), 0);
-	mReanimNameMap[reanimFilePath] = dynamicIndex;
-	ReanimatorEnsureDynamicDefinitionLoaded(dynamicIndex);
-	return dynamicIndex;
+void ModRegistry::FinalizeDynamicReanims()
+{
+	for (auto& [path, runtimeId] : mDynamicReanims)
+	{
+		auto existing = mReanimNameMap.find(path);
+		if (existing != mReanimNameMap.end())
+		{
+			runtimeId = existing->second;
+			continue;
+		}
+
+		runtimeId = ReanimatorRegisterDynamic(path.c_str(), 0);
+		if (ReanimatorEnsureDynamicDefinitionLoaded(runtimeId))
+		{
+			mReanimNameMap[path] = runtimeId;
+		}
+		else
+		{
+			TodLog("Failed to load Mod reanimation: %s", path.c_str());
+		}
+	}
 }
 
 void ModRegistry::InjectPlantStringOverrides(Sexy::SexyAppBase* app)

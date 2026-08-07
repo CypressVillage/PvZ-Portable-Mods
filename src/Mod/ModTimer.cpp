@@ -13,11 +13,12 @@
 
 ModTimer gModTimer;
 
-int ModTimer::New(void* parentPtr, int frames, int callbackRef, bool isRepeat, int interval)
+int ModTimer::New(void* parentPtr, int frames, int callbackRef, bool isRepeat, int interval,
+	const std::string& modId, const std::string& modRoot)
 {
 	mNextId++;
 	int id = mNextId;
-	mTimers[id] = { id, parentPtr, frames, interval, isRepeat, callbackRef };
+	mTimers[id] = { id, parentPtr, frames, interval, isRepeat, callbackRef, modId, modRoot };
 	return id;
 }
 
@@ -77,12 +78,24 @@ void ModTimer::TickAll(void* parentPtr, lua_State* L)
 		if (it == mTimers.end())
 			continue;
 
+		lua_getglobal(L, "__mod_id");
+		lua_getglobal(L, "__mod_root");
+		lua_pushlstring(L, it->second.modId.c_str(), it->second.modId.size());
+		lua_setglobal(L, "__mod_id");
+		lua_pushlstring(L, it->second.modRoot.c_str(), it->second.modRoot.size());
+		lua_setglobal(L, "__mod_root");
+
 		lua_rawgeti(L, LUA_REGISTRYINDEX, it->second.callbackRef);
 		if (lua_pcall(L, 0, 0, 0) != 0)
 		{
 			TodLog("_timer callback error: %s", lua_tostring(L, -1));
 			lua_pop(L, 1);
 		}
+		lua_pushvalue(L, -2);
+		lua_setglobal(L, "__mod_id");
+		lua_pushvalue(L, -1);
+		lua_setglobal(L, "__mod_root");
+		lua_pop(L, 2);
 
 		it = mTimers.find(id);
 		if (it == mTimers.end())

@@ -635,7 +635,7 @@ void AwardScreen::AchievementsContinuePressed() {
 	if (mAwardType == AWARD_ACHIEVEMENTONLY) {
 		mApp->KillAwardScreen();
 		if (mApp->IsAdventureMode()) {
-			mApp->PreNewGame(mApp->mGameMode, false);
+			mApp->PreNewGame(mApp->mGameMode, false, mApp->mActiveModMode);
 		}
 		else if (mApp->IsSurvivalMode()) {
 			mApp->ShowChallengeScreen(ChallengePage::CHALLENGE_PAGE_SURVIVAL);
