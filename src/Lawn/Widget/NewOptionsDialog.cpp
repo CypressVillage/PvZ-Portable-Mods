@@ -45,6 +45,8 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
     mAlmanacButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Almanac, this, "[VIEW_ALMANAC_BUTTON]");
     mRestartButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Restart, this, "[RESTART_LEVEL]");
     mBackToMainButton = MakeButton(NewOptionsDialog::NewOptionsDialog_MainMenu, this, "[MAIN_MENU_BUTTON]");
+    mModsButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Mods, this, "Mods");
+    mModsButton->SetVisible(mFromGameSelector);
 
     mBackToGameButton = MakeNewButton(
         Dialog::ID_OK, 
@@ -121,6 +123,7 @@ NewOptionsDialog::~NewOptionsDialog()
     delete mRestartButton;
     delete mBackToMainButton;
     delete mBackToGameButton;
+    delete mModsButton;
 }
 
 int NewOptionsDialog::GetPreferredHeight(int theWidth)
@@ -140,6 +143,7 @@ void NewOptionsDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
     AddWidget(mHardwareAccelerationCheckbox);
     AddWidget(mFullscreenCheckbox);
     AddWidget(mBackToGameButton);
+    AddWidget(mModsButton);
 }
 
 void NewOptionsDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
@@ -153,6 +157,7 @@ void NewOptionsDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
     RemoveWidget(mBackToMainButton);
     RemoveWidget(mBackToGameButton);
     RemoveWidget(mRestartButton);
+    RemoveWidget(mModsButton);
 }
 
 void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
@@ -166,6 +171,7 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
     mRestartButton->Resize(mAlmanacButton->mX, mAlmanacButton->mY + 43, 209, 46);
     mBackToMainButton->Resize(mRestartButton->mX, mRestartButton->mY + 43, 209, 46);
     mBackToGameButton->Resize(30, 381, mBackToGameButton->mWidth, mBackToGameButton->mHeight);
+    mModsButton->Resize(107, 274, 209, 46);
 
     if (mFromGameSelector)
     {
@@ -394,6 +400,10 @@ void NewOptionsDialog::ButtonDepress(int theId)
 
     case NewOptionsDialog::NewOptionsDialog_Update:
         mApp->CheckForUpdates();
+        break;
+
+    case NewOptionsDialog::NewOptionsDialog_Mods:
+        mApp->DoModManagerDialog();
         break;
     }
 }

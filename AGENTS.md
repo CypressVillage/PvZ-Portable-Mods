@@ -8,7 +8,7 @@ A cross-platform community reimplementation of Plants vs. Zombies GOTY Edition (
 
 **User intent**: Develop a Lua-based Mod framework, delivered as the `mods/` system with C++ scaffolding under `src/Mod/`.
 
-**Current verified status (2026-08-07)**: The stabilized Lua Mod framework builds and passes CTest in both Debug and Release with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
+**Current verified status (2026-08-07)**: The stabilized Lua Mod framework builds and passes CTest in both Debug and Release with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays, with a restart-based native Mod manager for dependency-aware enable/disable state. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
 
 ---
 
@@ -30,7 +30,7 @@ src/
   main.cpp             — entry point
   LawnApp.h/.cpp       — main game app (inherits SexyApp)
   Lawn/                — game logic: Board, Plant, Zombie, Coin, Projectile
-  Lawn/Widget/         — UI: SeedChooserScreen, AlmanacDialog, LawnDialog, GameButton
+  Lawn/Widget/         — UI: SeedChooserScreen, AlmanacDialog, ModManagerDialog, LawnDialog, GameButton
   Lawn/System/         — system utilities
   SexyAppFramework/    — engine (rendering, audio, widget system, resource mgmt, paklib)
   Sexy.TodLib/         — animation (Reanimator), particles, string file, debug
@@ -39,6 +39,7 @@ src/
     ModLua.h/.cpp          — Lua 5.4 VM, API bindings, event hooks
     ModTimer.h/.cpp        — frame-based timer pool (C++, replaces former _timer.lua)
     ModRegistry.h/.cpp     — dynamic data registry (plants/zombies/modes/projectiles)
+    ModConfig.h/.cpp       — global enabled state (modconfig.json)
     ModSave.h/.cpp         — per-mod KV persistence (modsave/<id>.json)
     LuaProxyDialog.h/.cpp  — Lua-created dialog proxy
 tests/
@@ -50,8 +51,10 @@ Mod plant IDs: `seedType >= 2000`; zombie IDs: `>= 3000`; projectile IDs: `>= 40
 
 Current Mod system limitations to remember:
 - `priority` deterministically orders dependency-ready Mods by ascending value and id, but does not provide override/conflict semantics.
-- Missing dependencies are not fatal; only dependencies that exist are used for topological ordering.
+- Missing or unavailable dependencies invalidate the dependent Mod.
 - Invalid and duplicate manifest ids are rejected; circularly dependent Mods are reported and omitted.
+- The main-menu Mod manager stages dependency-aware enabled states in `<appdata>/modconfig.json`; changes require a restart.
+- The Mod manager uses a native-style scrollable checkbox list, ellipsizes long names on the left, and shows the complete selected Mod name and metadata in the aligned details pane.
 - Duplicate plant/zombie/mode/projectile registration ids are rejected by `ModRegistry`; later mods do not override earlier registrations.
 - All mods currently share one Lua VM/global environment. Captured handlers, timers, and dialogs restore their owning Mod context, but ordinary globals can still collide; prefer `local` in examples and docs.
 - Hot reload, dependency version constraints, schema gating, JSON data tables, and per-mod Lua environments are not implemented.
@@ -69,6 +72,7 @@ Current Mod system limitations to remember:
 - **C++ logging**: `TodLog("fmt", ...)` (after `TodAssertInitForApp()`)
 - **Lua logging**: `Game.Log("msg")` → `[Lua]` prefix in log
 - **Mod save data**: `<appdata>/modsave/<mod_id>.json`
+- **Mod enabled state**: `<appdata>/modconfig.json`
 - **Symlink for build dir**: `ln -s ../mods ./mods`
 
 ---

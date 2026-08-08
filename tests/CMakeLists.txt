@@ -1,6 +1,7 @@
 add_executable(pvz-mod-tests
 	mod_core_tests.cpp
 	mod_test_stubs.cpp
+	${PROJECT_SOURCE_DIR}/src/Mod/ModConfig.cpp
 	${PROJECT_SOURCE_DIR}/src/Mod/ModJson.cpp
 	${PROJECT_SOURCE_DIR}/src/Mod/ModLoader.cpp
 	${PROJECT_SOURCE_DIR}/src/Mod/ModSave.cpp

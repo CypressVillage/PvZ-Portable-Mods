@@ -2,7 +2,9 @@
 
 本文描述 PvZ-Portable 当前已经实现的 Lua Mod 体系。目标是新增植物、僵尸与模式，同时保持跨平台与存档兼容。
 
-实现状态：已于 2026-06-24 对照 C++ 源码核对。当前可用管线是 `mod.json` + Lua 注册 API + `resources/` 资源覆盖；`data/plants.json`、`data/zombies.json` 等 JSON 数据表尚未由引擎加载。
+实现状态：已于 2026-08-07 重新对照 C++ 源码核对。当前管线是 `mod.json` + Lua 注册 API + `resources/` 资源覆盖；`data/plants.json`、`data/zombies.json` 等 JSON 数据表尚未由引擎加载。
+
+稳定化修复已通过开启 Lua 的 Debug、Release 构建和 Mod 框架自动化测试。剩余限制在对应章节中明确说明。
 
 ## 1. 设计目标
 
@@ -29,7 +31,7 @@ mods/
 ```
 
 说明：
-- `mod_id` 必须唯一，建议仅用 `a-z`、`0-9`、`_`、`-`。
+- `mod_id` 必须唯一，只允许 ASCII 字母、数字、`.`、`_`、`-`。
 - `resources/` 是资源覆盖层，优先级高于基础资源。
 - `properties/default.xml` 可覆盖字符串键值。
 
@@ -49,22 +51,37 @@ mods/
 ```
 
 字段说明：
-- `priority`：当前会被解析，但实际排序主要由依赖拓扑顺序决定；不要依赖它解决冲突。
-- `dependencies`：依赖的 Mod id。当前只会对已存在的依赖建立顺序关系，缺失依赖不会导致加载失败。
+- `priority`：依赖已满足的 Mod 按较小值优先加载，值相同时按 id 确定性排序；依赖关系始终优先于 priority。
+- `dependencies`：必需的 Mod id，同一 id 只能出现一次。依赖缺失、非法、重复、不可用或形成循环时，当前 Mod 会被标记为无效且不会加载。
 - `entry`：Lua 入口脚本。
 - `data`：未实现。植物、僵尸、模式、投射物请在 Lua 中用 `Game.Register*` 注册。
 
 ## 4. 加载顺序
 
 1) 扫描 `mods/` 并解析 `mod.json`。
-2) 对已加载的依赖做拓扑排序。
-3) 执行每个 Mod 的 Lua `entry`，并调用 `OnModInit`。
-4) 在资源 XML 解析前注册每个 Mod 的 `resources/` 覆盖目录。
+2) 拒绝依赖缺失、依赖不可用和循环依赖的 Mod 链。
+3) 对有效 Mod 做拓扑排序，并对依赖已满足项按 priority、id 排序。
+4) 应用持久化启用状态，省略已禁用 Mod 及其因依赖被禁用的依赖者。
+5) 执行每个已启用 Mod 的 Lua `entry`，并调用 `OnModInit`。
+6) 在资源 XML 解析前注册每个已启用 Mod 的 `resources/` 覆盖目录。
 
 冲突与限制：
-- `ModLoader` 当前没有严格拒绝重复的 manifest id。
+- `ModLoader` 会拒绝重复或非法的 manifest id。
 - 植物、僵尸、模式、投射物的重复注册 id 会被 `ModRegistry` 拒绝，不会后加载覆盖先加载。
 - 所有 Mod 共享一个 Lua 全局环境。入口加载后会捕获回调列表，但全局变量/函数仍可能互相覆盖；建议尽量使用 `local`。
+- 运行时 handler、Mod 定时器和对话框回调会在执行期间恢复所属 Mod 的 id/root。
+- 每个 Mod 入口执行前后都会清理入口回调和上下文全局量，入口失败不会向后续 Mod 泄漏回调。
+- 0、1、2 参数回调均通过保护调用执行，Lua 错误会记录日志。
+
+### 4.1 Mod 管理器
+
+- 在主菜单打开“选项”，再选择 `Mods`。关卡内暂停选项不会显示该按钮。
+- 管理器使用可滚动的原生风格列表和游戏“选项”复选框；选中条目后，右侧对齐的详情区会显示完整名称、清单元数据、依赖、校验错误以及当前或待生效状态。
+- 名称过长时，左侧列表会用 `...` 省略，完整名称仍会显示在右侧详情区。
+- 启用 Mod 时会自动启用其依赖；禁用依赖时会自动禁用当前已启用的所有依赖者。
+- 选择 `Apply` 后写入待应用状态。重启前再次打开管理器会显示已保存的待生效状态，但本次运行中实际加载的 Mod 保持不变；改动仅在重启后生效，不会执行热重载。
+- 全局启用状态保存在 `<appdata>/modconfig.json`，使用带版本号的 `disabled` id 列表；新安装的 Mod 默认启用。
+- 非法清单、重复 id、缺失依赖、不可用依赖链和循环依赖会显示错误，但不可启用。
 
 ## 5. Lua 数据注册
 
@@ -102,27 +119,29 @@ Game.RegisterPlant({
 
 保留范围：
 - Mod 植物的 SeedType ID 从 `2000` 起自动分配。
+- 注册成功会返回实际分配的 `2000+` ID。
+- `reanimFile` 在 Lua 注册阶段排队，并在基础 Reanimator 和 Mod 资源根就绪后统一注册。
 
 ### 5.2 僵尸
 
 ```lua
 Game.RegisterZombie({
   id = "conehead_fast",
-  name = "Conehead Fast",
+  name = "Fast Zombie",
   bodyHealth = 600,
   headHealth = 100,
   speed = 1.2,
   damage = 100,
-  reanimation = "reanim/Zombie.reanim",
-  helmType = HelmType.TRAFFIC_CONE,
-  helmHealth = 370
+  reanimation = "reanim/Zombie.reanim"
 })
 ```
 
 必填字段：`id`
 
-保留范围：
-- Mod 僵尸的 ZombieType ID 从 `3000` 起自动分配。
+运行行为与限制：
+- Mod 僵尸的 ZombieType ID 从 `3000` 起自动分配，注册成功返回实际 ID。
+- `bodyHealth`、`headHealth`、`speed`、`damage`、`hasHead`、`hasArm`、名称和动画会应用到运行时实体。
+- 当前不支持自定义僵尸的头盔和盾牌装备；设置 `helmType`、`helmHealth`、`shieldType` 或 `shieldHealth` 会使注册失败，因为原版装备依赖任意自定义动画不一定具备的轨道和附件。
 
 ### 5.3 投射物
 
@@ -135,12 +154,15 @@ Game.RegisterProjectile({
 })
 ```
 
+Mod 投射物 ID 从 `4000` 起自动分配并在注册成功时返回。`OnProjectileSpawn` 在基础字段和自定义字段初始化后触发。
+
 ### 5.4 模式
 
 ```lua
 Game.RegisterMode({
   id = "rush_mode",
   name = "Rush Mode",
+  baseMode = GameMode.ADVENTURE,
   page = 0,
   row = 0,
   col = 0,
@@ -149,6 +171,11 @@ Game.RegisterMode({
 ```
 
 必填字段：`id`
+
+运行行为与限制：
+- `baseMode` 必须引用原版模式；引擎规则路径使用 `baseMode`，Lua 的 `Game.GetMode()` 和 `OnLevelStart(mode)` 使用动态 `5000+` ID。
+- 自定义模式不会读取、写入或删除原版中途存档，也不会自动创建独立进度、成就或挑战记录。
+- 注册成功返回实际分配的 ID。
 
 ### 5.5 字符串
 
@@ -280,6 +307,8 @@ API：
 - `Game.SaveModData(key, value)`
 - `Game.LoadModData(key)`
 
+运行时 handler、Mod 定时器和对话框回调会使用所属 Mod 的存档上下文。原版中途存档仍以数值记录动态植物、僵尸和投射物类型；改变启用 Mod 或注册顺序可能改变这些 ID 的含义，因此自定义模式不使用中途存档槽。
+
 ## 10. 热重载 (开发模式)
 
 未实现。可作为未来开发调试功能：
@@ -289,8 +318,10 @@ API：
 
 ## 11. 错误处理
 
-- 清单缺失或非法：跳过该 Mod 并记录错误。
+- 缺失清单会跳过；非法清单、重复/非法 id、错误字段类型、缺失/不可用依赖和循环依赖会记录错误，对应 Mod 不会执行。
 - Lua 入口或回调异常：记录日志并继续运行其他回调。
+- 文件系统错误通过非抛出路径报告。ModSave 拒绝非法 id、保留无法解析的现有文件，并通过临时文件替换写入。
+- 无效的 `modconfig.json` 会记录错误并在本次启动中忽略；只有用户重新应用状态时才会覆盖配置。
 
 ## 12. 版本与兼容
 
@@ -425,15 +456,17 @@ API：
 ## 18. Mod 加载器的最小职责
 
 - 扫描 `mods/` 目录并解析 `mod.json`
-- 对已存在依赖做拓扑排序
-- 记录循环依赖错误
+- 严格校验依赖存在且可用
+- 对有效依赖图做拓扑排序
+- 记录循环依赖错误并省略相关 Mod
+- 读取 `modconfig.json`，过滤已禁用 Mod 和依赖者
 - 资源根注册由 `LawnApp` 根据 manifest 完成
 - 初始化 Lua VM 并执行入口脚本
 
 建议日志输出：
 - 解析成功/失败、依赖缺失、字段缺失、覆盖冲突
 
-当前限制：缺失依赖、重复 manifest id、priority 冲突策略尚未严格处理。
+当前限制：priority 只决定依赖已满足项的加载顺序，不提供后加载覆盖语义；依赖版本范围尚未实现。
 
 ## 19. 开发模式热重载建议
 

@@ -1,4 +1,5 @@
 #include "Mod/ModJson.h"
+#include "Mod/ModConfig.h"
 #include "Mod/ModLoader.h"
 #include "Mod/ModSave.h"
 #include "SexyAppFramework/Common.h"
@@ -109,6 +110,7 @@ namespace
 	{
 		TempDir temp;
 		Sexy::SetResourceFolder(Sexy::PathToU8(temp.path));
+		Sexy::SetAppDataFolder(Sexy::PathToU8(temp.path));
 		ModLoader loader;
 		Check(loader.LoadAll(), "missing Mods directory succeeds");
 		Check(loader.GetManifests().empty(), "missing Mods directory loads nothing");
@@ -116,13 +118,52 @@ namespace
 		AddManifest(temp.path, "dependent", R"({"id":"dependent","priority":-10,"dependencies":["base"]})");
 		AddManifest(temp.path, "base", R"({"id":"base","priority":20})");
 		AddManifest(temp.path, "alpha", R"({"id":"alpha","priority":0})");
-		AddManifest(temp.path, "beta", R"({"id":"beta","priority":0,"dependencies":["missing"]})");
 		Check(loader.LoadAll(), "valid dependency graph loads");
 		std::vector<std::string> ids;
 		for (const ModManifest& manifest : loader.GetManifests())
 			ids.push_back(manifest.id);
-		Check(ids == std::vector<std::string>({"alpha", "beta", "base", "dependent"}),
+		Check(ids == std::vector<std::string>({"alpha", "base", "dependent"}),
 			"loader orders ready Mods by priority and id while preserving dependencies");
+
+		AddManifest(temp.path, "beta", R"({"id":"beta","priority":0,"dependencies":["missing"]})");
+		Check(!loader.LoadAll(), "missing dependency fails the load");
+		Check(Contains(loader.GetErrors(), "Missing dependency"), "missing dependency reports a useful error");
+		std::filesystem::remove_all(temp.path / "mods" / "beta");
+
+		WriteFile(temp.path / "modconfig.json", R"({"version":1,"disabled":["base"]})");
+		Check(loader.LoadAll(), "disabled Mod config loads");
+		ids.clear();
+		for (const ModManifest& manifest : loader.GetManifests())
+			ids.push_back(manifest.id);
+		Check(ids == std::vector<std::string>({"alpha"}), "disabled dependency also prevents dependent from loading");
+		const std::vector<ModInfo>& mods = loader.GetMods();
+		size_t baseIndex = mods.size();
+		size_t dependentIndex = mods.size();
+		std::vector<bool> states;
+		for (size_t i = 0; i < mods.size(); i++)
+		{
+			states.push_back(mods[i].enabled);
+			if (mods[i].manifest.id == "base") baseIndex = i;
+			if (mods[i].manifest.id == "dependent") dependentIndex = i;
+		}
+		std::vector<size_t> affected;
+		std::string stateError;
+		Check(loader.SetEnabledState(states, dependentIndex, true, affected, stateError), "enabling dependent succeeds");
+		Check(states[baseIndex] && states[dependentIndex], "enabling dependent enables its dependency");
+		Check(loader.SaveEnabledStates(states, stateError), "enabled states save without restart");
+		Check(mods[baseIndex].enabled && mods[dependentIndex].enabled,
+			"saved pending states are visible when the manager is reopened");
+		Check(!mods[baseIndex].loaded && !mods[dependentIndex].loaded,
+			"saving pending states does not hot-load Mods");
+		Check(loader.SetEnabledState(states, baseIndex, false, affected, stateError), "disabling dependency succeeds");
+		Check(!states[baseIndex] && !states[dependentIndex], "disabling dependency disables its dependent");
+		Check(loader.SaveEnabledStates(states, stateError), "enabled states save");
+		Check(!mods[baseIndex].enabled && !mods[dependentIndex].enabled,
+			"later saved pending states replace the previous selection");
+		ModConfig::DisabledIds disabled;
+		Check(ModConfig::LoadDisabledIds(disabled, stateError), "saved Mod config reloads");
+		Check(disabled.contains("base") && disabled.contains("dependent"), "saved Mod config contains disabled dependency closure");
+		std::filesystem::remove(temp.path / "modconfig.json");
 
 		AddManifest(temp.path, "invalid", R"({"id":"../bad"})");
 		Check(!loader.LoadAll(), "invalid manifest id fails the load");
@@ -134,9 +175,19 @@ namespace
 		Check(Contains(loader.GetErrors(), "entry"), "wrong optional field names the field");
 		std::filesystem::remove_all(temp.path / "mods" / "wrong-type");
 
+		AddManifest(temp.path, "duplicate-dependency", R"({"id":"duplicate-dependency","dependencies":["base","base"]})");
+		Check(!loader.LoadAll(), "duplicate dependency fails the load");
+		Check(Contains(loader.GetErrors(), "duplicate dependency id 'base'"),
+			"duplicate dependency reports a useful error");
+		std::filesystem::remove_all(temp.path / "mods" / "duplicate-dependency");
+
 		AddManifest(temp.path, "duplicate", R"({"id":"alpha"})");
 		Check(!loader.LoadAll(), "duplicate Mod id fails the load");
-		Check(Contains(loader.GetErrors(), "duplicate Mod id"), "duplicate id reports a useful error");
+		Check(Contains(loader.GetErrors(), "Duplicate Mod id"), "duplicate id reports a useful error");
+		int duplicateErrors = 0;
+		for (const ModInfo& mod : loader.GetMods())
+			if (mod.manifest.id == "alpha" && !mod.valid) duplicateErrors++;
+		Check(duplicateErrors == 2, "all duplicate Mod entries are invalid");
 		std::filesystem::remove_all(temp.path / "mods" / "duplicate");
 
 		AddManifest(temp.path, "cycle-a", R"({"id":"cycle-a","dependencies":["cycle-b"]})");

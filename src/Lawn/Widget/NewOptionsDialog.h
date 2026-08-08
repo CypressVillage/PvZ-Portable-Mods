@@ -48,6 +48,7 @@ protected:
 		NewOptionsDialog_SoundVolume,
 		NewOptionsDialog_Fullscreen,
 		NewOptionsDialog_HardwareAcceleration,
+		NewOptionsDialog_Mods,
 	};
 
 public:
@@ -59,6 +60,7 @@ public:
 	LawnStoneButton*		mAlmanacButton;
 	LawnStoneButton*		mBackToMainButton;
 	LawnStoneButton*		mRestartButton;
+	LawnStoneButton*		mModsButton;
 	NewLawnButton*			mBackToGameButton;
 	bool					mFromGameSelector;
 

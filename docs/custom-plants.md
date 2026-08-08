@@ -2,7 +2,7 @@
 
 This document describes how to add custom plants to PvZ-Portable via the mod system.
 
-Implementation status: verified against the C++ source on 2026-06-24. Custom plants are registered from Lua; JSON data files are not used. External reanim definitions use the engine's element-based Reanim XML format, not attribute-style XML.
+Implementation status: verified against the C++ source on 2026-08-07. Custom plants are registered from Lua; JSON data files are not used. External reanim definitions use the engine's element-based Reanim XML format, not attribute-style XML, and are finalized after Mod resource roots and the base Reanimator are initialized.
 
 ## 1. Overview
 

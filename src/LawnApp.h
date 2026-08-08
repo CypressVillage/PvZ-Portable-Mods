@@ -195,6 +195,7 @@ public:
 	void							DoBackToMain();
 	void							DoConfirmBackToMain();
 	void							DoNewOptions(bool theFromGameSelector);
+	void							DoModManagerDialog();
 	void							DoRegister();
 	void							DoRegisterError();
 	bool							CanDoRegisterDialog();

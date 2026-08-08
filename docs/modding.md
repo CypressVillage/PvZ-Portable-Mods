@@ -3,7 +3,11 @@
 This document describes the currently implemented mod system for PvZ-Portable with Lua scripting and resource overrides.
 The goal is to enable new plants, new zombies, and new modes while keeping cross-platform compatibility.
 
-Implementation status: verified against the C++ source on 2026-06-24. The implemented content path is `mod.json` + Lua registration APIs + `resources/`; JSON data tables such as `data/plants.json` are not loaded by the current engine.
+Implementation status: re-audited against the C++ source on 2026-08-07. The implemented content path is `mod.json` + Lua registration APIs + `resources/`; JSON data tables such as `data/plants.json` are not loaded by the current engine.
+
+The stabilization pass is verified with Lua-enabled Debug and Release builds and
+the automated Mod framework test suite. Remaining limitations are documented in
+the relevant sections below.
 
 ## 1. Design Goals
 
@@ -33,7 +37,7 @@ mods/
 ```
 
 Notes:
-- `mod_id` must be unique and ASCII-safe: `a-z`, `0-9`, `_`, `-`.
+- `mod_id` must be unique and ASCII-safe: letters, digits, `.`, `_`, and `-`.
 - `resources/` is an override layer with higher priority than base assets.
 - `properties/default.xml` can override string keys for UI/almanac text.
 
@@ -55,23 +59,37 @@ Minimal schema:
 ```
 
 Fields:
-- `priority`: parsed by the loader, but the current implementation primarily preserves dependency/topological order; do not rely on it for conflict resolution.
-- `dependencies`: list of mod ids that should load before this mod when present. Missing dependencies are not currently treated as fatal errors.
+- `priority`: lower values load first among Mods whose dependencies are already satisfied; id is the deterministic tie-breaker. Dependencies always take precedence over priority.
+- `dependencies`: required Mod ids. Each id may appear only once; a Mod with a missing, invalid, duplicate, unavailable, or cyclic dependency is marked invalid and is not loaded.
 - `entry`: Lua entry file executed during mod initialization; use `OnModInit()` to register content.
 - `data`: not implemented. Define plants, zombies, modes, and projectiles in Lua with `Game.Register*` APIs.
 
 ## 4. Loading Order
 
 1) Scan `mods/` and parse all `mod.json` files.
-2) Topologically order loaded mods by dependencies that are also present.
-3) Run each Lua `entry` and call its `OnModInit`.
-4) Register each mod's `resources/` directory as a resource overlay before resource files are parsed.
+2) Reject unavailable dependency chains and circular dependencies.
+3) Topologically order valid Mods, then use ascending priority and id among dependency-ready Mods.
+4) Apply the persisted enabled state and omit disabled Mods and their disabled dependents.
+5) Run each enabled Lua `entry` and call its `OnModInit`.
+6) Register each enabled Mod's `resources/` directory as a resource overlay before resource files are parsed.
 
 Conflicts and limitations:
-- Duplicate manifest ids are not currently rejected by `ModLoader`.
+- Duplicate manifest ids and invalid ids are rejected by `ModLoader`.
 - Duplicate plant, zombie, mode, or projectile ids are rejected by `ModRegistry`; later registrations do not override earlier ones.
 - All mod scripts share one Lua global state. Callbacks are captured per mod after loading, but global variables/functions can still collide. Prefer `local` variables and uniquely named globals.
-- Script errors in entries and callbacks are logged and do not intentionally crash the game.
+- Captured callbacks, timers, and dialog callbacks restore their owning Mod's id/root while executing.
+- Entry callback globals and Mod context globals are cleared between Mods, including after a failed entry.
+- Callback errors are caught and logged for zero-, one-, and two-argument handlers.
+
+### 4.1 Mod Manager
+
+- Open main-menu **Options**, then select **Mods**. The button is intentionally unavailable in the in-level pause dialog.
+- The manager uses a scrollable native-style list with the game's Options checkboxes. Selecting an entry shows its full name, manifest metadata, dependencies, validation error, and current or pending state in the aligned details pane.
+- Long names are shortened with `...` in the list when necessary; the full name remains visible in the details pane.
+- Enabling a Mod also enables its dependencies. Disabling a dependency also disables all currently enabled dependents.
+- Select **Apply** to write the staged state. Reopening the manager before restarting shows the saved pending state, while the running game keeps its original loaded state until restart; hot reload is not performed.
+- Enabled state is stored globally in `<appdata>/modconfig.json` as a versioned `disabled` id list. Newly installed Mods are enabled by default.
+- Invalid manifests, duplicate ids, missing dependencies, unavailable dependency chains, and circular dependencies are visible but cannot be enabled.
 
 ## 5. Data Registration via Lua
 
@@ -108,6 +126,8 @@ Optional fields:
 
 Reserved ranges:
 - Mod plant SeedType IDs are automatically assigned starting from `2000`.
+- Successful registration returns the assigned runtime ID.
+- External `reanimFile` definitions are queued during Lua registration and finalized after resource roots and the base Reanimator are initialized.
 
 ### 5.2 Zombies
 
@@ -122,6 +142,11 @@ Required fields:
 
 Reserved ranges:
 - ZombieType IDs are automatically assigned starting from `3000`.
+
+Runtime behavior:
+- Registered health, speed, damage, `hasHead`, `hasArm`, name, and Reanim fields are applied to custom zombies.
+- Successful registration returns the assigned `3000+` runtime ID, and registered dynamic IDs are accepted in Debug builds.
+- Helmet and shield equipment is currently rejected at registration because vanilla equipment requires animation tracks and attachments that arbitrary custom Reanims do not guarantee.
 
 ### 5.3 Projectiles
 
@@ -145,11 +170,17 @@ Optional fields:
 Reserved ranges:
 - ProjectileType IDs are automatically assigned starting from `4000`.
 
+Runtime behavior:
+- Successful registration returns the assigned `4000+` runtime ID.
+- `OnProjectileSpawn` runs after basic and custom projectile fields are initialized, so callback changes are retained.
+
 ### 5.4 Modes
 
 ```lua
 Game.RegisterMode({
-    id = "rush_mode"
+    id = "rush_mode",
+    name = "Rush Mode",
+    baseMode = GameMode.ADVENTURE
 })
 ```
 
@@ -158,6 +189,12 @@ Required fields:
 
 Reserved ranges:
 - Mode IDs are automatically assigned starting from `5000`.
+
+Runtime behavior and limitations:
+- `baseMode` is required and must reference a vanilla mode. Engine rule paths use it, while `Game.GetMode()` and `OnLevelStart(mode)` expose the dynamic `5000+` identity.
+- A mode without `name` is not added to the Challenge Screen.
+- Custom modes intentionally do not load, write, or erase vanilla mid-level save slots. They also do not create separate progression, achievement, or challenge-record entries.
+- Successful registration returns the assigned runtime ID.
 
 ### 5.5 Strings
 
@@ -184,10 +221,10 @@ Recommended paths inside `resources/`:
 | API | Returns | Description |
 |-----|---------|-------------|
 | `Game.Log(text)` | — | Log a message to `log.txt` with `[Lua]` prefix |
-| `Game.RegisterPlant(def)` | int | Register a custom plant, returns SeedType (≥2000) |
-| `Game.RegisterZombie(def)` | int | Register a custom zombie, returns ZombieType (≥3000) |
-| `Game.RegisterMode(def)` | int | Register a custom game mode, returns mode ID (≥5000) |
-| `Game.RegisterProjectile(def)` | int | Register a custom projectile, returns type ID (≥4000) |
+| `Game.RegisterPlant(def)` | int or nil,error | Assigned SeedType (≥2000), or failure details |
+| `Game.RegisterZombie(def)` | int or nil,error | Assigned ZombieType (≥3000), or failure details |
+| `Game.RegisterMode(def)` | int or nil,error | Assigned mode ID (≥5000), or failure details |
+| `Game.RegisterProjectile(def)` | int or nil,error | Assigned type ID (≥4000), or failure details |
 | `Game.GetMode()` | int | Current game mode ID |
 | `Game.GetSpeed()` | int | Current game speed multiplier |
 | `Game.SetSpeed(mult)` | — | Set game speed (1, 2, 3, 5, 10) |
@@ -418,7 +455,7 @@ function OnBoardButtonClick(button_id)                                          
 
 Notes:
 - `OnPlantUpdate(plant)` fires every frame **only for mod plants** (seedType ≥ 2000). Always call `PlantHelper.Update(plant)` here if using any PlantHelper features.
-- Errors in callbacks are caught and logged without crashing the game.
+- Errors raised inside callbacks are caught and logged; the dispatcher supports zero, one, or two arguments.
 
 ### 7.3 PlantHelper API — Built-in Helper Module
 
@@ -506,6 +543,8 @@ end
 
 Schedule a one-shot callback to fire after `frames` frames.
 
+Standalone timers are advanced whenever `PlantHelper.Update(plant)` is called, even if the plant has no `SimpleAI` or `AutoShooter` entry.
+
 ```lua
 function OnPlantUpdate(plant)
     if plant.age == 1 then
@@ -522,6 +561,8 @@ end
 #### PlantHelper.RepeatAction(plant, interval, callback)
 
 Schedule a repeating callback every `interval` frames.
+
+Returning `false` from the callback stops repetition. The returned handle can also be cancelled explicitly.
 
 ```lua
 function OnPlantSpawn(plant)
@@ -696,6 +737,8 @@ Access via Lua:
 - `Game.SaveModData(key, value)`
 - `Game.LoadModData(key)`
 
+Runtime callbacks, timers, and dialog callbacks use the owning Mod's save context. Normal in-progress vanilla game saves still serialize dynamic plant/zombie/projectile types as numeric IDs; changing the enabled Mod set or registration order can make those IDs resolve differently. Custom modes therefore do not use mid-level save slots.
+
 ## 10. Hot Reload (Developer Mode)
 
 Not implemented. Possible future developer-only feature:
@@ -705,9 +748,10 @@ Not implemented. Possible future developer-only feature:
 
 ## 11. Error Handling
 
-- Missing files: skip mod and log error.
-- Invalid schema: skip record and log field name.
-- Lua error in callbacks: caught and logged without crashing the game.
+- Missing manifests are skipped. Invalid manifests, duplicate ids, missing or invalid dependencies, entry failures, and filesystem traversal errors are reported without uncaught filesystem exceptions.
+- Required and optional manifest fields are type-checked. Unavailable dependency chains and circularly dependent Mods are reported and omitted rather than executed in an unsafe order.
+- Invalid `modconfig.json` data is reported and ignored for that startup; the existing file is not overwritten until the user applies a new state.
+- Lua errors reached through protected execution are caught and logged.
 
 ## 12. Versioning
 

@@ -1,10 +1,29 @@
 # Mod Framework — 待办清单
 
-> 源码核对日期：2026-06-24。当前框架可编译并已实现 Lua 注册、资源覆盖、事件回调、ModRegistry、ModSave、PlantHelper 与 UI Dialog；本文仍保留历史任务记录，完成项不等于 API 稳定承诺。
+> 源码核对日期：2026-08-07。当前框架已通过 `PVZ_ENABLE_LUA=ON` 的 Debug/Release 构建和自动化测试，并已实现 Lua 注册、资源覆盖、事件回调、ModRegistry、ModSave、PlantHelper 与 UI Dialog；本文仍保留历史任务记录，完成项不等于 API 稳定承诺。
 > 
 > **近期目标阶段**：P7+P8 — Game/Board API 扩展 + 次要回调（2026-05-19 达成）
 >
-> 当前已知限制：JSON 数据表加载、热重载、依赖版本约束、缺失依赖失败处理、重复 manifest id 检测、可靠 priority 冲突排序、每个 Mod 独立 Lua 环境尚未实现。
+> 当前已知限制：JSON 数据表加载、热重载、依赖版本约束、priority 覆盖冲突策略、每个 Mod 独立 Lua 环境、动态实体符号化中途存档尚未实现。自定义模式不使用中途存档；自定义僵尸头盔/盾牌暂不支持。
+
+## 2026-08-06 稳定化审查待办
+
+- [x] 修复双参数 Lua handler 的栈索引错误，并覆盖 0/1/2 参数路径
+- [x] handler、Timer、Dialog 绑定并恢复所属 Mod 的 id/root
+- [x] 清理 `OnModInit`、入口上下文和入口失败后残留的全局回调
+- [x] 注册 API 返回 Registry 实际分配的运行时 ID，并校验 ID 冲突/边界
+- [x] 将外部 Reanim 注册延迟到资源根和基础 Reanimator 初始化完成之后
+- [x] 应用自定义僵尸安全字段，并拒绝尚不安全的头盔/盾牌组合
+- [x] 为自定义模式增加安全的原版 `baseMode` 映射，并隔离原版中途存档槽
+- [x] 将 `OnProjectileSpawn` 移到初始化完成后，并补齐 miss 事件语义
+- [x] 为 Lua Entity/Dialog 增加销毁失效机制，接入 Lua VM 正常关闭
+- [x] 修复 PlantHelper 独立定时器、确定性初始状态、死亡清理和 RepeatAction 停止语义
+- [x] 加强 manifest、文件系统与 ModSave 错误处理
+- [x] 在 README 和原生 CI 配置中覆盖 Lua-enabled 构建与测试
+- [x] 严格拒绝缺失/不可用依赖，并保留无效 Mod 信息供界面显示
+- [x] 增加主菜单原生 Mod 管理器、依赖联动启停和重启生效提示
+- [x] 优化 Mod 管理器布局：透明原生列表、紧凑双按钮底栏、加高内容区、详情对齐和超长名称省略
+- [x] 使用 `<appdata>/modconfig.json` 持久化全局禁用列表
 
 ---
 
@@ -21,11 +40,13 @@
   - 新增 bodyHealth/headHealth/speed/damage/reanimationName/helm/shield/hasHead/hasArm/zombieName
   - `GetZombieDefinition()` 现从 ModZombieDef 读取 Reanim 类型
 
-- [x] **添加依赖拓扑排序（仍有限制）**
-  - 位置：`src/Mod/ModLoader.cpp:401-442`
-  - 实现 Kahn 算法，对已存在 dependencies 做拓扑排序
-  - 检测循环依赖的 mod 会追加末尾并记录错误
-  - 限制：缺失依赖不报错；重复 manifest id 不严格拒绝；`priority` 当前不能可靠作为覆盖/冲突排序依据
+- [x] **添加严格依赖校验与确定性拓扑排序（仍有限制）**
+  - 位置：`src/Mod/ModLoader.cpp`
+  - 实现 Kahn 算法，对有效 dependencies 做拓扑排序
+  - 缺失、重复、无效或不可用依赖会使依赖者失效
+  - 检测循环依赖的 Mod 会记录错误并从执行列表中省略
+  - 拒绝重复 manifest id、非法 id 和错误字段类型
+  - 限制：`priority` 仅排序当前可加载项，不提供覆盖/冲突语义；依赖版本范围尚未实现
 
 ### 常量表暴露 — 第一阶段（无 C++ 改动，纯 Lua 注册）
 
@@ -341,7 +362,7 @@
     end
     ```
 
-- [x] **`plant_helper.TimedAction(plant, frames, callback)`** — 单次延时
+- [ ] **`plant_helper.TimedAction(plant, frames, callback)`** — 独立单次延时和取消已完成，链式语义未完成
   - 设计细节：
     - 基于 `_timer` 实现，`frames` 帧后调用 `callback(plant)`
     - 返回 `cancel()` 函数用于提前取消
@@ -355,7 +376,7 @@
     end
     ```
 
-- [x] **`plant_helper.RepeatAction(plant, interval, callback)`** — 重复执行
+- [x] **`plant_helper.RepeatAction(plant, interval, callback)`** — 支持独立驱动、取消和返回 `false` 停止
   - 类似 TimedAction 但循环执行，`callback` 返回 false 时停止
   - 适合周期性效果（如每 120 帧产生阳光）
 
@@ -521,8 +542,8 @@
 | **P3** | 实体属性+方法扩展 + Projectile 新实体类型 | ~2天 | ✅ 完成 |
 | **P4** | 关键回调（PlantDie、ZombieAttack、ProjectileSpawn/Hit/Miss、CoinCollect、ZombieReachHouse） | ~2天 | ✅ 完成 |
 | **P5a** | **C++ 预置条件**：helper 模块嵌入加载、`entity._ptr` 稳定标识符 | ~0.5天 | ✅ 完成 |
-| **P5b** | **plant_helper 模块**：C++ `_timer` + SimpleAI + AutoShooter + TimedAction | ~1天 | ✅ 完成 |
-| **P5c** | **验证**：`_test_helpers` 端到端测试 | ~0.5天 | ✅ 完成 |
+| **P5b** | **plant_helper 模块**：C++ `_timer` + SimpleAI + AutoShooter + TimedAction | ~1天 | ⚠️ 基础实现完成，稳定化语义待修复 |
+| **P5c** | **验证**：`_test_helpers` 端到端测试 | ~0.5天 | ⚠️ 已有验证 Mod，缺少独立定时器和停止语义覆盖 |
 | **P6** | 辅助模块 Phase 2（zombie_helper + projectile_helper + wave_helper + tween_helper + util_helper + ui_helper） | ~2天 | ❌ 待定 |
 | **P7** | Game/Board API 扩展（Sun、Coin、Foley、场地类型等） | ~1天 | ✅ 完成 |
 | **P8** | 次要回调 + UI 回调（OnPlantEaten、OnPause、OnSeedChooserOpen 等） | ~2天 | ✅ 中优先级完成（OnPlantEaten/Produce/Upgrade、OnZombieFrozen/Buttered/MindControl、OnCoinExpire、OnFlagRaise、OnMowerTriggered、OnSunCountChange） |

@@ -1,17 +1,24 @@
 # PvZ-Portable Mod 框架架构（当前实现）
 
-本文档已于 2026-06-24 对照源码核对。当前实现以 `mod.json` 清单、Lua 注册 API、`resources/` 覆盖和 `ModRegistry` 动态注册为核心；JSON 数据表加载、热重载、依赖版本约束和每个 Mod 独立 Lua 环境尚未实现。
+本文档已于 2026-08-07 对照源码和 Lua-enabled Debug/Release 测试结果重新核对。当前实现以 `mod.json` 清单、Lua 注册 API、`resources/` 覆盖、`ModRegistry` 动态注册和原生 Mod 管理器为核心；JSON 数据表加载、热重载、依赖版本约束和每个 Mod 独立 Lua 环境尚未实现。
+
+稳定化修复已覆盖 handler 参数和 Mod 上下文、动态 Reanim 初始化顺序、注册返回值、自定义模式安全映射、Lua Entity/Dialog 生命周期、Loader、ModSave 和 PlantHelper。剩余能力边界在下文明确列出。
 
 ## 一、Mod 框架组成部分
 
 ```
-src/Mod/                         # Mod 框架核心（6 个模块）
+src/Mod/                         # Mod 框架核心
 ├── ModLoader.h/.cpp             # Mod 加载器
 ├── ModLua.h/.cpp                # Lua 虚拟机与 API 绑定
+├── ModTimer.h/.cpp              # C++ 帧定时器池
 ├── ModRegistry.h/.cpp           # 数据注册表（植物、僵尸、模式、投射物）
 ├── ModSave.h/.cpp               # Mod 独立存档（JSON 格式）
+├── ModConfig.h/.cpp             # 全局 Mod 启用配置
 ├── ModJson.h/.cpp               # JSON 解析/序列化共享基础模块
 └── LuaProxyDialog.h/.cpp        # Lua 创建的对话框代理
+
+src/Lawn/Widget/
+└── ModManagerDialog.h/.cpp      # 主菜单原生 Mod 管理界面
 ```
 
 ## 二、各模块功能
@@ -20,14 +27,25 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 
 - 扫描 `mods/<mod_id>/mod.json` 清单文件
 - 解析 `ModManifest`（id, name, version, priority, dependencies, entry）
-- **依赖排序**：对已存在的 dependencies 做拓扑排序；循环依赖会记录错误并追加末尾
-- **priority 限制**：字段会被解析，但当前排序主要由拓扑顺序决定，不能可靠用于覆盖冲突处理
-- **未实现限制**：缺失依赖不会导致加载失败，重复 manifest id 不会被严格拒绝
-- **字符串覆盖**：加载所有 Mod 的 `resources/properties/default.xml`，并注入已注册 Mod 植物的名称/描述字符串
+- **依赖校验**：依赖数组中的重复 id，以及缺失、无效或已因错误不可用的依赖会使依赖者无效
+- **依赖排序**：对有效 dependencies 做拓扑排序；当前可加载项按 priority 升序、id 升序确定性排序
+- **循环依赖**：记录错误并从可执行 manifest 列表中省略，不再追加执行
+- **校验**：拒绝非法/重复 manifest id、非法 dependency id 和字段类型错误
+- **启用过滤**：读取 `ModConfig`，仅把启用且依赖已启用的 Mod 加入可执行 manifest 列表
+- **状态联动**：启用 Mod 时递归启用依赖，禁用 Mod 时递归禁用依赖者
+- **未实现限制**：priority 不提供覆盖冲突语义，依赖版本约束尚未实现
+- **字符串覆盖**：加载所有已启用 Mod 的 `resources/properties/default.xml`，并注入已注册 Mod 植物的名称/描述字符串
+
+### (1.1) ModConfig 与 ModManagerDialog
+
+- `ModConfig` 在 `<appdata>/modconfig.json` 保存版本化的 `disabled` id 集合，并通过临时文件替换写入。
+- `ModManagerDialog` 只从主菜单选项打开，显示所有扫描到的有效/无效 Mod、清单详情、错误和待重启状态。
+- 界面只编辑暂存状态；`Apply` 写入配置并同步加载器中的待生效 `enabled` 状态，重新打开界面会保留选择，但运行中的 `loaded` 状态、Lua VM、资源根和注册表不会热重载。
+- 新 Mod 默认启用；无效 Mod 不可切换。
 
 ### (2) ModLua — Lua 虚拟机与 API
 
-- 集成 **Lua 5.4**，通过 `PVZ_ENABLE_LUA` CMake 选项控制
+- 通过 CMake `find_package(Lua 5.4 REQUIRED)` 集成 Lua 5.4 或兼容的更高版本，并由 `PVZ_ENABLE_LUA` 选项控制
 - 注册 Lua 全局 API 表：
 
 | 全局表 | API | 说明 |
@@ -109,21 +127,26 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 | `OnMowerTriggered(row, mowerType)` | 小推车触发 |
 | `OnSunCountChange(oldAmount, newAmount)` | 阳光数量改变 |
 
-- **Lua 环境限制**：所有 Mod 当前共享同一个 Lua VM 和全局环境。入口脚本执行后会捕获全局回调到内部 handler 表，但全局变量和辅助函数仍可能相互覆盖。
+- **Lua 环境限制**：所有 Mod 当前共享同一个 Lua VM 和全局环境。入口脚本执行后会捕获回调及其 Mod id/root；运行时 handler、Timer 和 Dialog 回调执行时恢复所属上下文，但普通全局变量和辅助函数仍可能相互覆盖。
+- **入口隔离**：入口回调和上下文全局量会在 Mod 之间清理，入口失败不会把 callback 泄漏给后续 Mod。
+- **分发安全**：0、1、2 参数 handler 统一通过受保护调用执行并记录 Lua 错误。
 
 ### (3) ModRegistry — 数据注册表
 
-- **运行时 ID 映射**：Mod 植物 `seedType >= 2000`，僵尸 `zombieType >= 3000`，模式 `baseMode >= 5000`，投射物 `projectileType >= 4000`（自动分配）
+- **运行时 ID 映射**：Mod 植物 `seedType >= 2000`，僵尸 `zombieType >= 3000`，模式 `runtimeModeId >= 5000`，投射物 `projectileType >= 4000`（自动分配）
 - **注册类型**：
   - `ModPlantDef` — id, seedType, seedCost, refreshTime, subClass, launchRate, projectileType, plantName, reanimationName, imageName
   - `ModZombieDef` — id, zombieType, bodyHealth, headHealth, speed, damage, reanimationName, helm/shield, hasHead/hasArm, zombieName
-  - `ModModeDef` — id, baseMode, challengePage/Row/Col/IconIndex/Name
+  - `ModModeDef` — id, runtimeModeId, vanilla baseMode, challengePage/Row/Col/IconIndex/Name
   - `ModProjectileDef` — id, damage, speed, imageName, projectileType
   - `ModModeChallengeDef` — baseMode, page, row, col, iconIndex, name（供 ChallengeScreen 动态渲染）
 - **反向查询**：`FindByRuntimeId()` 支持运行时 ID → Mod 定义的反查
-- **动态 Reanim**：`RegisterDynamicReanim()` 支持外部 reanim XML 注册
+- **动态 Reanim**：Lua 入口先排队外部 reanim XML，资源根和基础 Reanimator 初始化后统一注册并解析运行时类型
 - **图鉴集成**：`GetTotalAlmanacPlants()` / `GetAlmanacPlantAt()` 与图鉴联动
 - **冲突策略**：重复注册 id 会失败并记录错误，不会后加载覆盖先加载
+- **返回值**：成功的 Lua 注册 API 返回 Registry 实际分配的运行时 ID；失败返回 `nil, error`。
+- **自定义僵尸**：应用 health、speed、damage、body state、name 和 Reanim；头盔/盾牌因依赖原版轨道与附件而在注册时拒绝。
+- **自定义模式**：Challenge Screen 保存动态 ID 与原版 `baseMode`；引擎固定数组只接收 `baseMode`，Lua 查询接收动态 ID。自定义模式不使用原版中途存档槽。
 
 ### (4) ModJson — JSON 共享模块
 
@@ -141,6 +164,7 @@ src/Mod/                         # Mod 框架核心（6 个模块）
 
 - 继承 `LawnDialog`，支持 Lua 侧创建模态/非模态对话框
 - 使用 `luaL_ref` 管理 Lua 回调引用，避免 GC 问题
+- C++ 销毁时会使 Lua handle 失效并释放引用；Lua VM 关闭前统一失效剩余 Dialog
 - 支持 `AddLuaButton()` 动态添加按钮
 - 支持 `AddLuaLabel()` 添加静态文本标签
 - 对话框 ID 从 `1000` 开始分配
@@ -199,10 +223,13 @@ mods/<mod_id>/
 | `src/Mod/ModRegistry.h/.cpp` | `ModPlantDef` 新增 `imageName` 字段；`ModModeDef` 新增挑战 UI 字段；新增 `ModModeChallengeDef`、`GetModeChallengeDefs()` |
 | `src/Mod/ModJson.h/.cpp` | **新增**：JSON 解析/序列化共享模块，供 ModLoader 和 ModSave 统一调用 |
 | `src/Mod/ModSave.cpp` | 存档格式从 `key=value` 文本改为标准 JSON，依赖 `ModJson` |
-| `src/Mod/ModLoader.cpp` | 移除内联 JSON 解析器，改用 `ModJson` |
+| `src/Mod/ModConfig.h/.cpp` | 全局 Mod 启用状态的 JSON 读取与原子写入 |
+| `src/Mod/ModLoader.cpp` | 使用 `ModJson`，严格验证依赖并应用启用状态 |
 | `src/Mod/ModLua.cpp` | `entity.id` 返回 Mod 注册 ID 字符串；`Game.RegisterMode()` 新增挑战 UI 参数读取 |
 | `src/Mod/LuaProxyDialog.cpp` | `ButtonDepress` Lua 回调返回 `false` 可阻止对话框关闭 |
 | `src/Lawn/Widget/ChallengeScreen.h/.cpp` | 支持 `ModRegistry` 注册的自定义模式动态生成按钮 |
+| `src/Lawn/Widget/ModManagerDialog.h/.cpp` | 透明原生风格 Mod 列表、复选框状态、超长名称省略、对齐详情区、依赖联动和配置应用界面；使用紧凑双按钮底栏 |
+| `src/Lawn/Widget/NewOptionsDialog.h/.cpp` | 主菜单选项新增独立布局的 `Mods` 入口 |
 
 ## 五、架构关系图
 

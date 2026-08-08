@@ -287,6 +287,8 @@ Game.RegisterPlant({
 
 ### 方案 B：提供自定义 reanim 文件
 
+> 外部 reanim 请求会在 Lua 注册阶段排队，并在基础 Reanimator 与 Mod 资源根初始化完成后统一注册。加载失败会记录错误，不会使用无效动画索引。
+
 ```
 mods/my_mod/
   resources/
@@ -314,7 +316,7 @@ Game.RegisterPlant({
 2. **编写 `.reanim` 文件**：参考 `PeaShooterSingle.reanim` 的结构
 3. **确保至少包含**：`anim_idle` 轨道（引擎至少需要这个）
 4. **图片 ID 引用**：`<i>IMAGE_REANIM_MYPLANT_HEAD</i>` → 引擎会按资源查找路径搜索 `reanim/MYPLANT_HEAD`、`images/MYPLANT_HEAD` 等资源
-5. **mod 中路径解析**：`reanimFile` 相对于 mod 根目录，图片也在 mod 的 `resources/` 下解析
+5. **mod 中路径解析**：`reanimFile` 相对于 mod 根目录，图片通过已注册的 mod `resources/` 根解析
 
 ### 最小示例
 
