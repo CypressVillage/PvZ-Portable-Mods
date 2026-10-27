@@ -48,7 +48,7 @@ public:
 	const std::vector<ModInfo>& GetMods() const;
 	const std::vector<std::string>& GetErrors() const;
 	bool SetEnabledState(std::vector<bool>& states, size_t index, bool enabled, std::vector<size_t>& affected, std::string& outError) const;
-	bool SaveEnabledStates(const std::vector<bool>& states, std::string& outError);
+	bool SaveEnabledStates(const std::vector<bool>& states, std::string& outError, bool updateRuntime = true);
 	void ApplyStringOverrides(Sexy::SexyAppBase* app) const;
 
 private:

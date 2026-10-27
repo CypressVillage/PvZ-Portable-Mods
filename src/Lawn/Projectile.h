@@ -107,4 +107,6 @@ public:
 
 };
 
+void ResetModProjectileDefinitions();
+
 #endif

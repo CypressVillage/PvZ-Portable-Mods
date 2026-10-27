@@ -13,8 +13,10 @@ class ModLua
 {
 public:
 	bool Init();
+	void CloseDialogs();
 	void Shutdown();
-	void RunEntries(const std::vector<ModManifest>& manifests);
+	bool ValidateEntries(const std::vector<ModManifest>& manifests, std::string& outError) const;
+	bool RunEntries(const std::vector<ModManifest>& manifests, std::string& outError, bool continueOnError = false);
 	void CallOnLevelStart(int gameMode);
 	void CallOnZombieSpawn(class Zombie* zombie);
 	void CallOnZombieDie(class Zombie* zombie);

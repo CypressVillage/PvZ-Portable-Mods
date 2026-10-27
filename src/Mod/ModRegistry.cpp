@@ -280,8 +280,9 @@ void ModRegistry::QueueDynamicReanim(const std::string& reanimFilePath)
 		mDynamicReanims.emplace(reanimFilePath, 0);
 }
 
-void ModRegistry::FinalizeDynamicReanims()
+bool ModRegistry::FinalizeDynamicReanims(std::string* outError)
 {
+	bool success = true;
 	for (auto& [path, runtimeId] : mDynamicReanims)
 	{
 		auto existing = mReanimNameMap.find(path);
@@ -298,9 +299,14 @@ void ModRegistry::FinalizeDynamicReanims()
 		}
 		else
 		{
-			TodLog("Failed to load Mod reanimation: %s", path.c_str());
+			std::string error = "Failed to load Mod reanimation: " + path;
+			TodLog("%s", error.c_str());
+			if (outError != nullptr && outError->empty())
+				*outError = error;
+			success = false;
 		}
 	}
+	return success;
 }
 
 void ModRegistry::InjectPlantStringOverrides(Sexy::SexyAppBase* app)

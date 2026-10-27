@@ -8,6 +8,7 @@
 #include "ModSave.h"
 #include "ModRegistry.h"
 #include "ModTimer.h"
+#include "ModLuaValidation.h"
 #include "LuaProxyDialog.h"
 #include "../LawnApp.h"
 #include "../GameConstants.h"
@@ -38,14 +39,22 @@ ModLua gModLua;
 
 namespace
 {
-	std::string ReadFileText(const std::string& path)
+	bool ReadFileText(const std::string& path, std::string& outText)
 	{
 		std::ifstream file(Sexy::PathFromU8(path), std::ios::in | std::ios::binary);
 		if (!file)
-			return std::string();
+			return false;
 		std::ostringstream ss;
 		ss << file.rdbuf();
-		return ss.str();
+		outText = ss.str();
+		return true;
+	}
+
+	std::string ReadFileText(const std::string& path)
+	{
+		std::string text;
+		ReadFileText(path, text);
+		return text;
 	}
 
 #if defined(PVZ_ENABLE_LUA)
@@ -2920,6 +2929,14 @@ bool ModLua::Init()
 #endif
 }
 
+void ModLua::CloseDialogs()
+{
+#if defined(PVZ_ENABLE_LUA)
+	if (mState != nullptr)
+		LuaProxyDialog::CloseAll(static_cast<lua_State*>(mState));
+#endif
+}
+
 void ModLua::Shutdown()
 {
 #if defined(PVZ_ENABLE_LUA)
@@ -2934,12 +2951,35 @@ void ModLua::Shutdown()
 #endif
 }
 
-void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
+bool ModLua::ValidateEntries(const std::vector<ModManifest>& manifests, std::string& outError) const
 {
+	outError.clear();
+#if defined(PVZ_ENABLE_LUA)
+	for (const ModManifest& manifest : manifests)
+	{
+		if (manifest.entry.empty())
+			continue;
+
+		std::filesystem::path entryPath = Sexy::PathFromU8(manifest.rootPath) / Sexy::PathFromU8(manifest.entry);
+		if (!ModLuaValidateEntry(Sexy::PathToU8(entryPath), manifest.id, outError))
+			return false;
+	}
+#else
+	(void)manifests;
+#endif
+	return true;
+}
+
+bool ModLua::RunEntries(const std::vector<ModManifest>& manifests, std::string& outError, bool continueOnError)
+{
+	outError.clear();
 #if defined(PVZ_ENABLE_LUA)
 	lua_State* L = static_cast<lua_State*>(mState);
 	if (L == nullptr)
-		return;
+	{
+		outError = "Lua state is not initialized";
+		return false;
+	}
 
 	// Create handler table in registry
 	lua_pushstring(L, "__pvz_handlers");
@@ -2954,12 +2994,17 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 			continue;
 
 		std::filesystem::path entryPath = Sexy::PathFromU8(manifest.rootPath) / Sexy::PathFromU8(manifest.entry);
-		std::string entryText = ReadFileText(Sexy::PathToU8(entryPath));
-		if (entryText.empty())
+		std::string entryText;
+		if (!ReadFileText(Sexy::PathToU8(entryPath), entryText))
 		{
-			TodLog("Lua entry missing: %s", Sexy::PathToU8(entryPath).c_str());
+			std::string error = "Lua entry missing for Mod '" + manifest.id + "': " + Sexy::PathToU8(entryPath);
+			if (outError.empty())
+				outError = error;
+			TodLog("%s", error.c_str());
 			Lua_ClearEntryGlobals(L);
-			continue;
+			if (continueOnError)
+				continue;
+			return false;
 		}
 
 		Lua_SetStringGlobal(L, "__mod_id", manifest.id);
@@ -2967,17 +3012,29 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 
 		if (luaL_loadbuffer(L, entryText.c_str(), entryText.size(), manifest.id.c_str()) != 0)
 		{
-			TodLog("Lua load failed: %s", lua_tostring(L, -1));
+			const char* luaError = lua_tostring(L, -1);
+			std::string error = "Lua load failed for Mod '" + manifest.id + "': " + (luaError ? luaError : "unknown error");
+			if (outError.empty())
+				outError = error;
+			TodLog("%s", error.c_str());
 			lua_pop(L, 1);
 			Lua_ClearEntryGlobals(L);
-			continue;
+			if (continueOnError)
+				continue;
+			return false;
 		}
 		if (lua_pcall(L, 0, 0, 0) != 0)
 		{
-			TodLog("Lua run failed: %s", lua_tostring(L, -1));
+			const char* luaError = lua_tostring(L, -1);
+			std::string error = "Lua run failed for Mod '" + manifest.id + "': " + (luaError ? luaError : "unknown error");
+			if (outError.empty())
+				outError = error;
+			TodLog("%s", error.c_str());
 			lua_pop(L, 1);
 			Lua_ClearEntryGlobals(L);
-			continue;
+			if (continueOnError)
+				continue;
+			return false;
 		}
 
 		lua_getglobal(L, "OnModInit");
@@ -2987,10 +3044,16 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 			lua_setglobal(L, "OnModInit");
 			if (lua_pcall(L, 0, 0, 0) != 0)
 			{
-				TodLog("Lua OnModInit failed: %s", lua_tostring(L, -1));
+				const char* luaError = lua_tostring(L, -1);
+				std::string error = "Lua OnModInit failed for Mod '" + manifest.id + "': " + (luaError ? luaError : "unknown error");
+				if (outError.empty())
+					outError = error;
+				TodLog("%s", error.c_str());
 				lua_pop(L, 1);
 				Lua_ClearEntryGlobals(L);
-				continue;
+				if (continueOnError)
+					continue;
+				return false;
 			}
 		}
 		else
@@ -3045,9 +3108,19 @@ void ModLua::RunEntries(const std::vector<ModManifest>& manifests)
 		Lua_ClearEntryGlobals(L);
 	}
 	Lua_ClearEntryGlobals(L);
+	if (!gModRegistry.GetErrors().empty())
+	{
+		if (outError.empty())
+			outError = gModRegistry.GetErrors().front();
+		return false;
+	}
+	if (!outError.empty())
+		return false;
 #else
 	(void)manifests;
+	(void)continueOnError;
 #endif
+	return true;
 }
 
 void ModLua::CallOnLevelStart(int gameMode)

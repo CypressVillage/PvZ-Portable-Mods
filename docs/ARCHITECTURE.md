@@ -39,8 +39,11 @@ src/Lawn/Widget/
 ### (1.1) ModConfig 与 ModManagerDialog
 
 - `ModConfig` 在 `<appdata>/modconfig.json` 保存版本化的 `disabled` id 集合，并通过临时文件替换写入。
-- `ModManagerDialog` 只从主菜单选项打开，显示所有扫描到的有效/无效 Mod、清单详情、错误和待重启状态。
-- 界面只编辑暂存状态；`Apply` 写入配置并同步加载器中的待生效 `enabled` 状态，重新打开界面会保留选择，但运行中的 `loaded` 状态、Lua VM、资源根和注册表不会热重载。
+- `ModManagerDialog` 只从主菜单选项打开，显示所有扫描到的有效/无效 Mod、清单详情、错误和暂存状态。
+- `Apply` 只写入配置而不直接修改活动 `ModLoader`，关闭对话框后由 `LawnApp` 在后续主循环安全点整体重载。
+- 重载前使用临时 `ModLoader` 重新解析依赖，并通过临时 Lua 状态只编译入口；预检失败会恢复旧配置并保留当前 runtime。
+- 激活会重建共享 Lua VM、timer、注册表、动态实体缓存、资源根和外部 Reanim。破坏性阶段失败时恢复旧配置并要求重启，不尝试进程内回滚旧 runtime。
+- 已缓存的原版 `resources.xml` 覆盖不保证随重载更新，仍可能需要进程重启。
 - 新 Mod 默认启用；无效 Mod 不可切换。
 
 ### (2) ModLua — Lua 虚拟机与 API

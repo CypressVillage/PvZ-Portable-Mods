@@ -87,7 +87,9 @@ Conflicts and limitations:
 - The manager uses a scrollable native-style list with the game's Options checkboxes. Selecting an entry shows its full name, manifest metadata, dependencies, validation error, and current or pending state in the aligned details pane.
 - Long names are shortened with `...` in the list when necessary; the full name remains visible in the details pane.
 - Enabling a Mod also enables its dependencies. Disabling a dependency also disables all currently enabled dependents.
-- Select **Apply** to write the staged state. Reopening the manager before restarting shows the saved pending state, while the running game keeps its original loaded state until restart; hot reload is not performed.
+- Select **Apply** from the idle main menu to save the staged state and reload the complete Mod set without restarting the process. The manager cannot apply changes while a level or another reload is active.
+- Reload rebuilds the shared Lua VM, callbacks, timers, registrations, custom definition images, resource-root order, and external Reanimations. Lua globals and other transient Mod runtime state are not preserved.
+- Already-loaded vanilla resources selected through `resources.xml` overlays may remain cached and still require a process restart.
 - Enabled state is stored globally in `<appdata>/modconfig.json` as a versioned `disabled` id list. Newly installed Mods are enabled by default.
 - Invalid manifests, duplicate ids, missing dependencies, unavailable dependency chains, and circular dependencies are visible but cannot be enabled.
 
@@ -739,12 +741,13 @@ Access via Lua:
 
 Runtime callbacks, timers, and dialog callbacks use the owning Mod's save context. Normal in-progress vanilla game saves still serialize dynamic plant/zombie/projectile types as numeric IDs; changing the enabled Mod set or registration order can make those IDs resolve differently. Custom modes therefore do not use mid-level save slots.
 
-## 10. Hot Reload (Developer Mode)
+## 10. Main-Menu Reload
 
-Not implemented. Possible future developer-only feature:
-- Reload Lua scripts and resource indexes.
-- Require returning to title or restarting level.
-- Avoid hot patching in-flight entities.
+- The Mod manager reloads the complete enabled Mod set after **Apply** at an idle main-menu safe point. It never hot-patches in-flight entities or reloads while a Board is active.
+- Before teardown, the loader rescans manifests and dependencies and compiles every enabled Lua entry in a temporary Lua state. A preflight failure restores the previous configuration and leaves the running Mod state unchanged.
+- Activation rebuilds Lua state, handlers, timers, registrations, custom definition caches, resource roots, external Reanimations, and Mod property/string overrides.
+- If activation fails after teardown begins, the old configuration is restored on disk and the game requires a restart rather than attempting an unsafe in-process rollback.
+- Changes to already-loaded vanilla `resources.xml` assets remain outside the reload guarantee and may require restarting the process.
 
 ## 11. Error Handling
 

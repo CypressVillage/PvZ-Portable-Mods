@@ -5010,12 +5010,29 @@ void Plant::Die()
 #include "../Mod/ModRegistry.h"
 #include "../SexyAppFramework/graphics/GLImage.h"
 
+namespace
+{
+    std::map<int, PlantDefinition> sModPlantDefs;
+    std::map<int, Image*> sModPlantImages;
+    std::map<int, std::string> sModPlantNames;
+}
+
+void ResetModPlantDefinitions()
+{
+    for (const auto& [id, image] : sModPlantImages)
+    {
+        (void)id;
+        delete image;
+    }
+    sModPlantDefs.clear();
+    sModPlantImages.clear();
+    sModPlantNames.clear();
+}
+
 PlantDefinition& GetPlantDefinition(SeedType theSeedType)
 {
     if (static_cast<int>(theSeedType) >= 2000)
     {
-        static std::map<int, PlantDefinition> sModPlantDefs;
-        static std::map<int, Image*> sModPlantImages;
         int key = static_cast<int>(theSeedType);
         if (sModPlantDefs.find(key) == sModPlantDefs.end())
         {
@@ -5054,7 +5071,6 @@ PlantDefinition& GetPlantDefinition(SeedType theSeedType)
                 }
                 if (!modDef->plantName.empty())
                 {
-                    static std::map<int, std::string> sModPlantNames;
                     sModPlantNames[key] = modDef->plantName;
                     def.mPlantName = sModPlantNames[key].c_str();
                 }

@@ -323,14 +323,19 @@ void ModManagerDialog::ButtonDepress(int theId)
 	}
 	if (theId == Dialog::ID_OK)
 	{
+		if (!mApp->CanReloadMods())
+		{
+			mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Mod Manager", "Mods can only be reloaded from an idle main menu.", "[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
+			return;
+		}
 		std::string error;
-		if (!gModLoader.SaveEnabledStates(mStates, error))
+		if (!gModLoader.SaveEnabledStates(mStates, error, false))
 		{
 			mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Mod Manager", error.c_str(), "[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
 			return;
 		}
-		mApp->LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Mods Updated", "Changes will take effect after restarting the game.", "[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
 		mApp->KillDialog(mId);
+		mApp->RequestModReload();
 		return;
 	}
 	LawnDialog::ButtonDepress(theId);

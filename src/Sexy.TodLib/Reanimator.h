@@ -121,6 +121,7 @@ void                                ReanimationFreeDefinition(ReanimatorDefiniti
 void                                ReanimatorEnsureDefinitionLoaded(ReanimationType theReanimType, bool theIsPreloading);
 void                                ReanimatorLoadDefinitions(ReanimationParams* theReanimationParamArray, int theReanimationParamArraySize);
 void                                ReanimatorFreeDefinitions();
+void                                ReanimatorResetDynamicDefinitions();
 
 extern ReanimationParams gLawnReanimationArray[static_cast<int>(ReanimationType::NUM_REANIMS)];
 

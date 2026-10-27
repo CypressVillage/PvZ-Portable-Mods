@@ -109,7 +109,7 @@ public:
 
 	void BuildReanimNameMap();
 	void QueueDynamicReanim(const std::string& reanimFilePath);
-	void FinalizeDynamicReanims();
+	bool FinalizeDynamicReanims(std::string* outError = nullptr);
 	void InjectPlantStringOverrides(Sexy::SexyAppBase* app);
 
 private:

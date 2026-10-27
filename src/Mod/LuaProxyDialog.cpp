@@ -119,6 +119,16 @@ void LuaProxyDialog::InvalidateAll(lua_State* L)
 	}
 }
 
+void LuaProxyDialog::CloseAll(lua_State* L)
+{
+	std::vector<LuaProxyDialog*> dialogs = gLuaProxyDialogs;
+	for (LuaProxyDialog* dialog : dialogs)
+	{
+		if (dialog->mLuaState == L)
+			dialog->Close();
+	}
+}
+
 void LuaProxyDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
 {
 	LawnDialog::AddedToManager(theWidgetManager);

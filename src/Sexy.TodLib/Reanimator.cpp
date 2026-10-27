@@ -31,14 +31,14 @@
 #include "graphics/Font.h"
 #include "misc/PerfTimer.h"
 #include "graphics/MemoryImage.h"
+#include <deque>
 
 unsigned int gReanimatorDefCount;
 ReanimatorDefinition* gReanimatorDefArray;
 unsigned int gReanimationParamArraySize;
 ReanimationParams* gReanimationParamArray;
 
-static std::vector<ReanimationParams> sDynamicReanimParams;
-static std::vector<ReanimatorDefinition> sDynamicReanimDefs;
+static std::deque<std::string> sDynamicReanimFileNames;
 static bool sParamsArrayWasDynamic = false;
 
 ReanimationParams gLawnReanimationArray[ReanimationType::NUM_REANIMS] = {
@@ -1228,6 +1228,34 @@ void ReanimatorFreeDefinitions()
 	gReanimationParamArray = nullptr;
 	gReanimationParamArraySize = 0;
 	sParamsArrayWasDynamic = false;
+	sDynamicReanimFileNames.clear();
+}
+
+void ReanimatorResetDynamicDefinitions()
+{
+	if (gReanimatorDefArray == nullptr || gReanimationParamArray == nullptr || gReanimatorDefCount <= ReanimationType::NUM_REANIMS)
+	{
+		sDynamicReanimFileNames.clear();
+		return;
+	}
+
+	for (unsigned int i = ReanimationType::NUM_REANIMS; i < gReanimatorDefCount; i++)
+		ReanimationFreeDefinition(&gReanimatorDefArray[i]);
+
+	ReanimationParams* newParamArray = new ReanimationParams[ReanimationType::NUM_REANIMS];
+	ReanimatorDefinition* newDefArray = new ReanimatorDefinition[ReanimationType::NUM_REANIMS];
+	memcpy(newParamArray, gReanimationParamArray, sizeof(ReanimationParams) * ReanimationType::NUM_REANIMS);
+	memcpy(newDefArray, gReanimatorDefArray, sizeof(ReanimatorDefinition) * ReanimationType::NUM_REANIMS);
+
+	if (sParamsArrayWasDynamic)
+		delete[] gReanimationParamArray;
+	delete[] gReanimatorDefArray;
+	gReanimationParamArray = newParamArray;
+	gReanimatorDefArray = newDefArray;
+	gReanimationParamArraySize = ReanimationType::NUM_REANIMS;
+	gReanimatorDefCount = ReanimationType::NUM_REANIMS;
+	sParamsArrayWasDynamic = true;
+	sDynamicReanimFileNames.clear();
 }
 
 float Reanimation::GetTrackVelocity(const char* theTrackName)
@@ -1509,18 +1537,16 @@ Reanimation* Reanimation::FindSubReanim(ReanimationType theReanimType)
 
 unsigned int ReanimatorRegisterDynamic(const char* theReanimFileName, int theFlags)
 {
-	unsigned int dynamicIndex = (unsigned int)sDynamicReanimParams.size();
+	unsigned int dynamicIndex = (unsigned int)sDynamicReanimFileNames.size();
+	sDynamicReanimFileNames.emplace_back(theReanimFileName);
 
 	ReanimationParams params;
 	params.mReanimationType = static_cast<ReanimationType>(ReanimationType::NUM_REANIMS + dynamicIndex);
-	params.mReanimFileName = theReanimFileName;
+	params.mReanimFileName = sDynamicReanimFileNames.back().c_str();
 	params.mReanimParamFlags = theFlags;
-	sDynamicReanimParams.push_back(params);
-
 	ReanimatorDefinition def;
-	sDynamicReanimDefs.push_back(def);
 
-	unsigned int newCount = ReanimationType::NUM_REANIMS + (unsigned int)sDynamicReanimParams.size();
+	unsigned int newCount = ReanimationType::NUM_REANIMS + (unsigned int)sDynamicReanimFileNames.size();
 
 	ReanimationParams* newParamArray = new ReanimationParams[newCount];
 	ReanimatorDefinition* newDefArray = new ReanimatorDefinition[newCount];
@@ -1533,8 +1559,8 @@ unsigned int ReanimatorRegisterDynamic(const char* theReanimFileName, int theFla
 	sParamsArrayWasDynamic = true;
 	delete[] gReanimatorDefArray;
 
-	memcpy(&newParamArray[gReanimationParamArraySize], &sDynamicReanimParams[0], sizeof(ReanimationParams) * sDynamicReanimParams.size());
-	memcpy(&newDefArray[gReanimatorDefCount], &sDynamicReanimDefs[0], sizeof(ReanimatorDefinition) * sDynamicReanimDefs.size());
+	newParamArray[gReanimationParamArraySize] = params;
+	newDefArray[gReanimatorDefCount] = def;
 
 	gReanimationParamArray = newParamArray;
 	gReanimatorDefArray = newDefArray;

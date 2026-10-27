@@ -49,6 +49,7 @@ public:
 	void InvalidateLuaBinding();
 	void Close();
 	static void InvalidateAll(lua_State* L);
+	static void CloseAll(lua_State* L);
 
 	virtual void AddedToManager(Sexy::WidgetManager* theWidgetManager);
 	virtual void RemovedFromManager(Sexy::WidgetManager* theWidgetManager);

@@ -142,6 +142,16 @@ public:
 	TrialType						mTrialType;
 	bool							mDebugTrialLocked;
 	bool							mMuteSoundsForCutscene;
+	bool							mModReloadPending;
+	bool							mModReloading;
+	bool							mModReloadRestartRequired;
+	uint32_t						mModReloadRequestCounter;
+	bool							mBasePropertiesCaptured;
+	StringSexyStringMap			mBaseStringProperties;
+	StringBoolMap					mBaseBoolProperties;
+	StringIntMap					mBaseIntProperties;
+	StringDoubleMap				mBaseDoubleProperties;
+	StringStringVectorMap			mBaseStringVectorProperties;
 
 public:
 	LawnApp();
@@ -196,6 +206,10 @@ public:
 	void							DoConfirmBackToMain();
 	void							DoNewOptions(bool theFromGameSelector);
 	void							DoModManagerDialog();
+	bool							CanReloadMods() const;
+	void							RequestModReload();
+	void							ProcessPendingModReload();
+	bool							ReloadModsFromConfig(std::string& outError);
 	void							DoRegister();
 	void							DoRegisterError();
 	bool							CanDoRegisterDialog();

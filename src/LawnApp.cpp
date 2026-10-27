@@ -25,6 +25,7 @@
 #include "Lawn/Board.h"
 #include "Lawn/Plant.h"
 #include "Lawn/Zombie.h"
+#include "Lawn/Projectile.h"
 #include "Lawn/Cutscene.h"
 #include "GameConstants.h"
 #include "Lawn/Challenge.h"
@@ -97,6 +98,20 @@ static bool HasUnshownAchievements(PlayerInfo* thePlayerInfo)
 	return false;
 }
 
+static void RebuildModResourceRoots(const std::vector<ModManifest>& manifests)
+{
+	Sexy::ClearResourceRoots();
+	for (const ModManifest& manifest : manifests)
+	{
+		std::filesystem::path modResources = Sexy::PathFromU8(manifest.rootPath) / "resources";
+		std::error_code error;
+		if (std::filesystem::exists(modResources, error))
+			Sexy::AddResourceRoot(Sexy::PathToU8(modResources));
+		else if (error)
+			TodLog("Failed to inspect Mod resource directory %s: %s", Sexy::PathToU8(modResources).c_str(), error.message().c_str());
+	}
+}
+
 bool LawnGetCloseRequest()
 {
 	if (gLawnApp == nullptr)
@@ -152,6 +167,11 @@ LawnApp::LawnApp()
 	mTrialType = TrialType::TRIALTYPE_NONE;
 	mDebugTrialLocked = false;
 	mMuteSoundsForCutscene = false;
+	mModReloadPending = false;
+	mModReloading = false;
+	mModReloadRestartRequired = false;
+	mModReloadRequestCounter = 0;
+	mBasePropertiesCaptured = false;
 	mMusicVolume = 0.85;
 	mSfxVolume = 0.5525;
 	mAutoStartLoadingThread = false;
@@ -756,6 +776,160 @@ void LawnApp::DoModManagerDialog()
 	mWidgetManager->SetFocus(aDialog);
 }
 
+bool LawnApp::CanReloadMods() const
+{
+	return mBoard == nullptr && mGameSelector != nullptr && mGameScene == GameScenes::SCENE_MENU &&
+		mBasePropertiesCaptured && !mLoadingFailed && !mShutdown && !mCloseRequest &&
+		!mModReloadPending && !mModReloading && !mModReloadRestartRequired;
+}
+
+void LawnApp::RequestModReload()
+{
+	if (!CanReloadMods())
+		return;
+	mModReloadPending = true;
+	mModReloadRequestCounter = mAppCounter;
+}
+
+void LawnApp::ProcessPendingModReload()
+{
+	if (!mModReloadPending || mModReloading || mAppCounter == mModReloadRequestCounter)
+		return;
+
+	mModReloadPending = false;
+	std::string error;
+	if (ReloadModsFromConfig(error))
+	{
+		LawnMessageBox(Dialogs::DIALOG_MESSAGE, "Mods Reloaded",
+			"Mods reloaded. Some already-loaded vanilla resource overrides may still require a restart.",
+			"[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
+	}
+	else
+	{
+		const char* title = mModReloadRestartRequired ? "Mod Reload Failed" : "Mod Manager";
+		std::string message = mModReloadRestartRequired ? "Mod reload failed; restart required.\n\n" + error : error;
+		LawnMessageBox(Dialogs::DIALOG_MESSAGE, title, message.c_str(), "[DIALOG_BUTTON_OK]", "", Dialog::BUTTONS_FOOTER);
+	}
+}
+
+bool LawnApp::ReloadModsFromConfig(std::string& outError)
+{
+	outError.clear();
+	ModLoader oldLoader = gModLoader;
+	std::vector<bool> oldStates;
+	oldStates.reserve(oldLoader.GetMods().size());
+	for (const ModInfo& mod : oldLoader.GetMods())
+		oldStates.push_back(mod.enabled);
+
+	auto restoreConfig = [&]() {
+		std::string restoreError;
+		if (!oldLoader.SaveEnabledStates(oldStates, restoreError, false))
+		{
+			TodLog("Failed to restore Mod configuration: %s", restoreError.c_str());
+			outError += "\nFailed to restore the previous Mod configuration: " + restoreError;
+			return false;
+		}
+		return true;
+	};
+
+	ModLoader newLoader;
+	if (!newLoader.LoadAll())
+	{
+		outError = newLoader.GetErrors().empty() ? "Mod manifest or dependency validation failed" : newLoader.GetErrors().front();
+		if (!restoreConfig())
+			mModReloadRestartRequired = true;
+		return false;
+	}
+	if (!gModLua.ValidateEntries(newLoader.GetManifests(), outError))
+	{
+		if (!restoreConfig())
+			mModReloadRestartRequired = true;
+		return false;
+	}
+
+	mModReloading = true;
+	if (mGameSelector != nullptr)
+	{
+		mWidgetManager->RemoveWidget(mGameSelector);
+		delete mGameSelector;
+		mGameSelector = nullptr;
+	}
+
+	gModLua.CloseDialogs();
+	gModLua.Shutdown();
+	if (mEffectSystem != nullptr)
+		mEffectSystem->EffectSystemDispose();
+	if (mReanimatorCache != nullptr)
+	{
+		mReanimatorCache->ReanimatorCacheDispose();
+		delete mReanimatorCache;
+		mReanimatorCache = nullptr;
+	}
+
+	mStringProperties = mBaseStringProperties;
+	mBoolProperties = mBaseBoolProperties;
+	mIntProperties = mBaseIntProperties;
+	mDoubleProperties = mBaseDoubleProperties;
+	mStringVectorProperties = mBaseStringVectorProperties;
+	ResetModPlantDefinitions();
+	ResetModZombieDefinitions();
+	ResetModProjectileDefinitions();
+	ReanimatorResetDynamicDefinitions();
+	gModRegistry.Reset();
+	gModLoader = std::move(newLoader);
+	RebuildModResourceRoots(gModLoader.GetManifests());
+
+	if (!gModLua.Init() || !gModLua.RunEntries(gModLoader.GetManifests(), outError))
+	{
+		if (outError.empty())
+			outError = "Failed to initialize the Lua runtime";
+		restoreConfig();
+		mModReloading = false;
+		mModReloadRestartRequired = true;
+		return false;
+	}
+
+	gModRegistry.BuildReanimNameMap();
+	if (!gModRegistry.FinalizeDynamicReanims(&outError))
+	{
+		restoreConfig();
+		mModReloading = false;
+		mModReloadRestartRequired = true;
+		return false;
+	}
+	gModLoader.ApplyStringOverrides(this);
+	for (const ModManifest& manifest : gModLoader.GetManifests())
+	{
+		std::filesystem::path modProperties = Sexy::PathFromU8(manifest.rootPath) / "resources" / "properties" / "default.xml";
+		std::error_code propertyError;
+		bool propertyExists = std::filesystem::exists(modProperties, propertyError);
+		if (propertyError)
+		{
+			outError = "Failed to inspect Mod properties for '" + manifest.id + "': " + propertyError.message();
+			restoreConfig();
+			mModReloading = false;
+			mModReloadRestartRequired = true;
+			return false;
+		}
+		if (propertyExists && !LoadProperties(Sexy::PathToU8(modProperties), false, false))
+		{
+			outError = "Failed to load Mod properties for '" + manifest.id + "'";
+			restoreConfig();
+			mModReloading = false;
+			mModReloadRestartRequired = true;
+			return false;
+		}
+	}
+
+	if (mEffectSystem != nullptr)
+		mEffectSystem->EffectSystemInitialize();
+	mReanimatorCache = new ReanimatorCache();
+	mReanimatorCache->ReanimatorCacheInitialize();
+	ShowGameSelector();
+	mModReloading = false;
+	return true;
+}
+
 // GOTY @Patoke: 0x453410
 AlmanacDialog* LawnApp::DoAlmanacDialog(SeedType theSeedType, ZombieType theZombieType)
 {
@@ -1314,19 +1488,14 @@ void LawnApp::Init()
 		TodLog("Mod loader reported errors");
 	}
 
-	Sexy::ClearResourceRoots();
-	for (const ModManifest& manifest : gModLoader.GetManifests())
-	{
-		std::filesystem::path modResources = Sexy::PathFromU8(manifest.rootPath) / "resources";
-		std::error_code error;
-		if (std::filesystem::exists(modResources, error))
-			Sexy::AddResourceRoot(Sexy::PathToU8(modResources));
-		else if (error)
-			TodLog("Failed to inspect Mod resource directory %s: %s", Sexy::PathToU8(modResources).c_str(), error.message().c_str());
-	}
+	RebuildModResourceRoots(gModLoader.GetManifests());
 
 	if (gModLua.Init())
-		gModLua.RunEntries(gModLoader.GetManifests());
+	{
+		std::string error;
+		if (!gModLua.RunEntries(gModLoader.GetManifests(), error, true))
+			TodLog("Mod activation failed during startup: %s", error.c_str());
+	}
 
 	// if (!mResourceManager->ParseResourcesFile(Sexy::GetResourcePath("properties/resources.xml")))
 	if (!mResourceManager->ParseResourcesFile("properties/resources.xml"))
@@ -1404,7 +1573,11 @@ void LawnApp::Init()
 
 	ReanimatorLoadDefinitions(gLawnReanimationArray, ReanimationType::NUM_REANIMS);
 	gModRegistry.BuildReanimNameMap();
-	gModRegistry.FinalizeDynamicReanims();
+	{
+		std::string error;
+		if (!gModRegistry.FinalizeDynamicReanims(&error))
+			TodLog("Mod activation failed during startup: %s", error.c_str());
+	}
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_SPROUT, true);
 	ReanimatorEnsureDefinitionLoaded(ReanimationType::REANIM_LOADBAR_ZOMBIEHEAD, true);
 
@@ -1827,6 +2000,12 @@ void LawnApp::LoadingThreadProc()
 	// Load localized properties AFTER LawnStrings so they can override string values
 	LoadProperties("properties/default.xml", false, false);
 	LoadProperties("properties/Layout.xml", false, false);
+	mBaseStringProperties = mStringProperties;
+	mBaseBoolProperties = mBoolProperties;
+	mBaseIntProperties = mIntProperties;
+	mBaseDoubleProperties = mDoubleProperties;
+	mBaseStringVectorProperties = mStringVectorProperties;
+	mBasePropertiesCaptured = true;
 
 	gModLoader.ApplyStringOverrides(this);
 	for (const ModManifest& manifest : gModLoader.GetManifests())
@@ -2424,6 +2603,12 @@ bool LawnApp::UpdateApp()
 	//	LoadingThreadCompleted();
 	//}
 
+	if (mModReloadRestartRequired && GetDialog(Dialogs::DIALOG_MESSAGE) == nullptr)
+	{
+		CloseRequestAsync();
+		return false;
+	}
+	ProcessPendingModReload();
 	bool updated = SexyAppBase::UpdateApp();
 
 	//if (mLoadingThreadCompleted && !mExitToTop)

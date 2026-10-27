@@ -1,6 +1,7 @@
 #include "Mod/ModJson.h"
 #include "Mod/ModConfig.h"
 #include "Mod/ModLoader.h"
+#include "Mod/ModLuaValidation.h"
 #include "Mod/ModSave.h"
 #include "SexyAppFramework/Common.h"
 
@@ -157,6 +158,9 @@ namespace
 			"saving pending states does not hot-load Mods");
 		Check(loader.SetEnabledState(states, baseIndex, false, affected, stateError), "disabling dependency succeeds");
 		Check(!states[baseIndex] && !states[dependentIndex], "disabling dependency disables its dependent");
+		Check(loader.SaveEnabledStates(states, stateError, false), "staged enabled states save without changing the active loader");
+		Check(mods[baseIndex].enabled && mods[dependentIndex].enabled,
+			"staged save leaves active enabled states unchanged");
 		Check(loader.SaveEnabledStates(states, stateError), "enabled states save");
 		Check(!mods[baseIndex].enabled && !mods[dependentIndex].enabled,
 			"later saved pending states replace the previous selection");
@@ -164,6 +168,12 @@ namespace
 		Check(ModConfig::LoadDisabledIds(disabled, stateError), "saved Mod config reloads");
 		Check(disabled.contains("base") && disabled.contains("dependent"), "saved Mod config contains disabled dependency closure");
 		std::filesystem::remove(temp.path / "modconfig.json");
+
+		WriteFile(temp.path / "valid.lua", "local value = 1\nreturn value\n");
+		WriteFile(temp.path / "invalid.lua", "local value =\n");
+		Check(ModLuaValidateEntry((temp.path / "valid.lua").string(), "valid", stateError), "valid Lua entry passes preflight");
+		Check(!ModLuaValidateEntry((temp.path / "invalid.lua").string(), "invalid", stateError), "invalid Lua entry fails preflight");
+		Check(stateError.find("Lua syntax error") != std::string::npos, "Lua preflight reports a syntax error");
 
 		AddManifest(temp.path, "invalid", R"({"id":"../bad"})");
 		Check(!loader.LoadAll(), "invalid manifest id fails the load");

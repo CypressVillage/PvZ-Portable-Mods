@@ -8,7 +8,7 @@ A cross-platform community reimplementation of Plants vs. Zombies GOTY Edition (
 
 **User intent**: Develop a Lua-based Mod framework, delivered as the `mods/` system with C++ scaffolding under `src/Mod/`.
 
-**Current verified status (2026-08-07)**: The stabilized Lua Mod framework builds and passes CTest in both Debug and Release with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays, with a restart-based native Mod manager for dependency-aware enable/disable state. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
+**Current verified status (2026-08-08)**: The stabilized Lua Mod framework builds and passes CTest in both Debug and Release with `PVZ_ENABLE_LUA=ON`. The implemented content pipeline is `mod.json` + Lua registration APIs + `resources/` overlays, with a native Mod manager that applies dependency-aware enable/disable state through complete Mod reloads at the idle main menu. JSON data tables such as `data/plants.json`, `data/zombies.json`, `data/modes.json`, `data/projectiles.json`, and `strings.json` are not loaded by the current engine.
 
 ---
 
@@ -53,11 +53,11 @@ Current Mod system limitations to remember:
 - `priority` deterministically orders dependency-ready Mods by ascending value and id, but does not provide override/conflict semantics.
 - Missing or unavailable dependencies invalidate the dependent Mod.
 - Invalid and duplicate manifest ids are rejected; circularly dependent Mods are reported and omitted.
-- The main-menu Mod manager stages dependency-aware enabled states in `<appdata>/modconfig.json`; changes require a restart.
+- The main-menu Mod manager stages dependency-aware enabled states in `<appdata>/modconfig.json`; Apply performs a complete Mod reload at an idle main-menu safe point.
 - The Mod manager uses a native-style scrollable checkbox list, ellipsizes long names on the left, and shows the complete selected Mod name and metadata in the aligned details pane.
 - Duplicate plant/zombie/mode/projectile registration ids are rejected by `ModRegistry`; later mods do not override earlier registrations.
 - All mods currently share one Lua VM/global environment. Captured handlers, timers, and dialogs restore their owning Mod context, but ordinary globals can still collide; prefer `local` in examples and docs.
-- Hot reload, dependency version constraints, schema gating, JSON data tables, and per-mod Lua environments are not implemented.
+- In-level reload, single-Mod unload, dependency version constraints, schema gating, JSON data tables, and per-mod Lua environments are not implemented. Already-cached vanilla `resources.xml` overlays may still require a process restart.
 - Custom modes map to a vanilla `baseMode` for engine rules and intentionally do not use vanilla mid-level save slots or create progression/achievement records.
 - Custom zombie health, speed, damage, body state, name, and Reanim are applied; helmet and shield equipment is rejected until safe attachment/track semantics are implemented.
 - Vanilla mid-level saves serialize dynamic entity types as numeric IDs, so changing enabled Mods or registration order can invalidate those references.

@@ -352,7 +352,7 @@ bool ModLoader::SetEnabledState(std::vector<bool>& states, size_t index, bool en
 	return true;
 }
 
-bool ModLoader::SaveEnabledStates(const std::vector<bool>& states, std::string& outError)
+bool ModLoader::SaveEnabledStates(const std::vector<bool>& states, std::string& outError, bool updateRuntime)
 {
 	if (states.size() != mMods.size())
 	{
@@ -371,11 +371,14 @@ bool ModLoader::SaveEnabledStates(const std::vector<bool>& states, std::string& 
 	}
 	if (!ModConfig::SaveDisabledIds(disabled, outError))
 		return false;
-	mDisabledIds = std::move(disabled);
-	for (size_t i = 0; i < mMods.size(); i++)
+	if (updateRuntime)
 	{
-		if (mMods[i].valid)
-			mMods[i].enabled = states[i];
+		mDisabledIds = std::move(disabled);
+		for (size_t i = 0; i < mMods.size(); i++)
+		{
+			if (mMods[i].valid)
+				mMods[i].enabled = states[i];
+		}
 	}
 	return true;
 }

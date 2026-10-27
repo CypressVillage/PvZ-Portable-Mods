@@ -37,6 +37,24 @@
 #include "../SexyAppFramework/graphics/GLImage.h"
 #include "../SexyAppFramework/misc/ResourceManager.h"
 
+namespace
+{
+	std::map<int, Image*> sModProjectileImages;
+	std::map<int, bool> sOwnedModProjectileImages;
+	std::map<int, ProjectileDefinition> sModProjectileDefs;
+}
+
+void ResetModProjectileDefinitions()
+{
+	for (const auto& [type, image] : sModProjectileImages)
+	{
+		if (sOwnedModProjectileImages[type])
+			delete image;
+	}
+	sModProjectileImages.clear();
+	sOwnedModProjectileImages.clear();
+	sModProjectileDefs.clear();
+}
 ProjectileDefinition gProjectileDefinition[] = {
 	{ ProjectileType::PROJECTILE_PEA,           0,  20  },
 	{ ProjectileType::PROJECTILE_SNOWPEA,       0,  20  },
@@ -1044,7 +1062,6 @@ void Projectile::Draw(Graphics* g)
 	default:
 		if (static_cast<int>(mProjectileType) >= 4000)
 		{
-			static std::map<int, Image*> sModProjectileImages;
 			int ptype = static_cast<int>(mProjectileType);
 			auto it = sModProjectileImages.find(ptype);
 			if (it == sModProjectileImages.end())
@@ -1053,6 +1070,7 @@ void Projectile::Draw(Graphics* g)
 				if (modDef && !modDef->imageName.empty())
 				{
 					Image* loaded = gSexyAppBase->GetImage(modDef->imageName);
+					bool ownsImage = loaded != nullptr;
 					if (!loaded)
 					{
 						SharedImageRef ref = gSexyAppBase->mResourceManager->GetImage(modDef->imageName);
@@ -1061,11 +1079,13 @@ void Projectile::Draw(Graphics* g)
 					if (!loaded)
 						loaded = IMAGE_PROJECTILEPEA;
 					sModProjectileImages[ptype] = loaded;
+					sOwnedModProjectileImages[ptype] = ownsImage;
 					aImage = loaded;
 				}
 				else
 				{
 					sModProjectileImages[ptype] = IMAGE_PROJECTILEPEA;
+					sOwnedModProjectileImages[ptype] = false;
 					aImage = IMAGE_PROJECTILEPEA;
 				}
 			}
@@ -1293,7 +1313,6 @@ ProjectileDefinition& Projectile::GetProjectileDef()
 {
 	if (static_cast<int>(mProjectileType) >= 4000)
 	{
-		static std::map<int, ProjectileDefinition> sModProjectileDefs;
 		if (sModProjectileDefs.find(static_cast<int>(mProjectileType)) == sModProjectileDefs.end())
 		{
 			ProjectileDefinition def = { mProjectileType, 0, 20 };

@@ -95,12 +95,24 @@ static ZombieType gBossZombieList[] = {
 
 #include "../Mod/ModRegistry.h"
 
+namespace
+{
+    std::map<int, ZombieDefinition> sModZombieDefs;
+    std::map<int, std::string> sModZombieNames;
+}
+
+void ResetModZombieDefinitions()
+{
+    sModZombieDefs.clear();
+    sModZombieNames.clear();
+}
+
 ZombieDefinition& GetZombieDefinition(ZombieType theZombieType)
 {
     if (static_cast<int>(theZombieType) >= 3000)
     {
-        static std::map<int, ZombieDefinition> sModZombieDefs;
-        if (sModZombieDefs.find(static_cast<int>(theZombieType)) == sModZombieDefs.end())
+        int key = static_cast<int>(theZombieType);
+        if (sModZombieDefs.find(key) == sModZombieDefs.end())
         {
             int reanimType = static_cast<int>(ReanimationType::REANIM_NONE);
             int zombieValue = 1;
@@ -113,15 +125,18 @@ ZombieDefinition& GetZombieDefinition(ZombieType theZombieType)
                 return gZombieDefs[ZombieType::ZOMBIE_NORMAL];
 
             if (!modDef->zombieName.empty())
-                zombieName = modDef->zombieName.c_str();
+            {
+                sModZombieNames[key] = modDef->zombieName;
+                zombieName = sModZombieNames[key].c_str();
+            }
             int resolvedReanim = gModRegistry.ResolveReanimationType(modDef->reanimationName);
             if (resolvedReanim != static_cast<int>(ReanimationType::REANIM_NONE))
                 reanimType = resolvedReanim;
 
             ZombieDefinition def = { theZombieType, static_cast<ReanimationType>(reanimType), zombieValue, 1, 1, pickWeight, zombieName };
-            sModZombieDefs[static_cast<int>(theZombieType)] = def;
+            sModZombieDefs[key] = def;
         }
-        return sModZombieDefs[static_cast<int>(theZombieType)];
+        return sModZombieDefs[key];
     }
 
     TOD_ASSERT(theZombieType >= 0 && theZombieType < NUM_ZOMBIE_TYPES);

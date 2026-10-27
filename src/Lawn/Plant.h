@@ -337,3 +337,4 @@ public:
 extern PlantDefinition gPlantDefs[SeedType::MAX_SEED_TYPES];
 
 /*inline*/ PlantDefinition& GetPlantDefinition(SeedType theSeedType);
+void ResetModPlantDefinitions();
