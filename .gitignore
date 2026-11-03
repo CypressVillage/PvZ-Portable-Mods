@@ -397,6 +397,8 @@ FodyWeavers.xsd
 **/CMakeFiles/
 **/CTestTestfile.cmake
 **/Makefile
+!src/Mod/lua/Makefile
+!src/Mod/lua/src/Makefile
 **/*.cbp
 **/CMakeScripts
 **/compile_commands.json

@@ -161,13 +161,14 @@ Before building on PC, ensure you have the necessary dependencies installed:
 - **Audio**: `libopenmpt`
 - **Image**: `libpng`, `libjpeg-turbo`
 - **Windowing/Input**: `SDL2`
+- **Mod manifests/data**: `nlohmann_json`
 
 ### Arch Linux
 
 You can install the required dependencies using the following command:
 
 ```bash
-sudo pacman -S --needed base-devel cmake libjpeg-turbo libopenmpt libpng ninja sdl2-compat
+sudo pacman -S --needed base-devel cmake libjpeg-turbo libopenmpt libpng nlohmann-json ninja sdl2-compat
 ```
 
 ### Debian/Ubuntu
@@ -175,7 +176,7 @@ sudo pacman -S --needed base-devel cmake libjpeg-turbo libopenmpt libpng ninja s
 You can install the required dependencies using the following command:
 
 ```bash
-sudo apt install cmake ninja-build libjpeg-dev libopenmpt-dev libpng-dev libsdl2-dev
+sudo apt install cmake ninja-build libjpeg-dev libopenmpt-dev libpng-dev libsdl2-dev nlohmann-json3-dev
 ```
 
 ### Windows (MSYS2 UCRT64)
@@ -183,7 +184,7 @@ sudo apt install cmake ninja-build libjpeg-dev libopenmpt-dev libpng-dev libsdl2
 You can install the required dependencies using the following command:
 
 ```bash
-pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libjpeg-turbo mingw-w64-ucrt-x86_64-libopenmpt mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-SDL2
+pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-libjpeg-turbo mingw-w64-ucrt-x86_64-libopenmpt mingw-w64-ucrt-x86_64-libpng mingw-w64-ucrt-x86_64-nlohmann-json mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-SDL2
 ```
 
 ### macOS (Homebrew)
@@ -191,7 +192,7 @@ pacman -S --needed base-devel mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-
 You can install the required dependencies using [Homebrew](https://brew.sh/) with the following command:
 
 ```bash
-brew install cmake dylibbundler jpeg-turbo libopenmpt libpng ninja sdl2
+brew install cmake dylibbundler jpeg-turbo libopenmpt libpng nlohmann-json ninja sdl2
 ```
 
 ## Build Instructions

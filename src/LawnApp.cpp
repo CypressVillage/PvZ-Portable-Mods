@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <format>
 #include "LawnApp.h"
+#include "Mod/ModRuntime.h"
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
 #include "Lawn/Board.h"
@@ -170,6 +171,8 @@ LawnApp::LawnApp()
 
 LawnApp::~LawnApp()
 {
+	// Scripts stop before widgets, resources and other app-owned services die.
+	mModRuntime.reset();
 	while (!mDialogMap.empty())
 	{
 		KillDialog(mDialogMap.begin()->first);
@@ -1173,6 +1176,32 @@ void LawnApp::Init()
 	PvzpLogLn("Started {}", static_cast<uint64_t>(std::time(nullptr)));
 #endif
 	PvzpLogLn("session id: {}", static_cast<long long>(mSessionID));
+
+	// Step 1 only runs the foundation lifecycle; registered content is not yet
+	// connected to vanilla gameplay or profiles. No implicit auto-enable.
+	mModRuntime = std::make_unique<Mod::Runtime>([](const std::string& id, const std::string& message) {
+		PvzpLogLn("[mod {}] {}", id, message);
+	});
+	try
+	{
+		std::vector<std::string> enabled;
+		auto configPath = Sexy::PathFromU8(Sexy::GetAppDataPath("userdata/mods.json"));
+		if (std::filesystem::exists(configPath))
+		{
+			auto config = Mod::ReadJson(configPath);
+			enabled = config.at("enabled").get<std::vector<std::string>>();
+		}
+		auto discovery = Mod::Discover(Sexy::PathFromU8(Sexy::GetResourcePath("mods")));
+		for (const auto& error : discovery.errors) PvzpLogLn("{}", error.what());
+		if (!mModRuntime->Start(discovery, enabled)) throw *mModRuntime->LastError();
+	}
+	catch (const std::exception& error)
+	{
+		PvzpLogLn("Mod startup blocked: {}", error.what());
+		Popup(std::string("Mod startup blocked:\n") + error.what());
+		mLoadingFailed = true;
+		return;
+	}
 
 	if (!mResourceManager->ParseResourcesFile("properties/resources.xml"))
 	{

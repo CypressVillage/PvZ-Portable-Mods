@@ -35,6 +35,8 @@ if(MSVC)
 	endif()
 endif()
 
+include(CMake/ModRuntime.cmake)
+
 file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/*.cpp
 	src/SexyAppFramework/*.cpp
@@ -198,6 +200,7 @@ target_compile_definitions(pvz-portable PRIVATE
 	$<$<BOOL:${DO_FIX_BUGS}>:DO_FIX_BUGS>
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
+target_link_libraries(pvz-portable PRIVATE pvz_mod)
 set_target_properties(pvz-portable PROPERTIES CXX_EXTENSIONS OFF)
 
 if (LOW_MEMORY)

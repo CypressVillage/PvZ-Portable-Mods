@@ -49,6 +49,7 @@ class ChallengeScreen;
 class StoreScreen;
 class AlmanacDialog;
 class TypingCheck;
+namespace Mod { class Runtime; }
 
 namespace Sexy
 {
@@ -99,6 +100,7 @@ public:
 	std::unique_ptr<EffectSystem>	mEffectSystem;
 	std::unique_ptr<ReanimatorCache>	mReanimatorCache;
 	std::unique_ptr<ProfileMgr>		mProfileMgr;
+	std::unique_ptr<Mod::Runtime>	mModRuntime;
 	PlayerInfo*						mPlayerInfo;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;

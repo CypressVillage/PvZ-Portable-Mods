@@ -1,0 +1,507 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+#include "ModRuntime.h"
+extern "C"
+{
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+}
+#include <algorithm>
+#include <cmath>
+#include <set>
+
+namespace Mod
+{
+namespace
+{
+struct Stack
+{
+	lua_State* L;
+	int top;
+	explicit Stack(lua_State* state) : L(state), top(lua_gettop(L)) {}
+	~Stack() { lua_settop(L, top); }
+};
+
+std::string String(lua_State* L, int index)
+{
+	if (lua_type(L, index) != LUA_TSTRING) throw std::runtime_error("expected a string");
+	size_t length;
+	const char* value = lua_tolstring(L, index, &length);
+	return std::string(value, length);
+}
+
+Data ReadData(lua_State* L, int index, std::set<const void*>& visited, int depth)
+{
+	if (depth > 64) throw std::runtime_error("data nesting exceeds 64 levels");
+	index = lua_absindex(L, index);
+	switch (lua_type(L, index))
+	{
+	case LUA_TNIL: return nullptr;
+	case LUA_TBOOLEAN: return lua_toboolean(L, index) != 0;
+	case LUA_TNUMBER:
+		if (lua_isinteger(L, index)) return lua_tointeger(L, index);
+		if (!std::isfinite(lua_tonumber(L, index))) throw std::runtime_error("non-finite number is not serializable");
+		return lua_tonumber(L, index);
+	case LUA_TSTRING: return String(L, index);
+	case LUA_TTABLE:
+	{
+		if (lua_getmetatable(L, index)) { lua_pop(L, 1); throw std::runtime_error("metatables are not serializable"); }
+		const void* identity = lua_topointer(L, index);
+		if (!visited.insert(identity).second) throw std::runtime_error("cyclic data is not serializable");
+		Data object = Data::object();
+		std::map<lua_Integer, Data> array;
+		lua_pushnil(L);
+		while (lua_next(L, index))
+		{
+			auto value = ReadData(L, -1, visited, depth + 1);
+			if (lua_type(L, -2) == LUA_TSTRING) object[String(L, -2)] = std::move(value);
+			else if (lua_isinteger(L, -2) && lua_tointeger(L, -2) > 0) array.emplace(lua_tointeger(L, -2), std::move(value));
+			else throw std::runtime_error("data keys must be strings or dense positive integer indices");
+			lua_pop(L, 1);
+		}
+		visited.erase(identity);
+		if (array.empty()) return object;
+		if (!object.empty()) throw std::runtime_error("mixed array/object data is not serializable");
+		Data result = Data::array();
+		for (auto& [key, value] : array)
+		{
+			if (key != static_cast<lua_Integer>(result.size() + 1)) throw std::runtime_error("sparse arrays are not serializable");
+			result.push_back(std::move(value));
+		}
+		return result;
+	}
+	default: throw std::runtime_error("only plain data may cross mod/state boundaries (no functions, threads or userdata)");
+	}
+}
+
+Data ReadData(lua_State* L, int index)
+{
+	Stack stack(L);
+	std::set<const void*> visited;
+	return ReadData(L, index, visited, 0);
+}
+
+void ValidateData(const Data& value, int depth = 0)
+{
+	if (depth > 64) throw std::runtime_error("data nesting exceeds 64 levels");
+	if (value.is_number_float() && !std::isfinite(value.get<double>())) throw std::runtime_error("non-finite data");
+	if (value.is_binary() || value.is_discarded()) throw std::runtime_error("unsupported data type");
+	if (value.is_number_unsigned() && value.get<uint64_t>() > static_cast<uint64_t>(LUA_MAXINTEGER))
+		throw std::runtime_error("integer exceeds Lua integer range");
+	if (value.is_structured()) for (const auto& child : value)
+	{
+		// Lua nil removes a table member: refuse data we cannot round-trip.
+		if (child.is_null()) throw std::runtime_error("nested null cannot round-trip through a Lua table");
+		ValidateData(child, depth + 1);
+	}
+}
+
+void PushData(lua_State* L, const Data& value)
+{
+	if (value.is_null()) lua_pushnil(L);
+	else if (value.is_boolean()) lua_pushboolean(L, value.get<bool>());
+	else if (value.is_number_integer()) lua_pushinteger(L, value.get<lua_Integer>());
+	else if (value.is_number()) lua_pushnumber(L, value.get<double>());
+	else if (value.is_string())
+	{
+		const auto& text = value.get_ref<const std::string&>();
+		lua_pushlstring(L, text.data(), text.size());
+	}
+	else if (value.is_array())
+	{
+		lua_newtable(L);
+		for (size_t i = 0; i < value.size(); ++i) { PushData(L, value[i]); lua_rawseti(L, -2, i + 1); }
+	}
+	else
+	{
+		lua_newtable(L);
+		for (auto it = value.begin(); it != value.end(); ++it)
+		{
+			lua_pushlstring(L, it.key().data(), it.key().size());
+			PushData(L, it.value());
+			lua_rawset(L, -3);
+		}
+	}
+}
+
+int Traceback(lua_State* L)
+{
+	const char* message = lua_tostring(L, 1);
+	luaL_traceback(L, L, message ? message : "Lua error (non-string error value)", 1);
+	return 1;
+}
+
+void ProtectedCall(lua_State* L, int arguments, int results)
+{
+	int base = lua_gettop(L) - arguments;
+	lua_pushcfunction(L, Traceback);
+	lua_insert(L, base);
+	int status = lua_pcall(L, arguments, results, base);
+	lua_remove(L, base);
+	if (status != LUA_OK)
+	{
+		auto error = String(L, -1);
+		lua_pop(L, 1);
+		throw std::runtime_error(error);
+	}
+}
+}
+
+struct Runtime::Impl
+{
+	struct Script
+	{
+		Impl& host;
+		Manifest manifest;
+		lua_State* L = nullptr;
+		std::map<std::string, int> modules;
+		std::set<std::string> loading;
+		std::map<std::string, int> callbacks;
+		std::map<std::string, Data> exports;
+		std::map<std::string, int> interfaces;
+		Data state = Data::object();
+		bool entered = false;
+
+		Script(Impl& owner, Manifest info) : host(owner), manifest(std::move(info)) {}
+		~Script() { if (L) lua_close(L); }
+
+		// lua_error longjmps: it must run AFTER all C++ exception/RAII scopes.
+		template<int (Script::*Method)(lua_State*)>
+		static int Bridge(lua_State* L)
+		{
+			auto* self = static_cast<Script*>(lua_touserdata(L, lua_upvalueindex(1)));
+			try { return (self->*Method)(L); }
+			catch (const std::exception& error) { lua_pushstring(L, error.what()); }
+			catch (...) { lua_pushliteral(L, "unknown native mod API error"); }
+			return lua_error(L);
+		}
+
+		template<int (Script::*Method)(lua_State*)>
+		void Bind(const char* name)
+		{
+			lua_pushlightuserdata(L, this);
+			lua_pushcclosure(L, Bridge<Method>, 1);
+			lua_setfield(L, -2, name);
+		}
+
+		void RegistrationOnly()
+		{
+			if (host.phase != Phase::Registering) throw std::runtime_error("operation is only allowed during registration");
+		}
+
+		void Initialize()
+		{
+			L = luaL_newstate();
+			if (!L) throw std::runtime_error("cannot create Lua state");
+			const std::pair<const char*, lua_CFunction> libraries[] = {
+				{LUA_GNAME, luaopen_base}, {LUA_TABLIBNAME, luaopen_table}, {LUA_STRLIBNAME, luaopen_string},
+				{LUA_MATHLIBNAME, luaopen_math}, {LUA_UTF8LIBNAME, luaopen_utf8}
+			};
+			for (const auto& [name, open] : libraries) { luaL_requiref(L, name, open, 1); lua_pop(L, 1); }
+			for (const char* name : {"dofile", "loadfile", "load", "collectgarbage", "print"})
+				{ lua_pushnil(L); lua_setglobal(L, name); }
+			lua_newtable(L);
+			Bind<&Script::Register>("register");
+			Bind<&Script::On>("on");
+			Bind<&Script::Export>("export");
+			Bind<&Script::Import>("import");
+			Bind<&Script::Call>("call");
+			Bind<&Script::SetState>("set_state");
+			Bind<&Script::GetState>("get_state");
+			Bind<&Script::Log>("log");
+			lua_pushlstring(L, manifest.id.data(), manifest.id.size()); lua_setfield(L, -2, "id");
+			lua_pushinteger(L, ApiVersion); lua_setfield(L, -2, "api_version");
+			lua_setglobal(L, "mod");
+			lua_pushlightuserdata(L, this);
+			lua_pushcclosure(L, Bridge<&Script::Require>, 1);
+			lua_setglobal(L, "require");
+		}
+
+		void Execute()
+		{
+			Stack stack(L);
+			auto text = ReadText(ResolveFile(manifest.directory, manifest.entry));
+			std::string source = "@" + manifest.id + "/" + manifest.entry;
+			if (luaL_loadbufferx(L, text.data(), text.size(), source.c_str(), "t") != LUA_OK)
+				throw std::runtime_error(String(L, -1));
+			ProtectedCall(L, 0, 0);
+		}
+
+		int Require(lua_State* state)
+		{
+			auto name = String(state, 1);
+			if (!ValidName(name) || name.find('-') != std::string::npos) throw std::runtime_error("invalid module name");
+			if (auto it = modules.find(name); it != modules.end()) { lua_rawgeti(L, LUA_REGISTRYINDEX, it->second); return 1; }
+			if (!loading.insert(name).second) throw std::runtime_error("module cycle: " + name);
+			try
+			{
+				std::string relative = name;
+				std::replace(relative.begin(), relative.end(), '.', '/');
+				relative += ".lua";
+				auto text = ReadText(ResolveFile(manifest.directory, relative));
+				auto source = "@" + manifest.id + "/" + relative;
+				if (luaL_loadbufferx(L, text.data(), text.size(), source.c_str(), "t") != LUA_OK)
+					throw std::runtime_error(String(L, -1));
+				ProtectedCall(L, 0, 1);
+				if (lua_isnil(L, -1)) { lua_pop(L, 1); lua_pushboolean(L, 1); }
+				lua_pushvalue(L, -1);
+				modules.emplace(name, luaL_ref(L, LUA_REGISTRYINDEX));
+				loading.erase(name);
+				return 1;
+			}
+			catch (...) { loading.erase(name); throw; }
+		}
+
+		int Register(lua_State* state)
+		{
+			RegistrationOnly();
+			host.staging.Add(manifest.id, String(state, 1), String(state, 2), ReadData(state, 3));
+			return 0;
+		}
+
+		int On(lua_State* state)
+		{
+			RegistrationOnly();
+			auto event = String(state, 1);
+			if (event != "start" && event != "stop" && event != "save" && event != "restore")
+				throw std::runtime_error("unknown lifecycle event: " + event);
+			if (!lua_isfunction(state, 2)) throw std::runtime_error("callback must be a function");
+			if (callbacks.count(event)) throw std::runtime_error("duplicate lifecycle callback: " + event);
+			lua_pushvalue(L, 2);
+			callbacks.emplace(event, luaL_ref(L, LUA_REGISTRYINDEX));
+			return 0;
+		}
+
+		int Export(lua_State* state)
+		{
+			RegistrationOnly();
+			auto name = String(state, 1);
+			if (!ValidName(name) || exports.count(name) || interfaces.count(name)) throw std::runtime_error("invalid/duplicate export: " + name);
+			if (lua_isfunction(state, 2))
+			{
+				lua_pushvalue(L, 2);
+				interfaces.emplace(name, luaL_ref(L, LUA_REGISTRYINDEX));
+			}
+			else exports.emplace(name, ReadData(state, 2));
+			return 0;
+		}
+
+		Script& Dependency(lua_State* state)
+		{
+			if (host.phase == Phase::Empty || host.phase == Phase::Failed)
+				throw std::runtime_error("mod interfaces are no longer available");
+			auto id = String(state, 1);
+			if (std::find(manifest.dependencies.begin(), manifest.dependencies.end(), id) == manifest.dependencies.end())
+				throw std::runtime_error("import/call requires a declared direct dependency: " + id);
+			for (auto& script : host.scripts) if (script->manifest.id == id) return *script;
+			throw std::runtime_error("dependency is unavailable: " + id);
+		}
+
+		int Import(lua_State* state)
+		{
+			auto& dependency = Dependency(state);
+			auto name = String(state, 2);
+			auto found = dependency.exports.find(name);
+			if (found == dependency.exports.end()) throw std::runtime_error("missing data export: " + dependency.manifest.id + ":" + name);
+			PushData(state, found->second);
+			return 1;
+		}
+
+		int Call(lua_State* state)
+		{
+			if (host.phase == Phase::Empty || host.phase == Phase::Failed)
+				throw std::runtime_error("mod interfaces are no longer available");
+			auto& dependency = Dependency(state);
+			auto name = String(state, 2);
+			auto found = dependency.interfaces.find(name);
+			if (found == dependency.interfaces.end()) throw std::runtime_error("missing interface export: " + name);
+			if (host.callDepth >= 32) throw std::runtime_error("cross-mod call depth exceeded");
+			auto argument = ReadData(state, 3);
+			Stack stack(dependency.L);
+			++host.callDepth;
+			try
+			{
+				lua_rawgeti(dependency.L, LUA_REGISTRYINDEX, found->second);
+				PushData(dependency.L, argument);
+				ProtectedCall(dependency.L, 1, 1);
+				auto result = ReadData(dependency.L, -1);
+				PushData(state, result);
+				--host.callDepth;
+				return 1;
+			}
+			catch (const std::exception& error)
+			{
+				--host.callDepth;
+				throw Error(dependency.manifest.id, "export " + name, error.what());
+			}
+		}
+
+		int SetState(lua_State* state) { this->state = ReadData(state, 1); return 0; }
+		int GetState(lua_State* state) { PushData(state, this->state); return 1; }
+		int Log(lua_State* state)
+		{
+			auto message = String(state, 1);
+			if (host.logger) host.logger(manifest.id, message);
+			return 0;
+		}
+
+		void Callback(const std::string& event, const Data* argument = nullptr)
+		{
+			auto found = callbacks.find(event);
+			if (found == callbacks.end()) return;
+			Stack stack(L);
+			try
+			{
+				lua_rawgeti(L, LUA_REGISTRYINDEX, found->second);
+				if (argument) PushData(L, *argument);
+				ProtectedCall(L, argument ? 1 : 0, 0);
+			}
+			catch (const std::exception& error) { throw Error(manifest.id, event, error.what()); }
+		}
+	};
+
+	Logger logger;
+	Phase phase = Phase::Empty;
+	Registry staging;
+	Registry committed;
+	std::optional<Error> error;
+	std::vector<std::string> diagnostics;
+	std::vector<std::unique_ptr<Script>> scripts;
+	int callDepth = 0;
+
+	explicit Impl(Logger sink) : logger(std::move(sink)) {}
+
+	void Cleanup()
+	{
+		phase = Phase::Stopping;
+		for (auto it = scripts.rbegin(); it != scripts.rend(); ++it)
+		{
+			if (!(*it)->entered) continue;
+			try { (*it)->Callback("stop"); }
+			catch (const std::exception& failure) { diagnostics.emplace_back(failure.what()); }
+		}
+		// lua_close can run user __gc finalizers. All cross-VM calls must be
+		// disabled before any VM is destroyed (including failure cleanup).
+		phase = Phase::Empty;
+		scripts.clear();
+		staging.Clear();
+		committed.Clear();
+		callDepth = 0;
+	}
+
+	void Fail(const Error& failure)
+	{
+		error = failure;
+		diagnostics.emplace_back(failure.what());
+		Cleanup();
+		phase = Phase::Failed;
+	}
+};
+
+Runtime::Runtime(Logger logger) : mImpl(std::make_unique<Impl>(std::move(logger))) {}
+Runtime::~Runtime() { Stop(); }
+Phase Runtime::GetPhase() const { return mImpl->phase; }
+const Registry& Runtime::Contents() const { return mImpl->committed; }
+const std::optional<Error>& Runtime::LastError() const { return mImpl->error; }
+const std::vector<std::string>& Runtime::Diagnostics() const { return mImpl->diagnostics; }
+
+bool Runtime::Start(const Discovery& discovery, const std::vector<std::string>& enabled)
+{
+	auto& impl = *mImpl;
+	if (impl.phase != Phase::Empty && impl.phase != Phase::Failed) return false;
+	impl.error.reset();
+	impl.diagnostics.clear();
+	try
+	{
+		auto ordered = ResolveOrder(discovery, enabled);
+		impl.phase = Phase::Registering;
+		for (const auto& manifest : ordered)
+		{
+			try
+			{
+				impl.scripts.push_back(std::make_unique<Impl::Script>(impl, manifest));
+				auto& script = *impl.scripts.back();
+				script.Initialize();
+				script.entered = true;
+				script.Execute();
+			}
+			catch (const std::exception& failure) { throw Error(manifest.id, "register", failure.what()); }
+		}
+		impl.phase = Phase::Starting;
+		for (auto& script : impl.scripts) script->Callback("start");
+		impl.committed = std::move(impl.staging);
+		impl.staging.Clear();
+		impl.phase = Phase::Running;
+		return true;
+	}
+	catch (const Error& failure) { impl.Fail(failure); }
+	catch (const std::exception& failure) { impl.Fail(Error("framework", "start", failure.what())); }
+	return false;
+}
+
+void Runtime::Stop()
+{
+	if (mImpl->phase == Phase::Empty || mImpl->phase == Phase::Failed) return;
+	mImpl->Cleanup();
+	mImpl->phase = Phase::Empty;
+}
+
+std::optional<Data> Runtime::SaveState()
+{
+	auto& impl = *mImpl;
+	if (impl.phase != Phase::Running) return std::nullopt;
+	try
+	{
+		impl.phase = Phase::Saving;
+		Data snapshot = {{"format", 1}, {"mods", Data::object()}};
+		for (auto& script : impl.scripts)
+		{
+			script->Callback("save");
+			snapshot["mods"][script->manifest.id] = {{"version", script->manifest.version}, {"state", script->state}};
+		}
+		impl.phase = Phase::Running;
+		return snapshot;
+	}
+	catch (const Error& failure) { impl.Fail(failure); }
+	catch (const std::exception& failure) { impl.Fail(Error("framework", "save", failure.what())); }
+	return std::nullopt;
+}
+
+bool Runtime::RestoreState(const Data& snapshot)
+{
+	auto& impl = *mImpl;
+	if (impl.phase != Phase::Running) return false;
+	try
+	{
+		if (snapshot.at("format") != 1 || !snapshot.at("mods").is_object()) throw std::runtime_error("invalid state envelope");
+		for (auto it = snapshot.at("mods").begin(); it != snapshot.at("mods").end(); ++it)
+		{
+			auto script = std::find_if(impl.scripts.begin(), impl.scripts.end(), [&it](const auto& item) { return item->manifest.id == it.key(); });
+			if (script == impl.scripts.end()) throw Error(it.key(), "restore preflight", "required mod is missing/disabled");
+			if (it.value().at("version") != (*script)->manifest.version) throw Error(it.key(), "restore preflight", "exact mod version required");
+			ValidateData(it.value().at("state"));
+		}
+	}
+	catch (const std::exception& failure)
+	{
+		// Preflight is read-only; the caller may retry with a different snapshot.
+		impl.error = Error("framework", "restore preflight", failure.what());
+		impl.diagnostics.emplace_back(impl.error->what());
+		return false;
+	}
+	try
+	{
+		impl.phase = Phase::Restoring;
+		for (auto& script : impl.scripts)
+			if (snapshot["mods"].contains(script->manifest.id)) script->state = snapshot["mods"][script->manifest.id]["state"];
+		for (auto& script : impl.scripts)
+			if (snapshot["mods"].contains(script->manifest.id)) script->Callback("restore", &script->state);
+		impl.phase = Phase::Running;
+		impl.error.reset();
+		return true;
+	}
+	catch (const Error& failure) { impl.Fail(failure); }
+	catch (const std::exception& failure) { impl.Fail(Error("framework", "restore", failure.what())); }
+	return false;
+}
+}
