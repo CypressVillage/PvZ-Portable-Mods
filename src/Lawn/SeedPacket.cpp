@@ -24,6 +24,7 @@
 #include "Cutscene.h"
 #include "Challenge.h"
 #include "SeedPacket.h"
+#include "ModPlants.h"
 #include "../LawnApp.h"
 #include "CursorObject.h"
 #include "../Resources.h"
@@ -210,6 +211,11 @@ void SeedPacket::Update()
 
 void SeedPacketDrawSeed(Graphics* g, float x, float y, SeedType theSeedType, SeedType theImitaterType, float theOffsetX, float theOffsetY, float theScale)
 {
+	if (const auto* definition = Mod::FindPlant(theSeedType))
+	{
+		PvzpDrawImageScaledF(g, definition->card.get(), x + theOffsetX, y + theOffsetY, theScale * g->mScaleX, theScale * g->mScaleY);
+		return;
+	}
 	Image* aImage = IMAGE_PACKET_PLANTS;
 	SeedType aSeedType = theSeedType;
 	if (theSeedType == SeedType::SEED_IMITATER && theImitaterType != SeedType::SEED_NONE)

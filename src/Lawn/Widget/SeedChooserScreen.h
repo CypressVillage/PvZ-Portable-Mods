@@ -26,6 +26,7 @@
 #include "../../PvzpLib/PvzpCommon.h"
 #include "widget/Widget.h"
 #include <memory>
+#include <vector>
 using namespace Sexy;
 
 class Board;
@@ -79,7 +80,8 @@ public:
 	std::unique_ptr<GameButton> mAlmanacButton;
 	std::unique_ptr<GameButton> mMenuButton;
 	std::unique_ptr<GameButton> mImitaterButton;
-	ChosenSeed              mChosenSeeds[NUM_SEED_TYPES];
+	std::vector<ChosenSeed>  mChosenSeeds;
+	int                     mPlantPage = 0;
 	LawnApp*                mApp;
 	Board*                  mBoard;
 	int                     mNumSeedsToChoose;
@@ -101,6 +103,7 @@ public:
 	void                    CrazyDavePickSeeds();
 	bool                    Has7Rows();
 	void                    GetSeedPositionInChooser(int theIndex, int& x, int& y);
+	bool                    IsOnPlantPage(SeedType type) const;
 	void         GetSeedPositionInBank(int theIndex, int& x, int& y);
 	unsigned int SeedNotRecommendedToPick(SeedType theSeedType);
 	bool         SeedNotAllowedToPick(SeedType theSeedType);

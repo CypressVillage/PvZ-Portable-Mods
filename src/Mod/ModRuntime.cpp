@@ -9,6 +9,7 @@ extern "C"
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <tuple>
 
 namespace Mod
 {
@@ -159,6 +160,8 @@ struct Runtime::Impl
 		std::map<std::string, int> callbacks;
 		std::map<std::string, Data> exports;
 		std::map<std::string, int> interfaces;
+		struct Hook { int token; std::string event; std::string type; int priority; int callback; };
+		std::vector<Hook> hooks;
 		Data state = Data::object();
 		bool entered = false;
 
@@ -212,6 +215,14 @@ struct Runtime::Impl
 			lua_pushlstring(L, manifest.id.data(), manifest.id.size()); lua_setfield(L, -2, "id");
 			lua_pushinteger(L, ApiVersion); lua_setfield(L, -2, "api_version");
 			lua_setglobal(L, "mod");
+			lua_newtable(L);
+			Bind<&Script::DefinePlant>("define");
+			Bind<&Script::GetPlant>("get");
+			lua_setglobal(L, "plants");
+			lua_newtable(L);
+			Bind<&Script::HookOn>("on");
+			Bind<&Script::HookOff>("off");
+			lua_setglobal(L, "hooks");
 			lua_pushlightuserdata(L, this);
 			lua_pushcclosure(L, Bridge<&Script::Require>, 1);
 			lua_setglobal(L, "require");
@@ -257,6 +268,105 @@ struct Runtime::Impl
 			RegistrationOnly();
 			host.staging.Add(manifest.id, String(state, 1), String(state, 2), ReadData(state, 3));
 			return 0;
+		}
+
+		int DefinePlant(lua_State* state)
+		{
+			RegistrationOnly();
+			auto name = String(state, 1);
+			auto definition = ReadData(state, 2);
+			if (!definition.is_object()) throw std::runtime_error("plant definition must be an object");
+			const std::set<std::string> fields = {"name", "description", "cost", "cooldown", "health", "appearance", "card"};
+			for (auto it = definition.begin(); it != definition.end(); ++it)
+				if (!fields.count(it.key())) throw std::runtime_error("unsupported plant field: " + it.key());
+			for (const char* field : {"name", "description"})
+			{
+				if (!definition.contains(field)) definition[field] = field == std::string("name") ? name : "";
+				if (!definition[field].is_string() || (field == std::string("name") && definition[field].get<std::string>().empty()))
+					throw std::runtime_error(std::string(field) + " must be a string (name must not be empty)");
+			}
+			for (const auto& [field, fallback, minimum, maximum] : {
+				std::tuple{"cost", 50, 0, 9990}, std::tuple{"cooldown", 750, 1, 1000000}, std::tuple{"health", 300, 1, 100000000}})
+			{
+				if (!definition.contains(field)) definition[field] = fallback;
+				if (!definition[field].is_number_integer() || definition[field] < minimum || definition[field] > maximum)
+					throw std::runtime_error(std::string(field) + " must be an integer in " + std::to_string(minimum) + ".." + std::to_string(maximum));
+			}
+			for (const char* field : {"appearance", "card"})
+			{
+				if (field == std::string("card") && !definition.contains(field)) definition[field] = definition.at("appearance");
+				const auto& asset = definition.at(field);
+				if (!asset.is_object() || asset.size() != 1 || !asset.contains("image") || !asset["image"].is_string())
+					throw std::runtime_error(std::string(field) + " must contain only image = 'relative/path.png'");
+				auto path = ResolveFile(manifest.directory, asset["image"].get<std::string>());
+				if (path.extension() != ".png") throw std::runtime_error("plant images must be PNG files");
+			}
+			host.staging.Add(manifest.id, "plant", name, definition);
+			auto id = manifest.id + ":" + name;
+			host.plants.emplace(id, Content{id, "plant", manifest.id, std::move(definition)});
+			lua_pushlstring(state, id.data(), id.size());
+			return 1;
+		}
+
+		int GetPlant(lua_State* state)
+		{
+			auto id = String(state, 1);
+			if (id.find(':') == std::string::npos) id = manifest.id + ":" + id;
+			auto found = host.plants.find(id);
+			if (found == host.plants.end()) { lua_pushnil(state); return 1; }
+			auto value = found->second.definition;
+			value["id"] = id;
+			PushData(state, value);
+			return 1;
+		}
+
+		int HookOn(lua_State* state)
+		{
+			RegistrationOnly();
+			auto event = String(state, 1);
+			static const std::set<std::string> events = {"plant.before_initialize", "plant.spawned", "plant.removed", "plant.can_place"};
+			if (!events.count(event)) throw std::runtime_error("unsupported plant hook: " + event);
+			int callback = 2, priority = 0;
+			std::string type;
+			if (lua_istable(state, 2))
+			{
+				auto options = ReadData(state, 2);
+				for (auto it = options.begin(); it != options.end(); ++it)
+					if (it.key() != "type" && it.key() != "priority") throw std::runtime_error("unknown hook option: " + it.key());
+				if (options.contains("type"))
+				{
+					type = options.at("type").get<std::string>();
+					if (type.find(':') == std::string::npos) type = manifest.id + ":" + type;
+				}
+				if (options.contains("priority"))
+				{
+					const auto& value = options.at("priority");
+					if (!value.is_number_integer() || value < -1000000 || value > 1000000) throw std::runtime_error("invalid hook priority");
+					priority = value.get<int>();
+				}
+				callback = 3;
+			}
+			if (!lua_isfunction(state, callback)) throw std::runtime_error("hook callback must be a function");
+			lua_pushvalue(state, callback);
+			int token = ++host.nextHook;
+			hooks.push_back({token, event, type, priority, luaL_ref(state, LUA_REGISTRYINDEX)});
+			lua_pushinteger(state, token);
+			return 1;
+		}
+
+		int HookOff(lua_State* state)
+		{
+			if (!lua_isinteger(state, 1)) throw std::runtime_error("hook token must be an integer");
+			auto token = lua_tointeger(state, 1);
+			for (auto it = hooks.begin(); it != hooks.end(); ++it) if (it->token == token)
+			{
+				luaL_unref(state, LUA_REGISTRYINDEX, it->callback);
+				hooks.erase(it);
+				lua_pushboolean(state, true);
+				return 1;
+			}
+			lua_pushboolean(state, false);
+			return 1;
 		}
 
 		int On(lua_State* state)
@@ -364,6 +474,8 @@ struct Runtime::Impl
 	Phase phase = Phase::Empty;
 	Registry staging;
 	Registry committed;
+	std::map<std::string, Content> plants;
+	int nextHook = 0;
 	std::optional<Error> error;
 	std::vector<std::string> diagnostics;
 	std::vector<std::unique_ptr<Script>> scripts;
@@ -386,6 +498,8 @@ struct Runtime::Impl
 		scripts.clear();
 		staging.Clear();
 		committed.Clear();
+		plants.clear();
+		nextHook = 0;
 		callDepth = 0;
 	}
 
@@ -404,6 +518,78 @@ Phase Runtime::GetPhase() const { return mImpl->phase; }
 const Registry& Runtime::Contents() const { return mImpl->committed; }
 const std::optional<Error>& Runtime::LastError() const { return mImpl->error; }
 const std::vector<std::string>& Runtime::Diagnostics() const { return mImpl->diagnostics; }
+const std::map<std::string, Content>& Runtime::Plants() const { return mImpl->plants; }
+
+bool Runtime::HasGameHooks() const
+{
+	for (const auto& script : mImpl->scripts) if (!script->hooks.empty()) return true;
+	return false;
+}
+
+std::string Runtime::ConfigurationIdentity() const
+{
+	Data identity = Data::array();
+	for (const auto& script : mImpl->scripts)
+		identity.push_back({{"id", script->manifest.id}, {"version", script->manifest.version}});
+	return identity.dump();
+}
+
+std::filesystem::path Runtime::PlantAsset(const std::string& id, bool card) const
+{
+	const auto& plant = mImpl->plants.at(id);
+	for (const auto& script : mImpl->scripts) if (script->manifest.id == plant.owner)
+		return ResolveFile(script->manifest.directory, plant.definition.at(card ? "card" : "appearance").at("image").get<std::string>());
+	throw std::runtime_error("plant owner is unavailable: " + id);
+}
+
+void Runtime::Dispatch(const std::string& event, Data& context)
+{
+	auto& impl = *mImpl;
+	if (impl.phase != Phase::Running) return;
+	struct Entry { Impl::Script* script; int token; int priority; };
+	std::vector<Entry> entries;
+	for (auto& script : impl.scripts) for (const auto& hook : script->hooks)
+		if (hook.event == event && (hook.type.empty() || hook.type == context.value("type", std::string())))
+			entries.push_back({script.get(), hook.token, hook.priority});
+	std::stable_sort(entries.begin(), entries.end(), [](const auto& a, const auto& b) { return a.priority < b.priority; });
+	for (const auto& entry : entries)
+	{
+		auto& script = *entry.script;
+		auto found = std::find_if(script.hooks.begin(), script.hooks.end(), [&](const auto& hook) { return hook.token == entry.token; });
+		if (found == script.hooks.end()) continue;
+		Stack stack(script.L);
+		try
+		{
+			lua_rawgeti(script.L, LUA_REGISTRYINDEX, found->callback);
+			PushData(script.L, context);
+			lua_pushvalue(script.L, -1);
+			int reference = luaL_ref(script.L, LUA_REGISTRYINDEX);
+			try { ProtectedCall(script.L, 1, 0); }
+			catch (...) { luaL_unref(script.L, LUA_REGISTRYINDEX, reference); throw; }
+			lua_rawgeti(script.L, LUA_REGISTRYINDEX, reference);
+			luaL_unref(script.L, LUA_REGISTRYINDEX, reference);
+			auto changed = ReadData(script.L, -1);
+			// Identity and coordinates are observational. Only documented fields mutate.
+			if (event == "plant.before_initialize")
+			{
+				const auto& health = changed.at("health");
+				if (!health.is_number_integer() || health < 1 || health > 100000000) throw std::runtime_error("hook health must be an integer in 1..100000000");
+				context["health"] = health;
+			}
+			else if (event == "plant.can_place")
+			{
+				if (!changed.at("cancel").is_boolean()) throw std::runtime_error("hook cancel must be boolean");
+				context["cancel"] = changed.at("cancel");
+			}
+		}
+		catch (const std::exception& failure)
+		{
+			Error error(script.manifest.id, event, failure.what());
+			impl.diagnostics.emplace_back(error.what());
+			if (impl.logger) impl.logger(script.manifest.id, error.what());
+		}
+	}
+}
 
 bool Runtime::Start(const Discovery& discovery, const std::vector<std::string>& enabled)
 {

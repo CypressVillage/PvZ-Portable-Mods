@@ -1,0 +1,1 @@
+return {cost = 50}

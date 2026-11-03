@@ -26,6 +26,13 @@ public:
 	const Registry& Contents() const;
 	const std::optional<Error>& LastError() const;
 	const std::vector<std::string>& Diagnostics() const;
+	// Playable, validated definitions created by plants.define (not mod.register).
+	const std::map<std::string, Content>& Plants() const;
+	std::filesystem::path PlantAsset(const std::string& id, bool card = false) const;
+	bool HasGameHooks() const;
+	std::string ConfigurationIdentity() const;
+	// Game-thread only. Each handler receives the previous handler's edits.
+	void Dispatch(const std::string& event, Data& context);
 	// Foundation state envelope, NOT a Board/game save. No closures, stacks or
 	// numeric runtime handles. The future game-save layer owns atomic disk I/O.
 	std::optional<Data> SaveState();

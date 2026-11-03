@@ -21,6 +21,7 @@
 
 #include "Music.h"
 #include "SaveGame.h"
+#include "../ModPlants.h"
 #include "../Board.h"
 #include "../Challenge.h"
 #include "../SeedPacket.h"
@@ -2757,6 +2758,7 @@ static void SyncBoard(SaveGameContext& theContext, Board* theBoard)
 
 bool LawnLoadGame(Board* theBoard, const std::string& theFilePath)
 {
+	if (Mod::GameplayActive()) return false;
 	if (LawnLoadGameV4(theBoard, theFilePath))
 	{
 		PvzpLogLn("Loaded save game (v4)");
@@ -2792,6 +2794,8 @@ bool LawnLoadGame(Board* theBoard, const std::string& theFilePath)
 
 bool LawnSaveGame(Board* theBoard, const std::string& theFilePath)
 {
+	// Session-local custom type numbers must never enter a vanilla save.
+	if (Mod::GameplayActive()) return false;
 	std::vector<uint8_t> aPayload;
 	if (!WriteChunkV4(aPayload, SAVE4_CHUNK_BOARD_BASE, theBoard)) return false;
 	if (!WriteChunkV4(aPayload, SAVE4_CHUNK_ZOMBIES, theBoard)) return false;

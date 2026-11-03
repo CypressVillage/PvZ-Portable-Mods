@@ -25,6 +25,8 @@
 #include <format>
 #include "LawnApp.h"
 #include "Mod/ModRuntime.h"
+#include "Lawn/ModPlants.h"
+#include "misc/RegEmu.h"
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
 #include "Lawn/Board.h"
@@ -1177,8 +1179,7 @@ void LawnApp::Init()
 #endif
 	PvzpLogLn("session id: {}", static_cast<long long>(mSessionID));
 
-	// Step 1 only runs the foundation lifecycle; registered content is not yet
-	// connected to vanilla gameplay or profiles. No implicit auto-enable.
+	// No implicit auto-enable. Playable definitions are published on this thread.
 	mModRuntime = std::make_unique<Mod::Runtime>([](const std::string& id, const std::string& message) {
 		PvzpLogLn("[mod {}] {}", id, message);
 	});
@@ -1194,6 +1195,16 @@ void LawnApp::Init()
 		auto discovery = Mod::Discover(Sexy::PathFromU8(Sexy::GetResourcePath("mods")));
 		for (const auto& error : discovery.errors) PvzpLogLn("{}", error.what());
 		if (!mModRuntime->Start(discovery, enabled)) throw *mModRuntime->LastError();
+		mModPlants = std::make_unique<Mod::Plants>(*this, *mModRuntime);
+		if (mModPlants->GameplayActive())
+		{
+			// Separate the entire profile tree before ProfileMgr::Load. Vanilla
+			// progress is never read or written by this experimental gameplay API.
+			SetAppDataFolder(GetAppDataPath("mod-profiles/" + mModPlants->ProfileKey()));
+			MkDir(GetAppDataPath("userdata"));
+			regemu::SetRegFile(GetAppDataPath("registry.regemu"));
+			PvzpLogLn("Mod plant profiles: {} (mid-level saves disabled)", GetAppDataPath("userdata"));
+		}
 	}
 	catch (const std::exception& error)
 	{
@@ -2297,6 +2308,7 @@ int LawnApp::GetSeedsAvailable()
 
 bool LawnApp::HasSeedType(SeedType theSeedType)
 {
+	if (theSeedType >= Mod::FirstPlantType) return Mod::FindPlant(theSeedType) != nullptr;
 	if (IsTrialStageLocked() && theSeedType >= SeedType::SEED_JALAPENO)
 		return false;
 

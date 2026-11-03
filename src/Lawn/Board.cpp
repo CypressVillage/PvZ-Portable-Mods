@@ -25,6 +25,7 @@
 #include <format>
 #include "ZenGarden.h"
 #include "BoardInclude.h"
+#include "ModPlants.h"
 #include "LawnCommon.h"
 #include "System/Music.h"
 #include "System/SaveGame.h"
@@ -335,6 +336,7 @@ void Board::TryToSaveGame()
 
 bool Board::NeedSaveGame()
 {
+	if (Mod::GameplayActive()) return false;
 	return
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ICE &&
 		mApp->mGameMode != GameMode::GAMEMODE_UPSELL &&
@@ -360,6 +362,7 @@ void Board::ResetFPSStats()
 
 bool Board::LoadGame(const std::string& theFileName)
 {
+	if (Mod::GameplayActive()) return false;
 	if (!LawnLoadGame(this, theFileName))
 		return false;
 
@@ -2021,6 +2024,8 @@ Plant* Board::NewPlant(int theGridX, int theGridY, SeedType theSeedType, SeedTyp
 	Plant* aPlant = mPlants.DataArrayAlloc();
 	aPlant->mIsOnBoard = true;
 	aPlant->PlantInitialize(theGridX, theGridY, theSeedType, theImitaterType);
+	auto context = Mod::PlantContext(*aPlant);
+	Mod::PlantHook("plant.spawned", context);
 	return aPlant;
 }
 
@@ -2692,6 +2697,14 @@ PlantingReason Board::CanPlantAt(int theGridX, int theGridY, SeedType theSeedTyp
 		return PlantingReason::PLANTING_NOT_HERE;
 	}
 
+	// Hooks may veto placement, but cannot bypass native occupancy/terrain checks.
+	auto aType = Mod::PlantTypeId(theSeedType);
+	if (!aType.empty())
+	{
+		Mod::Data aContext = {{"type", aType}, {"column", theGridX}, {"row", theGridY}, {"cancel", false}};
+		Mod::PlantHook("plant.can_place", aContext);
+		if (aContext.at("cancel").get<bool>()) return PlantingReason::PLANTING_NOT_HERE;
+	}
 	PlantingReason aReason = mChallenge->CanPlantAt(theGridX, theGridY, theSeedType);
 	if (aReason != PlantingReason::PLANTING_OK || Challenge::IsZombieSeedType(theSeedType))
 	{

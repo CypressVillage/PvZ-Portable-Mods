@@ -21,6 +21,7 @@
 
 #include "Coin.h"
 #include "Plant.h"
+#include "ModPlants.h"
 #include "Board.h"
 #include "Zombie.h"
 #include "Cutscene.h"
@@ -488,6 +489,17 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 		(theSeedType == SeedType::SEED_WALLNUT || theSeedType == SeedType::SEED_SUNFLOWER || theSeedType == SeedType::SEED_MARIGOLD))
 	{
 		mPlantHealth *= 2;
+	}
+	if (const auto* definition = Mod::FindPlant(mSeedType))
+	{
+		mPlantHealth = definition->health;
+		mNumFrames = 1;
+	}
+	if (IsOnBoard())
+	{
+		auto context = Mod::PlantContext(*this);
+		Mod::PlantHook("plant.before_initialize", context);
+		mPlantHealth = context.at("health").get<int>();
 	}
 	mPlantMaxHealth = mPlantHealth;
 
@@ -3436,6 +3448,11 @@ void Plant::Animate()
 	{
 		mBeghouledFlashCountdown--;
 	}
+	if (Mod::FindPlant(mSeedType))
+	{
+		mFrame = 0;
+		return;
+	}
 
 	if (mSquished)
 	{
@@ -4930,6 +4947,7 @@ int Plant::DistanceToClosestZombie()
 
 void Plant::Die()
 {
+	if (mDead) return;
 	if (IsOnBoard() && mSeedType == SeedType::SEED_TANGLEKELP)
 	{
 		Zombie* aZombie = mBoard->ZombieTryToGet(mTargetZombieID);
@@ -4940,6 +4958,11 @@ void Plant::Die()
 	}
 
 	mDead = true;
+	if (IsOnBoard())
+	{
+		auto context = Mod::PlantContext(*this);
+		Mod::PlantHook("plant.removed", context);
+	}
 	RemoveEffects();
 
 	if (!Plant::IsFlying(mSeedType) && IsOnBoard())
@@ -4965,8 +4988,9 @@ void Plant::Die()
 
 const PlantDefinition& GetPlantDefinition(SeedType theSeedType)
 {
-	PVZP_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->definition;
 	PVZP_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::NUM_SEED_TYPES));
+	PVZP_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
 
 	return gPlantDefs[theSeedType];
 }
@@ -5036,6 +5060,7 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType)
 
 std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 {
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->name;
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aName = std::format("[{}]", aPlantDef.mPlantName);
 	std::string aTranslatedName(PvzpStringTranslate(aName));
@@ -5053,6 +5078,7 @@ std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 
 std::string Plant::GetToolTip(SeedType theSeedType)
 {
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->description;
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aToolTip = std::format("[{}_TOOLTIP]", aPlantDef.mPlantName);
 	return std::string(PvzpStringTranslate(aToolTip));
