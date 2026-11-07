@@ -17,6 +17,9 @@ class Runtime
 {
 public:
 	using Logger = std::function<void(const std::string&, const std::string&)>;
+	using GameApi = std::function<Data(const std::string&, const Data&)>;
+	void SetGameApi(GameApi api);
+	void ForgetEntity(const std::string& entity);
 	explicit Runtime(Logger logger = {});
 	~Runtime();
 	Runtime(const Runtime&) = delete;

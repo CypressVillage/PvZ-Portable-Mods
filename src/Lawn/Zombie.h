@@ -178,6 +178,9 @@ public:
 	void                            DrawZombiePart(Graphics* g, Image* theImage, int theFrame, int theRow, const ZombieDrawPosition& theDrawPos);
 	void                            DrawBungeeCord(Graphics* g, int theOffsetX);
 	void                            TakeDamage(int theDamage, unsigned int theDamageFlags);
+#ifdef PVZ_MOD
+	bool                            HasMagnetAttractableItem() const;
+#endif
 	void                 SetRow(int theRow);
 	float                           GetPosYBasedOnRow(int theRow);
 	void                            ApplyChill(bool theIsIceTrap);

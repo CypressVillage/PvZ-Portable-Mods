@@ -166,6 +166,7 @@ struct Runtime::Impl
 		struct UiButton { Runtime::Button view; int callback; };
 		std::vector<UiButton> buttons;
 		Data state = Data::object();
+		std::map<std::string, Data> entityStates;
 		bool entered = false;
 
 		Script(Impl& owner, Manifest info) : host(owner), manifest(std::move(info)) {}
@@ -221,7 +222,18 @@ struct Runtime::Impl
 			lua_newtable(L);
 			Bind<&Script::DefinePlant>("define");
 			Bind<&Script::GetPlant>("get");
+			Bind<&Script::PlayAnimation>("play_animation");
 			lua_setglobal(L, "plants");
+			lua_newtable(L);
+			Bind<&Script::GetEntity>("get");
+			lua_setglobal(L, "entities");
+			lua_newtable(L);
+			Bind<&Script::QueryZombies>("query");
+			Bind<&Script::DamageZombie>("damage");
+			lua_setglobal(L, "zombies");
+			lua_newtable(L);
+			Bind<&Script::Lightning>("lightning");
+			lua_setglobal(L, "effects");
 			lua_newtable(L);
 			Bind<&Script::HookOn>("on");
 			Bind<&Script::HookOff>("off");
@@ -343,7 +355,7 @@ struct Runtime::Impl
 			auto name = String(state, 1);
 			auto definition = ReadData(state, 2);
 			if (!definition.is_object()) throw std::runtime_error("plant definition must be an object");
-			const std::set<std::string> fields = {"name", "description", "cost", "cooldown", "health", "appearance", "card"};
+			const std::set<std::string> fields = {"name", "description", "cost", "cooldown", "health", "appearance", "card", "upgrade", "traits"};
 			for (auto it = definition.begin(); it != definition.end(); ++it)
 				if (!fields.count(it.key())) throw std::runtime_error("unsupported plant field: " + it.key());
 			for (const char* field : {"name", "description"})
@@ -359,10 +371,40 @@ struct Runtime::Impl
 				if (!definition[field].is_number_integer() || definition[field] < minimum || definition[field] > maximum)
 					throw std::runtime_error(std::string(field) + " must be an integer in " + std::to_string(minimum) + ".." + std::to_string(maximum));
 			}
+			if (definition.contains("upgrade"))
+			{
+				const auto& upgrade = definition.at("upgrade");
+				if (!upgrade.is_object() || upgrade.size() != 1 || !upgrade.at("from").is_string())
+					throw std::runtime_error("upgrade must contain only from = 'plant-id'");
+			}
+			if (definition.contains("traits"))
+			{
+				if (!definition["traits"].is_object()) throw std::runtime_error("traits must be an object");
+				for (auto it = definition["traits"].begin(); it != definition["traits"].end(); ++it)
+					if ((it.key() != "fungus" && it.key() != "nocturnal") || !it.value().is_boolean())
+						throw std::runtime_error("traits supports only fungus and nocturnal booleans");
+			}
 			for (const char* field : {"appearance", "card"})
 			{
-				if (field == std::string("card") && !definition.contains(field)) definition[field] = definition.at("appearance");
+				if (field == std::string("card") && !definition.contains(field))
+				{
+					if (definition.at("appearance").contains("reanim")) throw std::runtime_error("Reanim plants require a card image");
+					definition[field] = definition.at("appearance");
+				}
 				const auto& asset = definition.at(field);
+				if (field == std::string("appearance") && asset.contains("reanim"))
+				{
+					for (auto it = asset.begin(); it != asset.end(); ++it)
+						if (it.key() != "reanim" && it.key() != "animations") throw std::runtime_error("unsupported Reanim appearance field: " + it.key());
+					if (ResolveFile(manifest.directory, asset.at("reanim").get<std::string>()).extension() != ".reanim")
+						throw std::runtime_error("external animations must be .reanim XML files");
+					const auto& actions = asset.at("animations");
+					if (!actions.is_object() || actions.size() != 3) throw std::runtime_error("animations must contain idle, attack and sleep");
+					for (const char* action : {"idle", "attack", "sleep"})
+						if (!actions.at(action).is_string() || actions.at(action).get<std::string>().empty())
+							throw std::runtime_error("animation actions must name Reanim tracks");
+					continue;
+				}
 				if (!asset.is_object() || asset.size() != 1 || !asset.contains("image") || !asset["image"].is_string())
 					throw std::runtime_error(std::string(field) + " must contain only image = 'relative/path.png'");
 				auto path = ResolveFile(manifest.directory, asset["image"].get<std::string>());
@@ -379,6 +421,7 @@ struct Runtime::Impl
 		{
 			auto id = String(state, 1);
 			if (id.find(':') == std::string::npos) id = manifest.id + ":" + id;
+			if (id.starts_with("base:")) { PushData(state, host.gameApi("plants.get", id)); return 1; }
 			auto found = host.plants.find(id);
 			if (found == host.plants.end()) { lua_pushnil(state); return 1; }
 			auto value = found->second.definition;
@@ -387,11 +430,23 @@ struct Runtime::Impl
 			return 1;
 		}
 
+		int GameCall(lua_State* state, const char* operation, Data arguments)
+		{
+			if (host.phase != Phase::Running || !host.boardActive) throw std::runtime_error("game operation requires an active level");
+			PushData(state, host.gameApi(operation, arguments));
+			return 1;
+		}
+		int GetEntity(lua_State* state) { return GameCall(state, "entities.get", String(state, 1)); }
+		int QueryZombies(lua_State* state) { return GameCall(state, "zombies.query", ReadData(state, 1)); }
+		int DamageZombie(lua_State* state) { return GameCall(state, "zombies.damage", {{"entity", String(state, 1)}, {"options", ReadData(state, 2)}}); }
+		int PlayAnimation(lua_State* state) { return GameCall(state, "plants.play_animation", {{"entity", String(state, 1)}, {"action", String(state, 2)}}); }
+		int Lightning(lua_State* state) { return GameCall(state, "effects.lightning", ReadData(state, 1)); }
+
 		int HookOn(lua_State* state)
 		{
 			RegistrationOnly();
 			auto event = String(state, 1);
-			static const std::set<std::string> events = {"plant.before_initialize", "plant.spawned", "plant.removed", "plant.can_place", "level.started", "level.ended"};
+			static const std::set<std::string> events = {"plant.before_initialize", "plant.spawned", "plant.removed", "plant.can_place", "plant.updated", "level.started", "level.ended"};
 			if (!events.count(event)) throw std::runtime_error("unsupported hook: " + event);
 			int callback = 2, priority = 0;
 			std::string type;
@@ -548,6 +603,7 @@ struct Runtime::Impl
 	std::vector<std::unique_ptr<Script>> scripts;
 	int callDepth = 0;
 	bool boardActive = false;
+	GameApi gameApi;
 	double timeScale = 1.0, timeRemainder = 0.0;
 
 	explicit Impl(Logger sink) : logger(std::move(sink)) {}
@@ -591,6 +647,11 @@ const Registry& Runtime::Contents() const { return mImpl->committed; }
 const std::optional<Error>& Runtime::LastError() const { return mImpl->error; }
 const std::vector<std::string>& Runtime::Diagnostics() const { return mImpl->diagnostics; }
 const std::map<std::string, Content>& Runtime::Plants() const { return mImpl->plants; }
+void Runtime::SetGameApi(GameApi api) { mImpl->gameApi = std::move(api); }
+void Runtime::ForgetEntity(const std::string& entity)
+{
+	for (auto& script : mImpl->scripts) script->entityStates.erase(entity);
+}
 
 bool Runtime::HasGameHooks() const
 {
@@ -647,6 +708,7 @@ void Runtime::EndBoard()
 	mImpl->timeRemainder = 0;
 	Data context = Data::object();
 	Dispatch("level.ended", context);
+	for (auto& script : mImpl->scripts) script->entityStates.clear();
 }
 
 std::string Runtime::ConfigurationIdentity() const
@@ -661,7 +723,10 @@ std::filesystem::path Runtime::PlantAsset(const std::string& id, bool card) cons
 {
 	const auto& plant = mImpl->plants.at(id);
 	for (const auto& script : mImpl->scripts) if (script->manifest.id == plant.owner)
-		return ResolveFile(script->manifest.directory, plant.definition.at(card ? "card" : "appearance").at("image").get<std::string>());
+	{
+		const auto& asset = plant.definition.at(card ? "card" : "appearance");
+		return ResolveFile(script->manifest.directory, asset.at(asset.contains("reanim") ? "reanim" : "image").get<std::string>());
+	}
 	throw std::runtime_error("plant owner is unavailable: " + id);
 }
 
@@ -684,7 +749,14 @@ void Runtime::Dispatch(const std::string& event, Data& context)
 		try
 		{
 			lua_rawgeti(script.L, LUA_REGISTRYINDEX, found->callback);
-			PushData(script.L, context);
+			auto input = context;
+			if (event == "plant.updated")
+			{
+				auto& state = script.entityStates[context.at("entity").get<std::string>()];
+				if (state.is_null()) state = Data::object();
+				input["state"] = state;
+			}
+			PushData(script.L, input);
 			lua_pushvalue(script.L, -1);
 			int reference = luaL_ref(script.L, LUA_REGISTRYINDEX);
 			try { ProtectedCall(script.L, 1, 0); }
@@ -692,6 +764,7 @@ void Runtime::Dispatch(const std::string& event, Data& context)
 			lua_rawgeti(script.L, LUA_REGISTRYINDEX, reference);
 			luaL_unref(script.L, LUA_REGISTRYINDEX, reference);
 			auto changed = ReadData(script.L, -1);
+			if (event == "plant.updated") script.entityStates[context.at("entity").get<std::string>()] = changed.at("state");
 			// Identity and coordinates are observational. Only documented fields mutate.
 			if (event == "plant.before_initialize")
 			{

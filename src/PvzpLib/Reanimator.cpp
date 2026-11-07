@@ -218,9 +218,17 @@ inline void ReanimationFillInMissingData(void*& thePrev, void*& theValue)
 		thePrev = theValue;
 }
 
+#ifdef PVZ_MOD
+bool ReanimationLoadDefinition(const std::string& theFileName, ReanimatorDefinition* theDefinition, const std::function<Image*(const std::string&)>* images)
+#else
 bool ReanimationLoadDefinition(const std::string& theFileName, ReanimatorDefinition* theDefinition)
+#endif
 {
+#ifdef PVZ_MOD
+	if (!DefinitionLoadXML(theFileName, &gReanimatorDefMap, theDefinition, images))
+#else
 	if (!DefinitionLoadXML(theFileName, &gReanimatorDefMap, theDefinition))
+#endif
 		return false;
 
 	for (int aTrackIndex = 0; aTrackIndex < theDefinition->mTracks.count; aTrackIndex++)
@@ -359,6 +367,10 @@ void Reanimation::ReanimationInitializeType(float theX, float theY, ReanimationT
 
 void ReanimationCreateAtlas(ReanimatorDefinition* theDefinition, ReanimationType theReanimationType)
 {
+#ifdef PVZ_MOD
+	// External definitions have no entry in the vanilla parameter array.
+	if (theReanimationType == REANIM_NONE) return;
+#endif
 	const ReanimationParams& aParam = gReanimationParamArray[theReanimationType];
 	if (theDefinition->mReanimAtlas != nullptr || TestBit(aParam.mReanimParamFlags, ReanimFlags::REANIM_NO_ATLAS))
 		return;
@@ -612,6 +624,9 @@ void Reanimation::MatrixFromTransform(const ReanimatorTransform& theTransform, S
 void Reanimation::ReanimBltMatrix(Graphics* g, Image* theImage, SexyMatrix3& theTransform, const Rect& theClipRect, const Color& theColor, int theDrawMode, const Rect& theSrcRect)
 {
 	if (!gSexyAppBase->Is3DAccelerated() &&
+#ifdef PVZ_MOD
+		mReanimationType != REANIM_NONE &&
+#endif
 		TestBit(gReanimationParamArray[mReanimationType].mReanimParamFlags, static_cast<int>(ReanimFlags::REANIM_FAST_DRAW_IN_SW_MODE)) &&
 		FloatApproxEqual(theTransform.m01, 0.0f) && FloatApproxEqual(theTransform.m10, 0.0f) &&  // no horizontal or vertical skew
 		theTransform.m00 > 0.0f && theTransform.m11 > 0.0f &&  // positive horizontal and vertical scale
@@ -1172,6 +1187,18 @@ Reanimation* ReanimationHolder::AllocReanimation(float theX, float theY, int the
 	aReanim->ReanimationInitializeType(theX, theY, theReanimationType);
 	return aReanim;
 }
+
+#ifdef PVZ_MOD
+Reanimation* ReanimationHolder::AllocReanimation(float theX, float theY, int theRenderOrder, ReanimatorDefinition* definition)
+{
+	Reanimation* animation = mReanimations.DataArrayAlloc();
+	animation->mRenderOrder = theRenderOrder;
+	animation->mReanimationHolder = this;
+	animation->mReanimationType = REANIM_NONE;
+	animation->ReanimationInitialize(theX, theY, definition);
+	return animation;
+}
+#endif
 
 void ReanimatorEnsureDefinitionLoaded(ReanimationType theReanimType, bool theIsPreloading)
 {

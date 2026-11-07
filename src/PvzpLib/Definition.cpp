@@ -370,8 +370,19 @@ bool DefinitionLoadFont(_Font** theFont, const std::string& theName)
 	return aFont != nullptr;
 }
 
+#ifdef PVZ_MOD
+bool DefinitionLoadXML(const std::string& theFileName, const DefMap* theDefMap, void* theDefinition, const DefinitionImageResolver* images)
+#else
 bool DefinitionLoadXML(const std::string& theFileName, const DefMap* theDefMap, void* theDefinition)
+#endif
 {
+#ifdef PVZ_MOD
+	if (images)
+	{
+		XMLParser parser;
+		return parser.OpenFile(theFileName) && DefinitionLoadMap(&parser, theDefMap, theDefinition, images);
+	}
+#endif
 	return DefinitionCompileAndLoad(theFileName, theDefMap, theDefinition);
 }
 
@@ -793,7 +804,11 @@ bool DefinitionReadVector2Field(XMLParser* theXmlParser, SexyVector2* theValue)
 	return false;
 }
 
+#ifdef PVZ_MOD
+bool DefinitionReadArrayField(XMLParser* theXmlParser, DefinitionArrayDef* theArray, const DefField* theField, const DefinitionImageResolver* images)
+#else
 bool DefinitionReadArrayField(XMLParser* theXmlParser, DefinitionArrayDef* theArray, const DefField* theField)
+#endif
 {
 	const DefMap* aDefMap = (const DefMap*)theField->mExtraData;
 
@@ -816,7 +831,11 @@ bool DefinitionReadArrayField(XMLParser* theXmlParser, DefinitionArrayDef* theAr
 		theArray->mArrayCount++;
 	}
 
+#ifdef PVZ_MOD
+	if (DefinitionLoadMap(theXmlParser, aDefMap, (unsigned char*)theArray->mArrayData + aDefMap->mDefSize * (theArray->mArrayCount - 1), images))
+#else
 	if (DefinitionLoadMap(theXmlParser, aDefMap, (unsigned char*)theArray->mArrayData + aDefMap->mDefSize * (theArray->mArrayCount - 1)))
+#endif
 		return true;
 
 	DefinitionXmlError(theXmlParser, "failed to read sub def");
@@ -1053,12 +1072,23 @@ bool DefinitionReadFlagField(XMLParser* theXmlParser, const std::string& theElem
 	return true;
 }
 
+#ifdef PVZ_MOD
+bool DefinitionReadImageField(XMLParser* theXmlParser, Image** theImage, const DefinitionImageResolver* images)
+#else
 bool DefinitionReadImageField(XMLParser* theXmlParser, Image** theImage)
+#endif
 {
 	std::string aStringValue;
 	if (!DefinitionReadXMLString(theXmlParser, aStringValue))
 		return false;
 
+#ifdef PVZ_MOD
+	if (images)
+	{
+		*theImage = aStringValue.empty() ? nullptr : (*images)(aStringValue);
+		return aStringValue.empty() || *theImage != nullptr;
+	}
+#endif
 	if (DefinitionLoadImage(theImage, aStringValue))
 		return true;
 
@@ -1083,7 +1113,11 @@ bool DefinitionReadFontField(XMLParser* theXmlParser, _Font** theFont)
 	return false;
 }
 
+#ifdef PVZ_MOD
+bool DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, bool* theDone, const DefinitionImageResolver* images)
+#else
 bool DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, bool* theDone)
+#endif
 {
 	if (theXmlParser->HasFailed())
 		return false;
@@ -1128,13 +1162,21 @@ bool DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void*
 				aSuccess = DefinitionReadVector2Field(theXmlParser, (SexyVector2*)pVar);
 				break;
 			case DefFieldType::DT_ARRAY:
+#ifdef PVZ_MOD
+				aSuccess = DefinitionReadArrayField(theXmlParser, (DefinitionArrayDef*)pVar, aField, images);
+#else
 				aSuccess = DefinitionReadArrayField(theXmlParser, (DefinitionArrayDef*)pVar, aField);
+#endif
 				break;
 			case DefFieldType::DT_TRACK_FLOAT:
 				aSuccess = DefinitionReadFloatTrackField(theXmlParser, (FloatParameterTrack*)pVar);
 				break;
 			case DefFieldType::DT_IMAGE:
+#ifdef PVZ_MOD
+				aSuccess = DefinitionReadImageField(theXmlParser, (Image**)pVar, images);
+#else
 				aSuccess = DefinitionReadImageField(theXmlParser, (Image**)pVar);
+#endif
 				break;
 			case DefFieldType::DT_FONT:
 				aSuccess = DefinitionReadFontField(theXmlParser, (_Font**)pVar);
@@ -1155,7 +1197,11 @@ bool DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void*
 	return false;
 }
 
+#ifdef PVZ_MOD
+bool DefinitionLoadMap(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, const DefinitionImageResolver* images)
+#else
 bool DefinitionLoadMap(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition)
+#endif
 {
 	if (theDefMap->mConstructorFunc)
 		theDefMap->mConstructorFunc(theDefinition);
@@ -1164,7 +1210,11 @@ bool DefinitionLoadMap(XMLParser* theXmlParser, const DefMap* theDefMap, void* t
 
 	bool aDone = false;
 	while (!aDone)
+#ifdef PVZ_MOD
+		if (!DefinitionReadField(theXmlParser, theDefMap, theDefinition, &aDone, images))
+#else
 		if (!DefinitionReadField(theXmlParser, theDefMap, theDefinition, &aDone))
+#endif
 			return false;
 	return true;
 }

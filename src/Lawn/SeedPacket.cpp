@@ -783,6 +783,21 @@ void SeedPacket::MouseDown([[maybe_unused]] int x, [[maybe_unused]] int y, [[may
 		if (!mBoard->PlantingRequirementsMet(aUseSeedType))
 		{
 			mApp->PlaySample(SOUND_BUZZER);
+#ifdef PVZ_MOD
+			if (const auto* definition = Mod::FindPlant(aUseSeedType); definition && !definition->upgradeFrom.empty())
+			{
+				const auto sourceName = [&]() -> std::string {
+					for (int i = 0; i < NUM_SEED_TYPES; ++i)
+					{
+						auto type = static_cast<SeedType>(i);
+						if (Mod::PlantTypeId(type) == definition->upgradeFrom) return Plant::GetNameString(type);
+					}
+					return mApp->mModRuntime->Plants().at(definition->upgradeFrom).definition.at("name").get<std::string>();
+				}();
+				mBoard->DisplayAdvice(std::format("Requires: {}", sourceName), MessageStyle::MESSAGE_STYLE_HINT_LONG, AdviceType::ADVICE_NONE);
+			}
+			else
+#endif
 			switch (aUseSeedType)
 			{
 			case SeedType::SEED_GATLINGPEA:

@@ -23,6 +23,9 @@
 #define __PVZPDEFINITION_H__
 
 #include <string>
+#ifdef PVZ_MOD
+#include <functional>
+#endif
 #include <format>
 #include "PvzpCommon.h"
 #include "PvzpList.h"
@@ -150,12 +153,25 @@ bool                    DefinitionReadFloatField(XMLParser* theXmlParser, float*
 bool                    DefinitionReadStringField(XMLParser* theXmlParser, const char** theValue);
 bool                    DefinitionReadEnumField(XMLParser* theXmlParser, int* theValue, const DefSymbol* theSymbolMap);
 bool                    DefinitionReadVector2Field(XMLParser* theXmlParser, SexyVector2* theValue);
+#ifdef PVZ_MOD
+using DefinitionImageResolver = std::function<Image*(const std::string&)>;
+bool                    DefinitionReadArrayField(XMLParser* theXmlParser, DefinitionArrayDef* theArray, const DefField* theField, const DefinitionImageResolver* images = nullptr);
+#else
 bool                    DefinitionReadArrayField(XMLParser* theXmlParser, DefinitionArrayDef* theArray, const DefField* theField);
+#endif
 bool                    DefinitionReadFloatTrackField(XMLParser* theXmlParser, FloatParameterTrack* theTrack);
 bool                    DefinitionReadFlagField(XMLParser* theXmlParser, const std::string& theElementName, uint* theResultValue, const DefSymbol* theSymbolMap);
+#ifdef PVZ_MOD
+bool                    DefinitionReadImageField(XMLParser* theXmlParser, Image** theImage, const DefinitionImageResolver* images = nullptr);
+#else
 bool                    DefinitionReadImageField(XMLParser* theXmlParser, Image** theImage);
+#endif
 bool                    DefinitionReadFontField(XMLParser* theXmlParser, _Font** theFont);
+#ifdef PVZ_MOD
+bool                    DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, bool* theDone, const DefinitionImageResolver* images = nullptr);
+#else
 bool                    DefinitionReadField(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, bool* theDone);
+#endif
 bool                    DefinitionWriteCompiledFile(const std::string& theCompiledFilePath, const DefMap* theDefMap, void* theDefinition);
 bool                    DefinitionCompileFile(const std::string& theXMLFilePath, const std::string& theCompiledFilePath, const DefMap* theDefMap, void* theDefinition);
 
@@ -188,10 +204,18 @@ inline bool             DefReadFromCacheFont(void*& theReadPtr, _Font** theFont)
 inline bool             DefReadFromCacheFloatTrack(void*& theReadPtr, FloatParameterTrack* theTrack);
 bool                    DefMapReadFromCache(void*& theReadPtr, const DefMap* theDefMap, void* theDefinition);
 bool                    DefinitionCompileAndLoad(const std::string& theXMLFilePath, const DefMap* theDefMap, void* theDefinition);
+#ifdef PVZ_MOD
+bool                    DefinitionLoadMap(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition, const DefinitionImageResolver* images = nullptr);
+#else
 bool                    DefinitionLoadMap(XMLParser* theXmlParser, const DefMap* theDefMap, void* theDefinition);
+#endif
 bool                    DefinitionLoadImage(Image** theImage, const std::string& theName);
 bool                    DefinitionLoadFont(_Font** theFont, const std::string& theName);
+#ifdef PVZ_MOD
+bool                    DefinitionLoadXML(const std::string& theFilename, const DefMap* theDefMap, void* theDefinition, const DefinitionImageResolver* images = nullptr);
+#else
 bool                    DefinitionLoadXML(const std::string& theFilename, const DefMap* theDefMap, void* theDefinition);
+#endif
 void                    DefinitionFreeArrayField(DefinitionArrayDef* theArray, const DefMap* theDefMap);
 void                    DefinitionFreeMap(const DefMap* theDefMap, void* theDefinition);
 

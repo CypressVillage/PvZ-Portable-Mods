@@ -162,6 +162,15 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 	mRenderOrder = CalcRenderOrder();
 
 	Reanimation* aBodyReanim = nullptr;
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(mSeedType); entry && entry->animation)
+	{
+		aBodyReanim = mApp->mEffectSystem->mReanimationHolder->AllocReanimation(0, PlantDrawHeightOffset(mBoard, this, mSeedType, mPlantCol, mRow), mRenderOrder + 1, entry->animation.get());
+		aBodyReanim->mIsAttachment = true;
+		mBodyReanimID = mApp->ReanimationGetID(aBodyReanim);
+		Mod::PlayAnimation(*this, "idle");
+	}
+#endif
 	if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)
 	{
 		float aOffsetY = PlantDrawHeightOffset(mBoard, this, mSeedType, mPlantCol, mRow);
@@ -578,6 +587,13 @@ void Plant::SetSleeping(bool theIsAsleep)
 	if (aBodyReanim == nullptr)
 		return;
 
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(mSeedType); entry && entry->animation)
+	{
+		Mod::PlayAnimation(*this, theIsAsleep ? "sleep" : "idle");
+		return;
+	}
+#endif
 	if (theIsAsleep)
 	{
 		if (!IsInPlay() && mSeedType == SeedType::SEED_SUNSHROOM)
@@ -804,7 +820,11 @@ bool Plant::FindTargetAndFire(int theRow, PlantWeapon thePlantWeapon)
 
 		switch (mSeedType)
 		{
+#ifdef PVZ_MOD
+		case SeedType::SEED_FUMESHROOM:     mShootingCounter = FUME_SHROOM_ATTACK.shootingTicks;  break;
+#else
 		case SeedType::SEED_FUMESHROOM:     mShootingCounter = 50;  break;
+#endif
 		case SeedType::SEED_PUFFSHROOM:     mShootingCounter = 29;  break;
 		case SeedType::SEED_SCAREDYSHROOM:  mShootingCounter = 25;  break;
 		case SeedType::SEED_CABBAGEPULT:    mShootingCounter = 32;  break;
@@ -963,7 +983,11 @@ void Plant::UpdateShooter()
 	mLaunchCounter--;
 	if (mLaunchCounter <= 0)
 	{
+#ifdef PVZ_MOD
+		mLaunchCounter = mLaunchRate - Sexy::Rand(SHOOTER_INTERVAL_VARIATION);
+#else
 		mLaunchCounter = mLaunchRate - Sexy::Rand(15);
+#endif
 
 		if (mSeedType == SeedType::SEED_THREEPEATER)
 		{
@@ -2095,6 +2119,10 @@ void Plant::UpdateMagnetShroom()
 			if (aZombieRect.mX > BOARD_WIDTH || aDiffY > 2 || aDiffY < -2)
 				continue;
 
+#ifdef PVZ_MOD
+			if (!aZombie->HasMagnetAttractableItem())
+				continue;
+#else
 			if (aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING ||
 				aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_STUNNED ||
 				aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_WALKING ||
@@ -2109,6 +2137,7 @@ void Plant::UpdateMagnetShroom()
 				aZombie->mShieldType == ShieldType::SHIELDTYPE_LADDER ||
 				aZombie->mZombiePhase == ZombiePhase::PHASE_JACK_IN_THE_BOX_RUNNING))
 				continue;
+#endif
 
 			int aRadius = aZombie->mIsEating ? 320 : 270;
 			if (GetCircleRectOverlap(mX, mY + 20, aRadius, aZombieRect))
@@ -2557,6 +2586,14 @@ void Plant::UpdateAbilities()
 	if (mIsAsleep || mSquished || mOnBungeeState != PlantOnBungeeState::NOT_ON_BUNGEE)
 		return;
 
+#ifdef PVZ_MOD
+	if (IsOnBoard() && !mDead && mApp->mGameScene == SCENE_PLAYING && !mBoard->mPaused && mBoard->mTimeStopCounter == 0)
+	{
+		auto context = Mod::PlantContext(*this);
+		context["active"] = true;
+		Mod::PlantHook("plant.updated", context);
+	}
+#endif
 	UpdateShooting();
 
 	if (mStateCountdown > 0)
@@ -2617,6 +2654,10 @@ bool Plant::IsPartOfUpgradableTo(SeedType theUpgradedType)
 
 bool Plant::IsUpgradableTo(SeedType theUpgradedType)
 {
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(theUpgradedType))
+		return entry->upgradeFrom == Mod::PlantTypeId(mSeedType);
+#endif
 	if (theUpgradedType == SeedType::SEED_GATLINGPEA && mSeedType == SeedType::SEED_REPEATER)
 	{
 		return true;
@@ -3260,7 +3301,11 @@ void Plant::UpdateShooting()
 			}
 		}
 	}
+#ifdef PVZ_MOD
+	else if (mShootingCounter == (mSeedType == SEED_FUMESHROOM ? FUME_SHROOM_ATTACK.hitCounter : 1))
+#else
 	else if (mShootingCounter == 1)
+#endif
 	{
 		if (mSeedType == SeedType::SEED_THREEPEATER)
 		{
@@ -4172,6 +4217,16 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 	{
 		const PlantDefinition& aPlantDef = GetPlantDefinition(aSeedType);
 
+#ifdef PVZ_MOD
+		if (const auto* entry = Mod::FindPlant(aSeedType); entry && entry->animation)
+		{
+			Reanimation preview;
+			preview.ReanimationInitialize(thePosX, thePosY, entry->animation.get());
+			preview.SetFramesForLayer(entry->actions.at("idle").get<std::string>().c_str());
+			preview.Draw(&aSeedG);
+			return;
+		}
+#endif
 		if (aSeedType == SeedType::SEED_GIANT_WALLNUT)
 		{
 			aSeedG.mScaleX *= 1.4f;
@@ -4500,7 +4555,11 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
 {
 	if (mSeedType == SeedType::SEED_FUMESHROOM)
 	{
+#ifdef PVZ_MOD
+		DoRowAreaDamage(FUME_SHROOM_ATTACK.damage, FUME_SHROOM_ATTACK.damageFlags);
+#else
 		DoRowAreaDamage(20, 2U);
+#endif
 		mApp->PlayFoley(FoleyType::FOLEY_FUME);
 		return;
 	}
@@ -5124,6 +5183,9 @@ int Plant::GetRefreshTime(SeedType theSeedType, SeedType theImitaterType)
 
 bool Plant::IsNocturnal(SeedType theSeedtype)
 {
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(theSeedtype)) return entry->nocturnal;
+#endif
 	return
 		theSeedtype == SeedType::SEED_PUFFSHROOM ||
 		theSeedtype == SeedType::SEED_SEASHROOM ||
@@ -5139,6 +5201,9 @@ bool Plant::IsNocturnal(SeedType theSeedtype)
 
 bool Plant::IsFungus(SeedType theSeedtype)
 {
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(theSeedtype)) return entry->fungus;
+#endif
 	return
 		theSeedtype == SeedType::SEED_PUFFSHROOM ||
 		theSeedtype == SeedType::SEED_SUNSHROOM ||
@@ -5168,6 +5233,9 @@ bool Plant::IsFlying(SeedType theSeedtype)
 
 bool Plant::IsUpgrade(SeedType theSeedtype)
 {
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(theSeedtype)) return !entry->upgradeFrom.empty();
+#endif
 	return
 		theSeedtype == SeedType::SEED_GATLINGPEA ||
 		theSeedtype == SeedType::SEED_WINTERMELON ||

@@ -24,6 +24,9 @@
 
 #include <cstdint>
 #include <memory>
+#ifdef PVZ_MOD
+#include <functional>
+#endif
 #include "DataArray.h"
 #include "FilterEffect.h"
 #include "misc/SexyMatrix.h"
@@ -103,7 +106,11 @@ extern const ReanimationParams* gReanimationParamArray;
 
 inline void                         ReanimationFillInMissingData(float& thePrev, float& theValue);
 inline void                         ReanimationFillInMissingData(void*& thePrev, void*& theValue);
+#ifdef PVZ_MOD
+bool                                ReanimationLoadDefinition(const std::string& theFileName, ReanimatorDefinition* theDefinition, const std::function<Image*(const std::string&)>* images = nullptr);
+#else
 bool                                ReanimationLoadDefinition(const std::string& theFileName, ReanimatorDefinition* theDefinition);
+#endif
 void                                ReanimationFreeDefinition(ReanimatorDefinition* theDefinition);
 void                                ReanimatorEnsureDefinitionLoaded(ReanimationType theReanimType, bool theIsPreloading);
 void                                ReanimatorLoadDefinitions(const ReanimationParams* theReanimationParamArray, int theReanimationParamArraySize);
@@ -132,6 +139,9 @@ public:
 	void                            InitializeHolder();
 	void                            DisposeHolder();
 	Reanimation*                    AllocReanimation(float theX, float theY, int theRenderOrder, ReanimationType theReanimationType);
+#ifdef PVZ_MOD
+	Reanimation*                    AllocReanimation(float theX, float theY, int theRenderOrder, ReanimatorDefinition* definition);
+#endif
 };
 
 // the current playback time position of an animation

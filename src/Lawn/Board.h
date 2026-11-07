@@ -57,6 +57,7 @@ class CursorPreview;
 class GameButton;
 #ifdef PVZ_MOD
 class ModButton;
+namespace Mod { class Entities; class Effects; }
 #endif
 class MessageWidget;
 class SeedBank;
@@ -147,6 +148,8 @@ public:
 	std::unique_ptr<GameButton>			mMenuButton;
 #ifdef PVZ_MOD
 	std::vector<std::unique_ptr<ModButton>> mModButtons;
+	std::unique_ptr<Mod::Entities> mModEntities;
+	std::unique_ptr<Mod::Effects> mModEffects;
 #endif
 	std::unique_ptr<GameButton>			mStoreButton;
 	bool							mIgnoreMouseUp;

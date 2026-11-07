@@ -26,6 +26,17 @@
 #include "GameObject.h"
 
 constexpr const int MAX_MAGNET_ITEMS = 5;
+#ifdef PVZ_MOD
+inline constexpr int SHOOTER_INTERVAL_VARIATION = 15;
+struct PlantAttackParameters
+{
+	int damage;
+	int shootingTicks;
+	int hitCounter;
+	unsigned int damageFlags;
+};
+inline constexpr PlantAttackParameters FUME_SHROOM_ATTACK{20, 50, 1, 2U};
+#endif
 
 enum PlantSubClass : int32_t
 {

@@ -27,6 +27,8 @@
 #include "BoardInclude.h"
 #ifdef PVZ_MOD
 #include "ModPlants.h"
+#include "ModEntities.h"
+#include "ModEffects.h"
 #endif
 #include "LawnCommon.h"
 #include "System/Music.h"
@@ -241,8 +243,15 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->SetLabel("[GET_FULL_VERSION_BUTTON]");
 	}
 #ifdef PVZ_MOD
+	mModEntities = std::make_unique<Mod::Entities>(*this);
+	mModEffects = std::make_unique<Mod::Effects>();
 	if (mApp->mModRuntime)
 	{
+		// The LawnApp::mBoard assignment happens after this constructor returns.
+		mApp->mModRuntime->SetGameApi([this](const std::string& operation, const Mod::Data& arguments) {
+			if (operation == "plants.get") return Mod::BasePlantDefinition(arguments.get<std::string>());
+			return mModEntities->Call(operation, arguments);
+		});
 		mApp->mModRuntime->BeginBoard();
 		for (const auto& definition : mApp->mModRuntime->Buttons())
 		{
@@ -273,6 +282,7 @@ void Board::DisposeBoard()
 #ifdef PVZ_MOD
 	// Board destruction is deferred by SafeDeleteWidget; reset immediately.
 	if (mApp->mModRuntime) mApp->mModRuntime->EndBoard();
+	mModEffects = std::make_unique<Mod::Effects>();
 #endif
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 		mApp->mZenGarden->LeaveGarden();
@@ -3838,7 +3848,11 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount)
 	Plant* aPumpkinPlant = aPlantOnLawn.mPumpkinPlant;
 	if (aNormalPlant && aNormalPlant->IsUpgradableTo(aPlantingSeedType))
 	{
-		if (aPlantingSeedType == SeedType::SEED_GLOOMSHROOM)
+		if (aPlantingSeedType == SeedType::SEED_GLOOMSHROOM
+#ifdef PVZ_MOD
+			|| (Mod::FindPlant(aPlantingSeedType) && Plant::IsNocturnal(aPlantingSeedType))
+#endif
+		)
 		{
 			aIsAwake = !aNormalPlant->mIsAsleep;
 			aWakeUpCounter = aNormalPlant->mWakeUpCounter;
@@ -5832,6 +5846,9 @@ void Board::Update()
 
 	UpdateGridItems();
 	UpdateFwoosh();
+#ifdef PVZ_MOD
+	if (mApp->mGameScene == SCENE_PLAYING) mModEffects->Update();
+#endif
 	UpdateGame();
 	UpdateFog();
 	mChallenge->Update();
@@ -6334,9 +6351,16 @@ void Board::DrawGameObjects(Graphics* g)
 
 	std::sort(aRenderList, aRenderList + aRenderItemCount, RenderItemSortFunc);
 
+#ifdef PVZ_MOD
+	int modEffectRow = 0;
+#endif
 	for (int i = 0; i < aRenderItemCount; i++)
 	{
 		RenderItem& aRenderItem = aRenderList[i];
+#ifdef PVZ_MOD
+		while (modEffectRow < MAX_GRID_SIZE_Y && MakeRenderOrder(RENDER_LAYER_PARTICLE, modEffectRow, 0) <= aRenderItem.mZPos)
+			mModEffects->Draw(g, modEffectRow++);
+#endif
 		switch (aRenderItem.mRenderObjectType)
 		{
 		case RenderObjectType::RENDER_ITEM_PLANT:
@@ -9325,6 +9349,14 @@ void Board::UpdateGridItems()
 
 bool Board::PlantingRequirementsMet(SeedType theSeedType)
 {
+#ifdef PVZ_MOD
+	if (const auto* entry = Mod::FindPlant(theSeedType); entry && !entry->upgradeFrom.empty())
+	{
+		for (auto* plant : mPlants)
+			if (!plant->mDead && Mod::PlantTypeId(plant->mSeedType) == entry->upgradeFrom) return true;
+		return false;
+	}
+#endif
 	switch (theSeedType)
 	{
 	case SeedType::SEED_GATLINGPEA:			return CountPlantByType(SeedType::SEED_REPEATER);

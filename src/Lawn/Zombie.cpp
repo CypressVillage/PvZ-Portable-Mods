@@ -7967,6 +7967,18 @@ void Zombie::TakeBodyDamage(int theDamage, unsigned int theDamageFlags)
 	}
 }
 
+#ifdef PVZ_MOD
+bool Zombie::HasMagnetAttractableItem() const
+{
+	if (mZombiePhase == PHASE_DIGGER_TUNNELING || mZombiePhase == PHASE_DIGGER_STUNNED ||
+		mZombiePhase == PHASE_DIGGER_WALKING || mZombieType == ZOMBIE_POGO)
+		return mHasObject;
+	return mHelmType == HELMTYPE_PAIL || mHelmType == HELMTYPE_FOOTBALL ||
+		mShieldType == SHIELDTYPE_DOOR || mShieldType == SHIELDTYPE_LADDER ||
+		mZombiePhase == PHASE_JACK_IN_THE_BOX_RUNNING;
+}
+#endif
+
 void Zombie::TakeDamage(int theDamage, unsigned int theDamageFlags)
 {
 	if (mZombiePhase == ZombiePhase::PHASE_JACK_IN_THE_BOX_POPPING || IsDeadOrDying())

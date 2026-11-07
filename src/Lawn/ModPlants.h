@@ -8,6 +8,7 @@
 #include <vector>
 
 class LawnApp;
+class ReanimatorDefinition;
 namespace Sexy { class Image; }
 
 namespace Mod
@@ -29,6 +30,12 @@ public:
 		std::unique_ptr<Sexy::Image> card;
 		Sexy::Image* imagePointer = nullptr;
 		PlantDefinition definition{};
+		std::unique_ptr<ReanimatorDefinition> animation;
+		std::map<std::string, std::unique_ptr<Sexy::Image>> animationImages;
+		Data actions;
+		std::string upgradeFrom;
+		bool fungus = false;
+		bool nocturnal = false;
 		~Entry();
 	};
 	Plants(LawnApp& app, Runtime& runtime);
@@ -49,5 +56,7 @@ Data PlantContext(const Plant& plant);
 void PlantHook(const char* event, Data& context);
 bool HasPlayablePlants();
 bool GameplayActive();
+Data BasePlantDefinition(const std::string& id);
+void PlayAnimation(Plant& plant, const std::string& action);
 }
 #endif

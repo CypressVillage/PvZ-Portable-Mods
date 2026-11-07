@@ -27,6 +27,7 @@
 #ifdef PVZ_MOD
 #include "Mod/ModRuntime.h"
 #include "Lawn/ModPlants.h"
+#include "Lawn/ModEntities.h"
 #include "misc/RegEmu.h"
 #endif
 #include "Resources.h"
@@ -1188,6 +1189,7 @@ void LawnApp::Init()
 	mModRuntime = std::make_unique<Mod::Runtime>([](const std::string& id, const std::string& message) {
 		PvzpLogLn("[mod {}] {}", id, message);
 	});
+	mModRuntime->SetGameApi(Mod::GameCall);
 	try
 	{
 		mModConfigPath = Sexy::GetAppDataPath("userdata/mods.json");
