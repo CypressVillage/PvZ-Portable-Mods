@@ -34,6 +34,7 @@ jobs:
           libjpeg-turbo \
           libopenmpt \
           libpng \
+          nlohmann-json \
           ninja \
           sdl2-compat \
           sudo
@@ -215,9 +216,18 @@ jobs:
         path: ~/pvz-deps
         key: linux-static-deps-v4-${{ env.SDL2_TAG }}-${{ env.OPENMPT_TAG }}-${{ env.LIBPNG_VERSION }}-${{ env.JPEG_TURBO_VERSION }}
 
+    - name: Install nlohmann/json CMake package
+      run: |
+        git clone --depth=1 --branch v3.12.0 https://github.com/nlohmann/json.git json-src
+        cmake -S json-src -B build-json \
+          -DJSON_BuildTests=OFF -DJSON_Install=ON \
+          -DCMAKE_INSTALL_PREFIX="$HOME/pvz-json"
+        cmake --install build-json
+
     - name: Build PvZ-Portable
       run: |
         cmake -G Ninja -B build \
+          -Dnlohmann_json_DIR="$HOME/pvz-json/share/cmake/nlohmann_json" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_STATIC=ON \
           -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++" \
@@ -253,6 +263,7 @@ jobs:
           mingw-w64-ucrt-x86_64-libjpeg-turbo
           mingw-w64-ucrt-x86_64-libopenmpt
           mingw-w64-ucrt-x86_64-libpng
+          mingw-w64-ucrt-x86_64-nlohmann-json
           mingw-w64-ucrt-x86_64-ninja
           mingw-w64-ucrt-x86_64-SDL2
 
@@ -437,6 +448,7 @@ jobs:
           jpeg-turbo \
           libopenmpt \
           libpng \
+          nlohmann-json \
           ninja \
           sdl2
 
@@ -738,10 +750,19 @@ jobs:
           EXAMPLES=0 OPENMPT123=0 TEST=0 \
           PREFIX="${SYSROOT}" install
 
+    - name: Install nlohmann/json CMake package
+      run: |
+        git clone --depth=1 --branch v3.12.0 https://github.com/nlohmann/json.git json-src
+        cmake -S json-src -B build-json \
+          -DJSON_BuildTests=OFF -DJSON_Install=ON \
+          -DCMAKE_INSTALL_PREFIX="$HOME/pvz-json"
+        cmake --install build-json
+
     - name: Build PvZ-Portable for WebAssembly
       run: |
         mkdir build-wasm
-        emcmake cmake -G Ninja -B build-wasm -DCMAKE_BUILD_TYPE=Release
+        emcmake cmake -G Ninja -B build-wasm -DCMAKE_BUILD_TYPE=Release \
+          -Dnlohmann_json_DIR="$HOME/pvz-json/share/cmake/nlohmann_json"
         cmake --build build-wasm -j$(nproc)
 
     - name: Upload Artifact

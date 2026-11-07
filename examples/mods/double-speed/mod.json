@@ -1,0 +1,8 @@
+{
+  "id": "double-speed",
+  "name": "Double Speed",
+  "version": "1.0.0",
+  "api_version": 1,
+  "entry": "main.lua",
+  "description": "Adds a native 1x / 2x toggle beside the top-right menu button. Resets to 1x for each level."
+}

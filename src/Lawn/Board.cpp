@@ -25,6 +25,9 @@
 #include <format>
 #include "ZenGarden.h"
 #include "BoardInclude.h"
+#ifdef PVZ_MOD
+#include "ModPlants.h"
+#endif
 #include "LawnCommon.h"
 #include "System/Music.h"
 #include "System/SaveGame.h"
@@ -69,6 +72,10 @@ constexpr const int FLAG_RAISE_TIME = 100;
 
 bool gShownMoreSunTutorial = false;
 
+#ifdef PVZ_MOD
+#include "Widget/ModButton.h"
+
+#endif
 Board::Board(LawnApp* theApp)
 {
 	mApp = theApp;
@@ -233,9 +240,28 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->mBtnNoDraw = true;
 		mStoreButton->SetLabel("[GET_FULL_VERSION_BUTTON]");
 	}
+#ifdef PVZ_MOD
+	if (mApp->mModRuntime)
+	{
+		mApp->mModRuntime->BeginBoard();
+		for (const auto& definition : mApp->mModRuntime->Buttons())
+		{
+			auto button = std::make_unique<ModButton>(*this, definition);
+			AddWidget(button.get());
+			mModButtons.push_back(std::move(button));
+		}
+	}
+#endif
 }
 
+#ifdef PVZ_MOD
+Board::~Board()
+{
+	for (auto& button : mModButtons) RemoveWidget(button.get());
+}
+#else
 Board::~Board() = default;
+#endif
 
 void BoardInitForPlayer()
 {
@@ -244,6 +270,10 @@ void BoardInitForPlayer()
 
 void Board::DisposeBoard()
 {
+#ifdef PVZ_MOD
+	// Board destruction is deferred by SafeDeleteWidget; reset immediately.
+	if (mApp->mModRuntime) mApp->mModRuntime->EndBoard();
+#endif
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 		mApp->mZenGarden->LeaveGarden();
 	if (mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
@@ -335,6 +365,9 @@ void Board::TryToSaveGame()
 
 bool Board::NeedSaveGame()
 {
+#ifdef PVZ_MOD
+	if (Mod::GameplayActive()) return false;
+#endif
 	return
 		mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_ICE &&
 		mApp->mGameMode != GameMode::GAMEMODE_UPSELL &&
@@ -360,6 +393,9 @@ void Board::ResetFPSStats()
 
 bool Board::LoadGame(const std::string& theFileName)
 {
+#ifdef PVZ_MOD
+	if (Mod::GameplayActive()) return false;
+#endif
 	if (!LawnLoadGame(this, theFileName))
 		return false;
 
@@ -2021,6 +2057,10 @@ Plant* Board::NewPlant(int theGridX, int theGridY, SeedType theSeedType, SeedTyp
 	Plant* aPlant = mPlants.DataArrayAlloc();
 	aPlant->mIsOnBoard = true;
 	aPlant->PlantInitialize(theGridX, theGridY, theSeedType, theImitaterType);
+#ifdef PVZ_MOD
+	auto context = Mod::PlantContext(*aPlant);
+	Mod::PlantHook("plant.spawned", context);
+#endif
 	return aPlant;
 }
 
@@ -2692,6 +2732,16 @@ PlantingReason Board::CanPlantAt(int theGridX, int theGridY, SeedType theSeedTyp
 		return PlantingReason::PLANTING_NOT_HERE;
 	}
 
+#ifdef PVZ_MOD
+	// Hooks may veto placement, but cannot bypass native occupancy/terrain checks.
+	auto aType = Mod::PlantTypeId(theSeedType);
+	if (!aType.empty())
+	{
+		Mod::Data aContext = {{"type", aType}, {"column", theGridX}, {"row", theGridY}, {"cancel", false}};
+		Mod::PlantHook("plant.can_place", aContext);
+		if (aContext.at("cancel").get<bool>()) return PlantingReason::PLANTING_NOT_HERE;
+	}
+#endif
 	PlantingReason aReason = mChallenge->CanPlantAt(theGridX, theGridY, theSeedType);
 	if (aReason != PlantingReason::PLANTING_OK || Challenge::IsZombieSeedType(theSeedType))
 	{

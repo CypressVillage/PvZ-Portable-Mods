@@ -21,6 +21,9 @@
 
 #include "Coin.h"
 #include "Plant.h"
+#ifdef PVZ_MOD
+#include "ModPlants.h"
+#endif
 #include "Board.h"
 #include "Zombie.h"
 #include "Cutscene.h"
@@ -489,6 +492,19 @@ void Plant::PlantInitialize(int theGridX, int theGridY, SeedType theSeedType, Se
 	{
 		mPlantHealth *= 2;
 	}
+#ifdef PVZ_MOD
+	if (const auto* definition = Mod::FindPlant(mSeedType))
+	{
+		mPlantHealth = definition->health;
+		mNumFrames = 1;
+	}
+	if (IsOnBoard())
+	{
+		auto context = Mod::PlantContext(*this);
+		Mod::PlantHook("plant.before_initialize", context);
+		mPlantHealth = context.at("health").get<int>();
+	}
+#endif
 	mPlantMaxHealth = mPlantHealth;
 
 	if (mSeedType != SeedType::SEED_FLOWERPOT && IsOnBoard())
@@ -3436,6 +3452,13 @@ void Plant::Animate()
 	{
 		mBeghouledFlashCountdown--;
 	}
+#ifdef PVZ_MOD
+	if (Mod::FindPlant(mSeedType))
+	{
+		mFrame = 0;
+		return;
+	}
+#endif
 
 	if (mSquished)
 	{
@@ -4930,6 +4953,9 @@ int Plant::DistanceToClosestZombie()
 
 void Plant::Die()
 {
+#ifdef PVZ_MOD
+	if (mDead) return;
+#endif
 	if (IsOnBoard() && mSeedType == SeedType::SEED_TANGLEKELP)
 	{
 		Zombie* aZombie = mBoard->ZombieTryToGet(mTargetZombieID);
@@ -4940,6 +4966,13 @@ void Plant::Die()
 	}
 
 	mDead = true;
+#ifdef PVZ_MOD
+	if (IsOnBoard())
+	{
+		auto context = Mod::PlantContext(*this);
+		Mod::PlantHook("plant.removed", context);
+	}
+#endif
 	RemoveEffects();
 
 	if (!Plant::IsFlying(mSeedType) && IsOnBoard())
@@ -4965,8 +4998,14 @@ void Plant::Die()
 
 const PlantDefinition& GetPlantDefinition(SeedType theSeedType)
 {
+#ifdef PVZ_MOD
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->definition;
+	PVZP_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::NUM_SEED_TYPES));
+	PVZP_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
+#else
 	PVZP_ASSERT(gPlantDefs[theSeedType].mSeedType == theSeedType);
 	PVZP_ASSERT(theSeedType >= 0 && theSeedType < static_cast<int>(SeedType::NUM_SEED_TYPES));
+#endif
 
 	return gPlantDefs[theSeedType];
 }
@@ -5036,6 +5075,9 @@ int Plant::GetCost(SeedType theSeedType, SeedType theImitaterType)
 
 std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 {
+#ifdef PVZ_MOD
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->name;
+#endif
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aName = std::format("[{}]", aPlantDef.mPlantName);
 	std::string aTranslatedName(PvzpStringTranslate(aName));
@@ -5053,6 +5095,9 @@ std::string Plant::GetNameString(SeedType theSeedType, SeedType theImitaterType)
 
 std::string Plant::GetToolTip(SeedType theSeedType)
 {
+#ifdef PVZ_MOD
+	if (const auto* definition = Mod::FindPlant(theSeedType)) return definition->description;
+#endif
 	const PlantDefinition& aPlantDef = GetPlantDefinition(theSeedType);
 	std::string aToolTip = std::format("[{}_TOOLTIP]", aPlantDef.mPlantName);
 	return std::string(PvzpStringTranslate(aToolTip));

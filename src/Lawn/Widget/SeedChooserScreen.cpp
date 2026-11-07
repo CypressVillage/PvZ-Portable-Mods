@@ -33,6 +33,9 @@
 #include "../../Lawn/Plant.h"
 #include "../ToolTipWidget.h"
 #include "SeedChooserScreen.h"
+#ifdef PVZ_MOD
+#include "../ModPlants.h"
+#endif
 #include "../../GameConstants.h"
 #include "../System/PlayerInfo.h"
 #include "misc/Debug.h"
@@ -158,8 +161,13 @@ SeedChooserScreen::SeedChooserScreen()
 	}
 
 	DBG_ASSERT(mApp->GetSeedsAvailable() < NUM_SEED_TYPES);
+#ifdef PVZ_MOD
+	mChosenSeeds.resize(Mod::HasPlayablePlants() ? mApp->mModPlants->EndType() : NUM_SEED_TYPES);
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	memset(mChosenSeeds, 0, sizeof(mChosenSeeds));
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		aChosenSeed.mSeedType = aSeedType;
@@ -283,6 +291,9 @@ bool SeedChooserScreen::Has7Rows()
 
 void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 {
+#ifdef PVZ_MOD
+	if (theIndex >= Mod::FirstPlantType) theIndex = (theIndex - Mod::FirstPlantType) % 40;
+#endif
 	if (theIndex == SEED_IMITATER)
 	{
 		x = mImitaterButton->mX;
@@ -313,6 +324,13 @@ void SeedChooserScreen::GetSeedPositionInBank(int theIndex, int& x, int& y)
 
 SeedChooserScreen::~SeedChooserScreen() = default;
 
+#ifdef PVZ_MOD
+bool SeedChooserScreen::IsOnPlantPage(SeedType type) const
+{
+	return type >= Mod::FirstPlantType ? mPlantPage == 1 + (type - Mod::FirstPlantType) / 40 : mPlantPage == 0;
+}
+
+#endif
 unsigned int SeedChooserScreen::SeedNotRecommendedToPick(SeedType theSeedType)
 {
 	uint aRecFlags = mBoard->SeedNotRecommendedForLevel(theSeedType);
@@ -342,14 +360,27 @@ void SeedChooserScreen::Draw(Graphics* g)
 		return;
 
 	g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_BACKGROUND, 0, 87);
+#ifdef PVZ_MOD
+	if (mPlantPage == 0 && mApp->HasSeedType(SEED_IMITATER))
+#else
 	if (mApp->HasSeedType(SEED_IMITATER))
+#endif
 	{
 		g->DrawImage(Sexy::IMAGE_SEEDCHOOSER_IMITATERADDON, 459, 503);
 	}
 	// the localization key name is wrong
 	PvzpDrawString(g, "[CHOOSE_YOUR_PLANTS]", 229, 110, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 
+#ifdef PVZ_MOD
+	if (Mod::HasPlayablePlants())
+	{
+		auto label = std::to_string(mPlantPage + 1) + "/" + std::to_string(1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 39) / 40) + " >";
+		PvzpDrawString(g, label, 400, 110, Sexy::FONT_BRIANNETOD12, Color::White, DS_ALIGN_CENTER);
+	}
+	int aNumSeeds = mPlantPage == 0 ? (Has7Rows() ? 48 : 40) : 0;
+#else
 	int aNumSeeds = Has7Rows() ? 48 : 40;
+#endif
 	for (SeedType aSeedShadow = SEED_PEASHOOTER; aSeedShadow < aNumSeeds; aSeedShadow = (SeedType)(aSeedShadow + 1))
 	{
 		int x, y;
@@ -384,10 +415,17 @@ void SeedChooserScreen::Draw(Graphics* g)
 		}
 	}
 
+#ifdef PVZ_MOD
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		ChosenSeedState aSeedState = aChosenSeed.mSeedState;
+#ifdef PVZ_MOD
+		if (aSeedState == SEED_IN_CHOOSER && !IsOnPlantPage(aSeedType)) continue;
+#endif
 		if (mApp->HasSeedType(aSeedType) && aSeedState != SEED_FLYING_TO_BANK && aSeedState != SEED_FLYING_TO_CHOOSER &&
 			aSeedState != SEED_PACKET_HIDDEN && (aSeedState == SEED_IN_CHOOSER || mBoard->mCutScene->mSeedChoosing))
 		{
@@ -407,8 +445,13 @@ void SeedChooserScreen::Draw(Graphics* g)
 		}
 	}
 
+#ifdef PVZ_MOD
+	if (mPlantPage == 0) mImitaterButton->Draw(g);
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	mImitaterButton->Draw(g);
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		ChosenSeedState aSeedState = aChosenSeed.mSeedState;
@@ -520,7 +563,11 @@ void SeedChooserScreen::Update()
 	mSeedChooserAge++;
 	mToolTip->Update();
 
+#ifdef PVZ_MOD
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		if (mApp->HasSeedType(aSeedType))
 		{
@@ -714,7 +761,11 @@ void SeedChooserScreen::PickRandomSeeds()
 		aChosenSeed.mSeedIndexInBank = anIndex;
 		mSeedsInBank++;
 	}
+#ifdef PVZ_MOD
+	for (SeedType aSeedFlying = SEED_PEASHOOTER; aSeedFlying < static_cast<int>(mChosenSeeds.size()); aSeedFlying = (SeedType)(aSeedFlying + 1))
+#else
 	for (SeedType aSeedFlying = SEED_PEASHOOTER; aSeedFlying < NUM_SEEDS_IN_CHOOSER; aSeedFlying = (SeedType)(aSeedFlying + 1))
+#endif
 		LandFlyingSeed(mChosenSeeds[aSeedFlying]);
 	CloseSeedChooser();
 }
@@ -767,9 +818,16 @@ SeedType SeedChooserScreen::SeedHitTest(int x, int y)
 {
 	if (mMouseVisible)
 	{
+#ifdef PVZ_MOD
+		for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 		for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 		{
 			ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
+#ifdef PVZ_MOD
+			if (aChosenSeed.mSeedState == SEED_IN_CHOOSER && !IsOnPlantPage(aSeedType)) continue;
+#endif
 			if (!mApp->HasSeedType(aSeedType) || aChosenSeed.mSeedState == SEED_PACKET_HIDDEN) continue;
 			if (Rect(aChosenSeed.mX, aChosenSeed.mY, SEED_PACKET_WIDTH, SEED_PACKET_HEIGHT).Contains(x, y)) return aSeedType;
 		}
@@ -779,7 +837,11 @@ SeedType SeedChooserScreen::SeedHitTest(int x, int y)
 
 SeedType SeedChooserScreen::FindSeedInBank(int theIndexInBank)
 {
+#ifdef PVZ_MOD
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		if (mApp->HasSeedType(aSeedType))
 		{
@@ -858,7 +920,11 @@ void SeedChooserScreen::ShowToolTip()
 	}
 	else if (mSeedsInFlight <= 0)
 	{
+#ifdef PVZ_MOD
+		if (mPlantPage == 0 && mImitaterButton->IsMouseOver() && mMouseVisible)
+#else
 		if (mImitaterButton->IsMouseOver() && mMouseVisible)
+#endif
 		{
 			mToolTip->SetLabel(Plant::GetToolTip(SEED_IMITATER));
 			mToolTip->SetTitle(Plant::GetNameString(SEED_IMITATER));
@@ -979,12 +1045,25 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 
 	if (mSeedsInFlight > 0)
 	{
+#ifdef PVZ_MOD
+		for (int i = 0; i < static_cast<int>(mChosenSeeds.size()); i++)
+#else
 		for (int i = 0; i < NUM_SEEDS_IN_CHOOSER; i++)
+#endif
 		{
 			LandFlyingSeed(mChosenSeeds[i]);
 		}
 	}
 
+#ifdef PVZ_MOD
+	if (Mod::HasPlayablePlants() && mChooseState == CHOOSE_NORMAL && Rect(350, 88, 100, 30).Contains(x, y))
+	{
+		int pages = 1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 39) / 40;
+		mPlantPage = (mPlantPage + 1) % pages;
+		RemoveToolTip();
+		return;
+	}
+#endif
 	if (mChooseState == CHOOSE_VIEW_LAWN)
 	{
 		CancelLawnView();
@@ -1007,7 +1086,11 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 	{
 		mApp->PlaySample(Sexy::SOUND_TAP);
 	}
+#ifdef PVZ_MOD
+	else if (mPlantPage == 0 && mImitaterButton->IsMouseOver())
+#else
 	else if (mImitaterButton->IsMouseOver())
+#endif
 	{
 		if (mSeedsInBank != mBoard->mSeedBank->mNumPackets)
 		{
@@ -1071,7 +1154,11 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 
 bool SeedChooserScreen::PickedPlantType(SeedType theSeedType)
 {
+#ifdef PVZ_MOD
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		if (aChosenSeed.mSeedState == SEED_IN_BANK)
@@ -1126,7 +1213,11 @@ void SeedChooserScreen::KeyChar(char theChar)
 
 void SeedChooserScreen::UpdateAfterPurchase()
 {
+#ifdef PVZ_MOD
+	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < static_cast<int>(mChosenSeeds.size()); aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		ChosenSeed& aChosenSeed = mChosenSeeds[aSeedType];
 		if (aChosenSeed.mSeedState == SEED_IN_BANK)

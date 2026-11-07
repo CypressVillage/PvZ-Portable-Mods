@@ -28,10 +28,16 @@
 #include "../System/Music.h"
 #include "../../Resources.h"
 #include "NewOptionsDialog.h"
+#ifdef PVZ_MOD
+#include "ModDialog.h"
+#endif
 #include "../../ConstEnums.h"
 #include "../../PvzpLib/PvzpFoley.h"
 #include "widget/Slider.h"
 #include "widget/Checkbox.h"
+#ifdef PVZ_MOD
+#include "widget/WidgetManager.h"
+#endif
 #include "../../PvzpLib/PvzpStringFile.h"
 
 using namespace Sexy;
@@ -45,6 +51,10 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
 	mAlmanacButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Almanac, this, "[VIEW_ALMANAC_BUTTON]");
 	mRestartButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Restart, this, "[RESTART_LEVEL]");
 	mBackToMainButton = MakeButton(NewOptionsDialog::NewOptionsDialog_MainMenu, this, "[MAIN_MENU_BUTTON]");
+#ifdef PVZ_MOD
+	mModsButton = MakeButton(NewOptionsDialog_Mods, this, mApp->GetString("MOD_MANAGER", "Mods"));
+	mModsButton->SetVisible(mFromGameSelector);
+#endif
 
 	mBackToGameButton = MakeNewButton(
 		Dialog::ID_OK,
@@ -122,6 +132,9 @@ void NewOptionsDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
 {
 	Dialog::AddedToManager(theWidgetManager);
 	AddWidget(mAlmanacButton.get());
+#ifdef PVZ_MOD
+	AddWidget(mModsButton.get());
+#endif
 	AddWidget(mRestartButton.get());
 	AddWidget(mBackToMainButton.get());
 	AddWidget(mMusicVolumeSlider.get());
@@ -135,6 +148,9 @@ void NewOptionsDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
 {
 	Dialog::RemovedFromManager(theWidgetManager);
 	RemoveWidget(mAlmanacButton.get());
+#ifdef PVZ_MOD
+	RemoveWidget(mModsButton.get());
+#endif
 	RemoveWidget(mMusicVolumeSlider.get());
 	RemoveWidget(mSfxVolumeSlider.get());
 	RemoveWidget(mFullscreenCheckbox.get());
@@ -152,6 +168,9 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
 	mHardwareAccelerationCheckbox->Resize(283, 175, 46, 45);
 	mFullscreenCheckbox->Resize(284, 206, 46, 45);
 	mAlmanacButton->Resize(107, 241, 209, 46);
+#ifdef PVZ_MOD
+	mModsButton->Resize(107, 284, 209, 46);
+#endif
 	mRestartButton->Resize(mAlmanacButton->mX, mAlmanacButton->mY + 43, 209, 46);
 	mBackToMainButton->Resize(mRestartButton->mX, mRestartButton->mY + 43, 209, 46);
 	mBackToGameButton->Resize(30, 381, mBackToGameButton->mWidth, mBackToGameButton->mHeight);
@@ -308,6 +327,24 @@ void NewOptionsDialog::ButtonDepress(int theId)
 
 	switch (theId)
 	{
+#ifdef PVZ_MOD
+	case NewOptionsDialog_Mods:
+	{
+		if (!mFromGameSelector || mApp->mBoard) break;
+		try
+		{
+			auto* dialog = new ModDialog(mApp);
+			mApp->CenterDialog(dialog, dialog->mWidth, dialog->mHeight);
+			mApp->AddDialog(DIALOG_MOD_MANAGER, dialog);
+			mApp->mWidgetManager->SetFocus(dialog);
+		}
+		catch (const std::exception& error)
+		{
+			mApp->DoDialog(DIALOG_INFO, true, "Cannot open Mods", error.what(), "[DIALOG_BUTTON_OK]", Dialog::BUTTONS_FOOTER);
+		}
+		break;
+	}
+#endif
 	case NewOptionsDialog::NewOptionsDialog_Almanac:
 	{
 		AlmanacDialog* aDialog = mApp->DoAlmanacDialog(SeedType::SEED_NONE, ZombieType::ZOMBIE_INVALID);

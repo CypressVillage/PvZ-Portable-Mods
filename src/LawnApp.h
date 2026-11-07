@@ -49,7 +49,9 @@ class ChallengeScreen;
 class StoreScreen;
 class AlmanacDialog;
 class TypingCheck;
-namespace Mod { class Runtime; }
+#ifdef PVZ_MOD
+namespace Mod { class Runtime; class Plants; }
+#endif
 
 namespace Sexy
 {
@@ -100,7 +102,13 @@ public:
 	std::unique_ptr<EffectSystem>	mEffectSystem;
 	std::unique_ptr<ReanimatorCache>	mReanimatorCache;
 	std::unique_ptr<ProfileMgr>		mProfileMgr;
+#ifdef PVZ_MOD
 	std::unique_ptr<Mod::Runtime>	mModRuntime;
+	std::unique_ptr<Mod::Plants>	mModPlants;
+	// Captured before gameplay Mods switch the application-data folder.
+	std::string                     mModConfigPath;
+	std::vector<std::string>         mLoadedModIds;
+#endif
 	PlayerInfo*						mPlayerInfo;
 	std::unique_ptr<LevelStats>		mLastLevelStats;
 	std::atomic<bool>					mCloseRequest;

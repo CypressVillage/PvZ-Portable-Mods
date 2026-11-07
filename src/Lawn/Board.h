@@ -24,6 +24,9 @@
 
 #include <cstdint>
 #include <memory>
+#ifdef PVZ_MOD
+#include <vector>
+#endif
 
 #include "../ConstEnums.h"
 #include "../PvzpLib/DataArray.h"
@@ -52,6 +55,9 @@ class LawnApp;
 class CursorObject;
 class CursorPreview;
 class GameButton;
+#ifdef PVZ_MOD
+class ModButton;
+#endif
 class MessageWidget;
 class SeedBank;
 class ToolTipWidget;
@@ -139,6 +145,9 @@ public:
 	std::unique_ptr<MessageWidget>		mAdvice;
 	std::unique_ptr<SeedBank>			mSeedBank;
 	std::unique_ptr<GameButton>			mMenuButton;
+#ifdef PVZ_MOD
+	std::vector<std::unique_ptr<ModButton>> mModButtons;
+#endif
 	std::unique_ptr<GameButton>			mStoreButton;
 	bool							mIgnoreMouseUp;
 	std::unique_ptr<ToolTipWidget>		mToolTip;

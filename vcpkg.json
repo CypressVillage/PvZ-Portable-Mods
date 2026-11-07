@@ -1,6 +1,5 @@
 {
   "dependencies": [
-    "nlohmann-json",
     "libjpeg-turbo",
     "libopenmpt",
     "libpng",
@@ -9,5 +8,13 @@
       "platform": "!android"
     },
     "zlib"
-  ]
+  ],
+  "features": {
+    "mod": {
+      "description": "Lua Mod runtime and Mod manager",
+      "dependencies": [
+        "nlohmann-json"
+      ]
+    }
+  }
 }

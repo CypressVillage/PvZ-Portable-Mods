@@ -20,6 +20,7 @@ depends=(
 makedepends=(
     cmake
     git
+    nlohmann-json
     ninja
 )
 source=(

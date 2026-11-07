@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.12...4.0)
 
+option(PVZ_MOD "Enable Lua Mods and the Mod manager" ON)
+if(PVZ_MOD)
+	list(APPEND VCPKG_MANIFEST_FEATURES mod)
+endif()
+
 project(pvz-portable LANGUAGES C CXX)
 
 include(CMake/ProjectVersion.cmake)
@@ -35,7 +40,9 @@ if(MSVC)
 	endif()
 endif()
 
-include(CMake/ModRuntime.cmake)
+if(PVZ_MOD)
+	include(CMake/ModRuntime.cmake)
+endif()
 
 file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/*.cpp
@@ -52,6 +59,13 @@ file(GLOB SOURCES CONFIGURE_DEPENDS
 	src/Lawn/Widget/*.cpp
 	src/Lawn/System/*.cpp
 )
+if(NOT PVZ_MOD)
+	list(REMOVE_ITEM SOURCES
+		${CMAKE_CURRENT_SOURCE_DIR}/src/Lawn/ModPlants.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/Lawn/Widget/ModButton.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/src/Lawn/Widget/ModDialog.cpp
+	)
+endif()
 
 option(LOW_MEMORY "Enable low memory mode" OFF)
 if(NINTENDO_SWITCH)
@@ -198,9 +212,12 @@ target_include_directories(pvz-portable PRIVATE
 target_compile_definitions(pvz-portable PRIVATE
 	$<$<BOOL:${PVZ_DEBUG}>:PVZ_DEBUG>
 	$<$<BOOL:${DO_FIX_BUGS}>:DO_FIX_BUGS>
+	$<$<BOOL:${PVZ_MOD}>:PVZ_MOD>
 )
 target_compile_features(pvz-portable PRIVATE cxx_std_20)
-target_link_libraries(pvz-portable PRIVATE pvz_mod)
+if(PVZ_MOD)
+	target_link_libraries(pvz-portable PRIVATE pvz_mod)
+endif()
 set_target_properties(pvz-portable PROPERTIES CXX_EXTENSIONS OFF)
 
 if (LOW_MEMORY)

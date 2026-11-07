@@ -320,6 +320,9 @@ enum Dialogs : int32_t
 	DIALOG_PURCHASE_PACKET_SLOT,                // 50
 	DIALOG_ZOMBATAR_TOS,                        // 51: terms of service
 	DIALOG_ZOMBATAR_DELETE,                     // 52
+#ifdef PVZ_MOD
+	DIALOG_MOD_MANAGER,
+#endif
 	NUM_DIALOGS
 };
 enum DebugTextMode : int32_t

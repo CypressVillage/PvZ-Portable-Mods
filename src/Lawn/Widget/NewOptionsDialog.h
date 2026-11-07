@@ -49,6 +49,9 @@ protected:
 		NewOptionsDialog_SoundVolume,
 		NewOptionsDialog_Fullscreen,
 		NewOptionsDialog_HardwareAcceleration,
+#ifdef PVZ_MOD
+		NewOptionsDialog_Mods,
+#endif
 	};
 
 public:
@@ -60,6 +63,9 @@ public:
 	std::unique_ptr<LawnStoneButton>	mAlmanacButton;
 	std::unique_ptr<LawnStoneButton>	mBackToMainButton;
 	std::unique_ptr<LawnStoneButton>	mRestartButton;
+#ifdef PVZ_MOD
+	std::unique_ptr<LawnStoneButton> mModsButton;
+#endif
 	std::unique_ptr<NewLawnButton>		mBackToGameButton;
 	bool								mFromGameSelector;
 

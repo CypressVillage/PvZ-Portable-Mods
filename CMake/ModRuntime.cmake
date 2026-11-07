@@ -18,6 +18,7 @@ add_library(pvz_mod STATIC
 )
 set_target_properties(pvz_mod PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_EXTENSIONS OFF)
 target_compile_features(pvz_mod PUBLIC cxx_std_20)
+target_compile_definitions(pvz_mod PUBLIC PVZ_MOD)
 target_include_directories(pvz_mod PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(pvz_mod PUBLIC nlohmann_json::nlohmann_json PRIVATE pvz_lua)
 if(EMSCRIPTEN)

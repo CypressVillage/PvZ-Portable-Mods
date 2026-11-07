@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 #pragma once
+#ifdef PVZ_MOD
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
@@ -31,6 +32,8 @@ struct Manifest
 	std::string id;
 	std::string name;
 	std::string version;
+	std::string author;
+	std::string description;
 	int apiVersion = 0;
 	std::string entry;
 	std::vector<std::string> dependencies;
@@ -47,6 +50,26 @@ Discovery Discover(const std::filesystem::path& root);
 // Input is enabled IDs in player priority order, low to high. Dependencies win
 // over that preference; lexical ID breaks any remaining tie. Never auto-enables.
 std::vector<Manifest> ResolveOrder(const Discovery& discovery, const std::vector<std::string>& enabled);
+
+// Staged UI changes never modify the running interpreter or player profile.
+class Selection
+{
+public:
+	Selection(Discovery discovery, std::vector<std::string> enabled);
+	const Discovery& Installed() const { return mDiscovery; }
+	const std::vector<std::string>& Enabled() const { return mEnabled; }
+	bool IsEnabled(const std::string& id) const;
+	// Enables required dependencies, or disables all transitive dependents.
+	// A failed enable leaves the selection unchanged.
+	void SetEnabled(const std::string& id, bool enabled);
+private:
+	Discovery mDiscovery;
+	std::vector<std::string> mEnabled;
+};
+
+std::vector<std::string> ReadEnabled(const std::filesystem::path& path);
+// Preserves other configuration fields and replaces the file atomically.
+void SaveEnabled(const std::filesystem::path& path, const std::vector<std::string>& enabled);
 
 struct Content
 {
@@ -67,3 +90,4 @@ private:
 	std::map<std::string, Content> mEntries;
 };
 }
+#endif

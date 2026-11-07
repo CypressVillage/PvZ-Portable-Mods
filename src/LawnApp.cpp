@@ -24,7 +24,11 @@
 #include <cstdio>
 #include <format>
 #include "LawnApp.h"
+#ifdef PVZ_MOD
 #include "Mod/ModRuntime.h"
+#include "Lawn/ModPlants.h"
+#include "misc/RegEmu.h"
+#endif
 #include "Resources.h"
 #include "Lawn/LawnCommon.h"
 #include "Lawn/Board.h"
@@ -171,8 +175,10 @@ LawnApp::LawnApp()
 
 LawnApp::~LawnApp()
 {
+#ifdef PVZ_MOD
 	// Scripts stop before widgets, resources and other app-owned services die.
 	mModRuntime.reset();
+#endif
 	while (!mDialogMap.empty())
 	{
 		KillDialog(mDialogMap.begin()->first);
@@ -1177,23 +1183,20 @@ void LawnApp::Init()
 #endif
 	PvzpLogLn("session id: {}", static_cast<long long>(mSessionID));
 
-	// Step 1 only runs the foundation lifecycle; registered content is not yet
-	// connected to vanilla gameplay or profiles. No implicit auto-enable.
+#ifdef PVZ_MOD
+	// No implicit auto-enable. Playable definitions are published on this thread.
 	mModRuntime = std::make_unique<Mod::Runtime>([](const std::string& id, const std::string& message) {
 		PvzpLogLn("[mod {}] {}", id, message);
 	});
 	try
 	{
-		std::vector<std::string> enabled;
-		auto configPath = Sexy::PathFromU8(Sexy::GetAppDataPath("userdata/mods.json"));
-		if (std::filesystem::exists(configPath))
-		{
-			auto config = Mod::ReadJson(configPath);
-			enabled = config.at("enabled").get<std::vector<std::string>>();
-		}
+		mModConfigPath = Sexy::GetAppDataPath("userdata/mods.json");
+		auto enabled = Mod::ReadEnabled(Sexy::PathFromU8(mModConfigPath));
 		auto discovery = Mod::Discover(Sexy::PathFromU8(Sexy::GetResourcePath("mods")));
 		for (const auto& error : discovery.errors) PvzpLogLn("{}", error.what());
 		if (!mModRuntime->Start(discovery, enabled)) throw *mModRuntime->LastError();
+		mLoadedModIds = enabled;
+		mModPlants = std::make_unique<Mod::Plants>(*this, *mModRuntime);
 	}
 	catch (const std::exception& error)
 	{
@@ -1203,6 +1206,7 @@ void LawnApp::Init()
 		return;
 	}
 
+#endif
 	if (!mResourceManager->ParseResourcesFile("properties/resources.xml"))
 	{
 		ShowResourceError(true);
@@ -1589,6 +1593,15 @@ void LawnApp::UpdateFrames()
 #endif
 
 	int aUpdateCount = 1;
+#ifdef PVZ_MOD
+	auto modTimeActive = [&]() {
+		return mBoard && mGameScene == GameScenes::SCENE_PLAYING && !mBoard->mPaused &&
+			!mBoard->mLevelComplete && mActive && !mMinimized && mDialogMap.empty();
+	};
+	const bool modScaled = mModRuntime && modTimeActive() && !gSlowMo && !gFastMo;
+	Board* const scaledBoard = mBoard;
+	if (mModRuntime) aUpdateCount = mModRuntime->AdvanceTime(modScaled);
+#endif
 	if (gSlowMo)
 	{
 		++gSlowMoCounter;
@@ -1608,6 +1621,10 @@ void LawnApp::UpdateFrames()
 
 	for (int i = 0; i < aUpdateCount; i++)
 	{
+#ifdef PVZ_MOD
+		// A tick can open a dialog, finish a level or destroy its Board.
+		if (i > 0 && modScaled && (mBoard != scaledBoard || !modTimeActive())) break;
+#endif
 		mAppCounter++;
 
 		if (mBoard)
@@ -2297,6 +2314,9 @@ int LawnApp::GetSeedsAvailable()
 
 bool LawnApp::HasSeedType(SeedType theSeedType)
 {
+#ifdef PVZ_MOD
+	if (theSeedType >= Mod::FirstPlantType) return Mod::FindPlant(theSeedType) != nullptr;
+#endif
 	if (IsTrialStageLocked() && theSeedType >= SeedType::SEED_JALAPENO)
 		return false;
 

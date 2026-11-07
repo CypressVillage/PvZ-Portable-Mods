@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
+#ifdef PVZ_MOD
 #include "ModData.h"
 #include <algorithm>
 #include <fstream>
 #include <set>
 #include <sstream>
+#include <functional>
+#include <chrono>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace Mod
 {
@@ -72,6 +81,8 @@ Manifest Manifest::Load(const std::filesystem::path& directory)
 		id = result.id;
 		result.name = data.at("name").get<std::string>();
 		result.version = data.at("version").get<std::string>();
+		result.author = data.value("author", std::string());
+		result.description = data.value("description", std::string());
 		if (result.name.empty() || result.version.empty()) throw std::runtime_error("name/version must not be empty");
 		if (!data.at("api_version").is_number_integer()) throw std::runtime_error("api_version must be an integer");
 		if (data.at("api_version") < 0 || data.at("api_version") > 2147483647)
@@ -153,6 +164,92 @@ std::vector<Manifest> ResolveOrder(const Discovery& discovery, const std::vector
 	return result;
 }
 
+Selection::Selection(Discovery discovery, std::vector<std::string> enabled)
+	: mDiscovery(std::move(discovery)), mEnabled(std::move(enabled)) {}
+
+bool Selection::IsEnabled(const std::string& id) const
+{
+	return std::find(mEnabled.begin(), mEnabled.end(), id) != mEnabled.end();
+}
+
+void Selection::SetEnabled(const std::string& id, bool enabled)
+{
+	auto candidate = mEnabled;
+	if (enabled)
+	{
+		std::set<std::string> visiting, done;
+		std::function<void(const std::string&)> add = [&](const std::string& current) {
+			if (done.count(current)) return;
+			if (!visiting.insert(current).second) throw Error(current, "resolve", "dependency cycle");
+			const Manifest* found = nullptr;
+			for (const auto& manifest : mDiscovery.manifests)
+				if (manifest.id == current)
+				{
+					if (found) throw Error(current, "resolve", "duplicate installed mod id");
+					found = &manifest;
+				}
+			if (!found) throw Error(current, "resolve", "required mod is missing or invalid");
+			if (found->apiVersion != ApiVersion) throw Error(current, "resolve", "unsupported framework API version");
+			for (const auto& dependency : found->dependencies) add(dependency);
+			if (std::find(candidate.begin(), candidate.end(), current) == candidate.end()) candidate.push_back(current);
+			visiting.erase(current);
+			done.insert(current);
+		};
+		add(id);
+		ResolveOrder(mDiscovery, candidate);
+	}
+	else
+	{
+		std::set<std::string> removed{id};
+		bool changed;
+		do
+		{
+			changed = false;
+			for (const auto& manifest : mDiscovery.manifests)
+				if (!removed.count(manifest.id) && std::any_of(manifest.dependencies.begin(), manifest.dependencies.end(),
+					[&](const auto& dependency) { return removed.count(dependency) != 0; }))
+					changed |= removed.insert(manifest.id).second;
+		} while (changed);
+		std::erase_if(candidate, [&](const auto& current) { return removed.count(current) != 0; });
+	}
+	mEnabled = std::move(candidate);
+}
+
+std::vector<std::string> ReadEnabled(const std::filesystem::path& path)
+{
+	if (!std::filesystem::exists(path)) return {};
+	return ReadJson(path).at("enabled").get<std::vector<std::string>>();
+}
+
+void SaveEnabled(const std::filesystem::path& path, const std::vector<std::string>& enabled)
+{
+	auto config = std::filesystem::exists(path) ? ReadJson(path) : Data::object();
+	config["enabled"] = enabled;
+	const auto text = config.dump(2) + "\n";
+	std::filesystem::create_directories(path.parent_path());
+	auto temporary = path;
+	temporary += ".tmp-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+	try
+	{
+		std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
+		stream.exceptions(std::ios::failbit | std::ios::badbit);
+		stream.write(text.data(), static_cast<std::streamsize>(text.size()));
+		stream.close();
+#ifdef _WIN32
+		if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+			throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), "cannot replace mod configuration");
+#else
+		std::filesystem::rename(temporary, path);
+#endif
+	}
+	catch (...)
+	{
+		std::error_code ignored;
+		std::filesystem::remove(temporary, ignored);
+		throw;
+	}
+}
+
 void Registry::Add(const std::string& owner, const std::string& kind, const std::string& name, Data definition)
 {
 	static const std::set<std::string> kinds = {"plant", "zombie", "projectile", "level", "ability", "image", "sound", "particle", "reanim"};
@@ -170,3 +267,4 @@ const Content* Registry::Find(const std::string& id) const
 	return found == mEntries.end() ? nullptr : &found->second;
 }
 }
+#endif
