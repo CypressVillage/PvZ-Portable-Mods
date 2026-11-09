@@ -83,6 +83,8 @@ public:
 	std::unique_ptr<GameButton> mMenuButton;
 	std::unique_ptr<GameButton> mImitaterButton;
 #ifdef PVZ_MOD
+	std::unique_ptr<GameButton> mPrevPageButton;
+	std::unique_ptr<GameButton> mNextPageButton;
 	std::vector<ChosenSeed>  mChosenSeeds;
 	int                     mPlantPage = 0;
 #else

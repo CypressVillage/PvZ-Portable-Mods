@@ -60,6 +60,11 @@ public:
 	std::unique_ptr<GameButton>	mIndexButton;
 	std::unique_ptr<GameButton>	mPlantButton;
 	std::unique_ptr<GameButton>	mZombieButton;
+#ifdef PVZ_MOD
+	std::unique_ptr<GameButton>	mPrevPageButton;
+	std::unique_ptr<GameButton>	mNextPageButton;
+	int                         mPlantPage = 0;
+#endif
 	AlmanacPage					mOpenPage;
 	Reanimation*				mReanim[4];
 	SeedType					mSelectedSeed;

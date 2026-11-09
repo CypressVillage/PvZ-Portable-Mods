@@ -1,10 +1,8 @@
 local fume = plants.get("base:fume_shroom")
 local gloom = plants.get("base:gloom_shroom")
-local attack = fume.attack
-
-local thunder = plants.define("thunder-shroom", {
-    name = "雷蘑菇",
-    description = "大喷菇升级卡。攻击前方整行，对携带金属物品的僵尸造成双倍伤害。",
+plants.define("thunder-shroom", {
+    name = "Thunder-shroom",
+    description = "An upgrade for Fume-shroom. Attacks all zombies ahead in its lane, dealing double damage to zombies carrying metal items.",
     cost = 150,
     cooldown = gloom.cooldown,
     health = 300,
@@ -15,45 +13,24 @@ local thunder = plants.define("thunder-shroom", {
         animations = {idle = "anim_idle", attack = "anim_shooting", sleep = "anim_sleep"},
     },
     card = {image = "assets/thunder_shroom_card.png"},
-})
-
-local function targets(plant)
-    return zombies.query({source = plant, direction = "forward", target = "ground"})
-end
-
-hooks.on("plant.updated", {type = thunder}, function(ctx)
-    local state = ctx.state
-    if state.launch == nil then
-        state.launch = math.random(attack.initial_min, attack.initial_max)
-        state.shooting = 0
-    end
-
-    -- As with the native shooter, the current attack advances before a new one starts.
-    if state.shooting > 0 then
-        state.shooting = state.shooting - 1
-        if state.shooting == attack.duration - attack.windup then
-            for _, handle in ipairs(targets(ctx.entity)) do
+    attack = {
+        timing = fume.attack,
+        animation = "attack",
+        animation_ticks = 90,
+        targets = function(plant)
+            return zombies.query({source = plant, direction = "forward", target = "ground"})
+        end,
+        on_strike = function(ctx)
+            for _, handle in ipairs(ctx.targets) do
                 local target = entities.get(handle)
-                local damage = attack.damage * (target.has_metal and 2 or 1)
+                local damage = ctx.attack.damage * (target.has_metal and 2 or 1)
                 zombies.damage(handle, {
                     source = ctx.entity,
                     amount = damage,
-                    mode = attack.damage_mode,
+                    mode = ctx.attack.damage_mode,
                 })
             end
-            effects.lightning({source = ctx.entity})
-        end
-        if state.shooting == 0 then
-            plants.play_animation(ctx.entity, "idle")
-        end
-    end
-
-    state.launch = state.launch - 1
-    if state.launch <= 0 then
-        state.launch = attack.interval - math.random(0, attack.interval_variation - 1)
-        if #targets(ctx.entity) > 0 then
-            state.shooting = attack.duration
-            plants.play_animation(ctx.entity, "attack")
-        end
-    end
-end)
+            effects.lightning({source = ctx.entity, duration = 100})
+        end,
+    },
+})

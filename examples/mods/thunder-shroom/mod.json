@@ -1,8 +1,8 @@
 {
   "id": "thunder-shroom",
-  "name": "雷蘑菇",
+  "name": "Thunder-shroom",
   "version": "1.0.0",
   "api_version": 1,
-  "description": "大喷菇的升级植物：攻击前方整行，对携带磁力菇可吸物品的僵尸造成双倍伤害。",
+  "description": "An upgraded Fume-shroom that attacks all zombies ahead in its lane, dealing double damage to zombies carrying items that Magnet-shroom can remove.",
   "entry": "main.lua"
 }

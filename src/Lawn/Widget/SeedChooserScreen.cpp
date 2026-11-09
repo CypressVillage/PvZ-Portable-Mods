@@ -149,6 +149,27 @@ SeedChooserScreen::SeedChooserScreen()
 	mImitaterButton->Resize(464, 515, Sexy::IMAGE_IMITATERSEED->mWidth, Sexy::IMAGE_IMITATERSEED->mHeight);
 	mImitaterButton->mParentWidget = this;
 
+#ifdef PVZ_MOD
+	mPrevPageButton = std::make_unique<GameButton>(107);
+	mNextPageButton = std::make_unique<GameButton>(108);
+	for (GameButton* aButton : {mPrevPageButton.get(), mNextPageButton.get()})
+	{
+		aButton->mParentWidget = this;
+		aButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
+		aButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
+		aButton->mBtnNoDraw = !Mod::HasPlayablePlants();
+	}
+	mPrevPageButton->SetLabel("<");
+	mNextPageButton->SetLabel(">");
+	mPrevPageButton->Resize(80, 545, 64, 42);
+	mNextPageButton->Resize(320, 545, 64, 42);
+	if (Mod::HasPlayablePlants())
+	{
+		mViewLawnButton->Resize(560, 530, aImageWidth, aImageHeight);
+		mRandomButton->Resize(560, 490, 100, 30);
+	}
+#endif
+
 	if (!mApp->CanShowAlmanac())
 	{
 		mAlmanacButton->mBtnNoDraw = true;
@@ -372,11 +393,6 @@ void SeedChooserScreen::Draw(Graphics* g)
 	PvzpDrawString(g, "[CHOOSE_YOUR_PLANTS]", 229, 110, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 
 #ifdef PVZ_MOD
-	if (Mod::HasPlayablePlants())
-	{
-		auto label = std::to_string(mPlantPage + 1) + "/" + std::to_string(1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 39) / 40) + " >";
-		PvzpDrawString(g, label, 400, 110, Sexy::FONT_BRIANNETOD12, Color::White, DS_ALIGN_CENTER);
-	}
 	int aNumSeeds = mPlantPage == 0 ? (Has7Rows() ? 48 : 40) : 0;
 #else
 	int aNumSeeds = Has7Rows() ? 48 : 40;
@@ -462,6 +478,25 @@ void SeedChooserScreen::Draw(Graphics* g)
 	}
 
 	mStartButton->Draw(g);
+#ifdef PVZ_MOD
+	for (GameButton* aButton : {mPrevPageButton.get(), mNextPageButton.get()})
+	{
+		if (aButton->mBtnNoDraw) continue;
+		int aOffset = aButton->IsButtonDown() ? 1 : 0;
+		Rect aDest(aButton->mX + aOffset, aButton->mY + aOffset, aButton->mWidth, aButton->mHeight);
+		Image* aImage = aButton->mButtonImage;
+		g->DrawImage(aImage, aDest, Rect(0, 0, aImage->mWidth, aImage->mHeight));
+		PvzpDrawString(g, aButton->mLabel, aDest.mX + aDest.mWidth / 2, aDest.mY + 27,
+			Sexy::FONT_DWARVENTODCRAFT18YELLOW, aButton->IsMouseOver() ? Color::White : Color::Black, DS_ALIGN_CENTER);
+		if (aButton->IsMouseOver())
+		{
+			Image* aGlow = aButton->mOverOverlayImage;
+			g->SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+			g->DrawImage(aGlow, aDest, Rect(0, 0, aGlow->mWidth, aGlow->mHeight));
+			g->SetDrawMode(Graphics::DRAWMODE_NORMAL);
+		}
+	}
+#endif
 	mRandomButton->Draw(g);
 	mViewLawnButton->Draw(g);
 	mAlmanacButton->Draw(g);
@@ -547,7 +582,11 @@ void SeedChooserScreen::UpdateCursor()
 
 	if (mMouseVisible && mChooseState != CHOOSE_VIEW_LAWN && ((aMouseSeedType != SEED_NONE && !SeedNotAllowedToPick(aMouseSeedType)) ||
 		mRandomButton->IsMouseOver() || mViewLawnButton->IsMouseOver() || mAlmanacButton->IsMouseOver() || mImitaterButton->IsMouseOver() ||
-		mStoreButton->IsMouseOver() || mMenuButton->IsMouseOver() || mStartButton->IsMouseOver()))
+		mStoreButton->IsMouseOver() || mMenuButton->IsMouseOver() || mStartButton->IsMouseOver()
+#ifdef PVZ_MOD
+		|| mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver()
+#endif
+		))
 		mApp->SetCursor(CURSOR_HAND);
 	else
 		mApp->SetCursor(CURSOR_POINTER);
@@ -594,6 +633,12 @@ void SeedChooserScreen::Update()
 	mImitaterButton->Update();
 	mStoreButton->Update();
 	mMenuButton->Update();
+#ifdef PVZ_MOD
+	mPrevPageButton->mDisabled = mChooseState != CHOOSE_NORMAL;
+	mNextPageButton->mDisabled = mChooseState != CHOOSE_NORMAL;
+	mPrevPageButton->Update();
+	mNextPageButton->Update();
+#endif
 	UpdateViewLawn();
 	UpdateCursor();
 	MarkDirty();
@@ -1018,6 +1063,16 @@ void SeedChooserScreen::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, 
 {
 	if (theClickCount == 1)
 	{
+#ifdef PVZ_MOD
+		if (mChooseState == CHOOSE_NORMAL && (mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver()))
+		{
+			int aPages = 1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 39) / 40;
+			int aDirection = mPrevPageButton->IsMouseOver() ? -1 : 1;
+			mPlantPage = (mPlantPage + aDirection + aPages) % aPages;
+			RemoveToolTip();
+			return;
+		}
+#endif
 		if (mMenuButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Menu);
 		else if (mStartButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Start);
 		else if (mAlmanacButton->IsMouseOver()) ButtonDepress(SeedChooserScreen::SeedChooserScreen_Almanac);
@@ -1056,11 +1111,9 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 	}
 
 #ifdef PVZ_MOD
-	if (Mod::HasPlayablePlants() && mChooseState == CHOOSE_NORMAL && Rect(350, 88, 100, 30).Contains(x, y))
+	if (mChooseState == CHOOSE_NORMAL && (mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver()))
 	{
-		int pages = 1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 39) / 40;
-		mPlantPage = (mPlantPage + 1) % pages;
-		RemoveToolTip();
+		mApp->PlaySample(Sexy::SOUND_TAP);
 		return;
 	}
 #endif

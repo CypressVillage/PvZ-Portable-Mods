@@ -5,9 +5,9 @@
 #include <algorithm>
 namespace Mod
 {
-void Effects::Lightning(int x, int y, int endX, int row)
+void Effects::Lightning(int x, int y, int endX, int row, int duration)
 {
-	mBolts.push_back({x, y, endX, row, 12, ++mSequence});
+	mBolts.push_back({x, y, endX, row, duration, duration, ++mSequence});
 }
 void Effects::Update()
 {
@@ -27,7 +27,7 @@ void Effects::Draw(Sexy::Graphics* graphics, int row) const
 			noise = noise * 1664525U + 1013904223U;
 			int endX = std::min(nextX, bolt.endX);
 			int endY = bolt.y + static_cast<int>((noise >> 16) % 23) - 11;
-			int alpha = bolt.ticks * 255 / 12;
+			int alpha = bolt.ticks * 255 / bolt.duration;
 			g.SetColor(Sexy::Color(80, 110, 255, alpha / 2));
 			for (int offset : {-2, -1, 1, 2}) g.DrawLine(x, y + offset, endX, endY + offset);
 			g.SetColor(Sexy::Color(210, 245, 255, alpha));

@@ -35,6 +35,10 @@
 #include "../System/ReanimationLawn.h"
 #include "../../PvzpLib/PvzpStringFile.h"
 #include "widget/WidgetManager.h"
+#ifdef PVZ_MOD
+#include "../ModPlants.h"
+#include <algorithm>
+#endif
 
 bool gZombieDefeated[NUM_ZOMBIE_TYPES] = { false };
 
@@ -98,6 +102,20 @@ AlmanacDialog::AlmanacDialog(LawnApp* theApp) : LawnDialog(theApp, DIALOG_ALMANA
 	mZombieButton->mDrawStoneButton = true;
 	mZombieButton->mParentWidget = this;
 
+#ifdef PVZ_MOD
+	mPrevPageButton = std::make_unique<GameButton>(4);
+	mNextPageButton = std::make_unique<GameButton>(5);
+	for (GameButton* aButton : {mPrevPageButton.get(), mNextPageButton.get()})
+	{
+		aButton->mParentWidget = this;
+		aButton->mButtonImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON;
+		aButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
+	}
+	mPrevPageButton->SetLabel("<");
+	mNextPageButton->SetLabel(">");
+	mPrevPageButton->Resize(230, 557, 64, 42);
+	mNextPageButton->Resize(330, 557, 64, 42);
+#endif
 	SetPage(ALMANAC_PAGE_INDEX);
 	if (!mApp->mBoard || !mApp->mBoard->mPaused)
 		mApp->mMusic->MakeSureMusicIsPlaying(MUSIC_TUNE_CHOOSE_YOUR_SEEDS);
@@ -170,6 +188,10 @@ void AlmanacDialog::SetupZombie()
 void AlmanacDialog::SetPage(AlmanacPage thePage)
 {
 	mOpenPage = thePage;
+#ifdef PVZ_MOD
+	mPrevPageButton->mBtnNoDraw = mOpenPage != ALMANAC_PAGE_PLANTS || !Mod::HasPlayablePlants();
+	mNextPageButton->mBtnNoDraw = mPrevPageButton->mBtnNoDraw;
+#endif
 	ClearPlantsAndZombies();
 
 	if (mOpenPage == AlmanacPage::ALMANAC_PAGE_INDEX)
@@ -208,6 +230,9 @@ void AlmanacDialog::SetPage(AlmanacPage thePage)
 void AlmanacDialog::ShowPlant(SeedType theSeedType)
 {
 	mSelectedSeed = theSeedType;
+#ifdef PVZ_MOD
+	mPlantPage = theSeedType >= Mod::FirstPlantType ? 1 + (theSeedType - Mod::FirstPlantType) / 48 : 0;
+#endif
 	SetPage(ALMANAC_PAGE_PLANTS);
 }
 
@@ -223,6 +248,10 @@ void AlmanacDialog::Update()
 	mIndexButton->Update();
 	mPlantButton->Update();
 	mZombieButton->Update();
+#ifdef PVZ_MOD
+	mPrevPageButton->Update();
+	mNextPageButton->Update();
+#endif
 	if (mPlant) mPlant->Update();
 	if (mZombie) mZombie->Update();
 	for (const std::unique_ptr<Zombie>& aZombie : mZombiePerfTest)
@@ -236,7 +265,11 @@ void AlmanacDialog::Update()
 	int aMouseX = mApp->mWidgetManager->mLastMouseX;
 	int aMouseY = mApp->mWidgetManager->mLastMouseY;
 	if (SeedHitTest(aMouseX, aMouseY) != SeedType::SEED_NONE || ZombieHitTest(aMouseX, aMouseY) != ZombieType::ZOMBIE_INVALID ||
-		mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver() || mPlantButton->IsMouseOver() || mZombieButton->IsMouseOver())
+		mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver() || mPlantButton->IsMouseOver() || mZombieButton->IsMouseOver()
+#ifdef PVZ_MOD
+		|| mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver()
+#endif
+		)
 	{
 		mApp->SetCursor(CURSOR_HAND);
 	}
@@ -279,7 +312,13 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 	PvzpDrawString(g, "[SUBURBAN_ALMANAC_PLANTS]", BOARD_WIDTH / 2, 48, Sexy::FONT_HOUSEOFTERROR20, Color(213, 159, 43), DrawStringJustification::DS_ALIGN_CENTER);
 
 	SeedType aSeedMouseOn = SeedHitTest(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY);
+#ifdef PVZ_MOD
+	int aFirstSeed = mPlantPage == 0 ? 0 : Mod::FirstPlantType + (mPlantPage - 1) * 48;
+	int aEndSeed = mPlantPage == 0 ? NUM_ALMANAC_SEEDS : std::min(aFirstSeed + 48, mApp->mModPlants->EndType());
+	for (SeedType aSeedType = (SeedType)aFirstSeed; aSeedType < aEndSeed; aSeedType = (SeedType)(aSeedType + 1))
+#else
 	for (SeedType aSeedType = SeedType::SEED_PEASHOOTER; aSeedType < NUM_ALMANAC_SEEDS; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 	{
 		int aPosX, aPosY;
 		GetSeedPosition(aSeedType, aPosX, aPosY);
@@ -335,6 +374,10 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 	const PlantDefinition& aPlantDef = GetPlantDefinition(mSelectedSeed);
 	std::string aName = Plant::GetNameString(mSelectedSeed, SEED_NONE);
 	std::string aDescriptionName = std::format("[{}_DESCRIPTION]", aPlantDef.mPlantName);
+#ifdef PVZ_MOD
+	if (const auto* aModPlant = Mod::FindPlant(mSelectedSeed))
+		aDescriptionName = aModPlant->description;
+#endif
 	PvzpDrawString(g, aName, 617, 288, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 	PvzpDrawStringWrapped(g, aDescriptionName, Rect(485, 309, 258, 230), Sexy::FONT_BRIANNETOD12, Color(40, 50, 90), DS_ALIGN_LEFT);
 
@@ -517,10 +560,33 @@ void AlmanacDialog::Draw(Graphics* g)
 	mIndexButton->Draw(g);
 	mPlantButton->Draw(g);
 	mZombieButton->Draw(g);
+#ifdef PVZ_MOD
+	for (GameButton* aButton : {mPrevPageButton.get(), mNextPageButton.get()})
+	{
+		if (aButton->mBtnNoDraw) continue;
+		int aOffset = aButton->IsButtonDown() ? 1 : 0;
+		Rect aDest(aButton->mX + aOffset, aButton->mY + aOffset, aButton->mWidth, aButton->mHeight);
+		Image* aImage = aButton->mButtonImage;
+		g->DrawImage(aImage, aDest, Rect(0, 0, aImage->mWidth, aImage->mHeight));
+		PvzpDrawString(g, aButton->mLabel, aDest.mX + aDest.mWidth / 2, aDest.mY + 27,
+			Sexy::FONT_DWARVENTODCRAFT18YELLOW, aButton->IsMouseOver() ? Color::White : Color::Black, DS_ALIGN_CENTER);
+		if (aButton->IsMouseOver())
+		{
+			Image* aGlow = aButton->mOverOverlayImage;
+			g->SetDrawMode(Graphics::DRAWMODE_ADDITIVE);
+			g->DrawImage(aGlow, aDest, Rect(0, 0, aGlow->mWidth, aGlow->mHeight));
+			g->SetDrawMode(Graphics::DRAWMODE_NORMAL);
+		}
+	}
+#endif
 }
 
 void AlmanacDialog::GetSeedPosition(SeedType theSeedType, int& x, int& y)
 {
+#ifdef PVZ_MOD
+	if (theSeedType >= Mod::FirstPlantType)
+		theSeedType = (SeedType)((theSeedType - Mod::FirstPlantType) % 48);
+#endif
 	if (theSeedType == SeedType::SEED_IMITATER)
 		x = 20, y = 23;
 	else
@@ -534,7 +600,13 @@ SeedType AlmanacDialog::SeedHitTest(int x, int y)
 {
 	if (mMouseVisible && mOpenPage == AlmanacPage::ALMANAC_PAGE_PLANTS)
 	{
+#ifdef PVZ_MOD
+		int aFirstSeed = mPlantPage == 0 ? 0 : Mod::FirstPlantType + (mPlantPage - 1) * 48;
+		int aEndSeed = mPlantPage == 0 ? NUM_ALMANAC_SEEDS : std::min(aFirstSeed + 48, mApp->mModPlants->EndType());
+		for (SeedType aSeedType = (SeedType)aFirstSeed; aSeedType < aEndSeed; aSeedType = (SeedType)(aSeedType + 1))
+#else
 		for (SeedType aSeedType = SeedType::SEED_PEASHOOTER; aSeedType < NUM_ALMANAC_SEEDS; aSeedType = (SeedType)(aSeedType + 1))
+#endif
 		{
 			if (mApp->HasSeedType(aSeedType))
 			{
@@ -638,6 +710,17 @@ ZombieType AlmanacDialog::ZombieHitTest(int x, int y)
 
 void AlmanacDialog::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int theClickCount)
 {
+#ifdef PVZ_MOD
+	if (theClickCount == 1 && (mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver()))
+	{
+		int aPages = 1 + (mApp->mModPlants->EndType() - Mod::FirstPlantType + 47) / 48;
+		int aDirection = mPrevPageButton->IsMouseOver() ? -1 : 1;
+		mPlantPage = (mPlantPage + aDirection + aPages) % aPages;
+		mSelectedSeed = mPlantPage == 0 ? SEED_PEASHOOTER : (SeedType)(Mod::FirstPlantType + (mPlantPage - 1) * 48);
+		SetupPlant();
+		return;
+	}
+#endif
 	if (mPlantButton->IsMouseOver())		SetPage(ALMANAC_PAGE_PLANTS);
 	else if (mZombieButton->IsMouseOver())	SetPage(ALMANAC_PAGE_ZOMBIES);
 	else if (mCloseButton->IsMouseOver())	mApp->KillAlmanacDialog();
@@ -646,6 +729,13 @@ void AlmanacDialog::MouseUp([[maybe_unused]] int x, [[maybe_unused]] int y, [[ma
 
 void AlmanacDialog::MouseDown(int x, int y, [[maybe_unused]] int theClickCount)
 {
+#ifdef PVZ_MOD
+	if (mPrevPageButton->IsMouseOver() || mNextPageButton->IsMouseOver())
+	{
+		mApp->PlaySample(Sexy::SOUND_TAP);
+		return;
+	}
+#endif
 	if (mPlantButton->IsMouseOver() || mCloseButton->IsMouseOver() || mIndexButton->IsMouseOver())
 		mApp->PlaySample(Sexy::SOUND_TAP);
 	if (mZombieButton->IsMouseOver())

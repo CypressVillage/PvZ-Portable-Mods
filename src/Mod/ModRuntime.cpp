@@ -167,6 +167,10 @@ struct Runtime::Impl
 		std::vector<UiButton> buttons;
 		Data state = Data::object();
 		std::map<std::string, Data> entityStates;
+		struct Attack { Data options; int targets; int strike; };
+		std::map<std::string, Attack> attacks;
+		struct AttackState { int launch = 0; int shooting = 0; int animation = 0; };
+		std::map<std::string, AttackState> attackStates;
 		bool entered = false;
 
 		Script(Impl& owner, Manifest info) : host(owner), manifest(std::move(info)) {}
@@ -356,9 +360,42 @@ struct Runtime::Impl
 		{
 			RegistrationOnly();
 			auto name = String(state, 1);
-			auto definition = ReadData(state, 2);
+			if (!lua_istable(state, 2)) throw std::runtime_error("plant definition must be an object");
+			lua_newtable(state);
+			int plain = lua_gettop(state);
+			lua_pushnil(state);
+			while (lua_next(state, 2))
+			{
+				if (String(state, -2) != "attack")
+				{
+					lua_pushvalue(state, -2);
+					lua_pushvalue(state, -2);
+					lua_rawset(state, plain);
+				}
+				lua_pop(state, 1);
+			}
+			auto definition = ReadData(state, plain);
+			lua_pop(state, 1);
+			lua_getfield(state, 2, "attack");
+			if (!lua_isnil(state, -1))
+			{
+				Data options = Data::object();
+				for (const char* field : {"timing", "animation", "animation_ticks"})
+				{
+					lua_getfield(state, -1, field);
+					options[field] = ReadData(state, -1);
+					lua_pop(state, 1);
+				}
+				lua_getfield(state, -1, "targets");
+				int targets = luaL_ref(state, LUA_REGISTRYINDEX);
+				lua_getfield(state, -1, "on_strike");
+				int strike = luaL_ref(state, LUA_REGISTRYINDEX);
+				attacks.emplace(manifest.id + ":" + name, Attack{options, targets, strike});
+				definition["attack"] = std::move(options);
+			}
+			lua_pop(state, 1);
 			if (!definition.is_object()) throw std::runtime_error("plant definition must be an object");
-			const std::set<std::string> fields = {"name", "description", "cost", "cooldown", "health", "appearance", "card", "upgrade", "traits"};
+			const std::set<std::string> fields = {"name", "description", "cost", "cooldown", "health", "appearance", "card", "upgrade", "traits", "attack"};
 			for (auto it = definition.begin(); it != definition.end(); ++it)
 				if (!fields.count(it.key())) throw std::runtime_error("unsupported plant field: " + it.key());
 			for (const char* field : {"name", "description"})
@@ -418,6 +455,60 @@ struct Runtime::Impl
 			host.plants.emplace(id, Content{id, "plant", manifest.id, std::move(definition)});
 			lua_pushlstring(state, id.data(), id.size());
 			return 1;
+		}
+
+		int Random(int minimum, int maximum)
+		{
+			lua_getglobal(L, "math");
+			lua_getfield(L, -1, "random");
+			lua_remove(L, -2);
+			lua_pushinteger(L, minimum);
+			lua_pushinteger(L, maximum);
+			ProtectedCall(L, 2, 1);
+			int result = lua_tointeger(L, -1);
+			lua_pop(L, 1);
+			return result;
+		}
+
+		Data AttackTargets(const Attack& attack, const std::string& entity)
+		{
+			lua_rawgeti(L, LUA_REGISTRYINDEX, attack.targets);
+			PushData(L, entity);
+			ProtectedCall(L, 1, 1);
+			auto result = ReadData(L, -1);
+			lua_pop(L, 1);
+			return result;
+		}
+
+		void UpdateAttack(const Attack& attack, const Data& context)
+		{
+			const auto& timing = attack.options.at("timing");
+			auto entity = context.at("entity").get<std::string>();
+			auto [entry, inserted] = attackStates.try_emplace(entity);
+			auto& state = entry->second;
+			if (inserted) state.launch = Random(timing.at("initial_min"), timing.at("initial_max"));
+			if (state.animation > 0 && --state.animation == 0)
+				host.gameApi("plants.play_animation", {{"entity", entity}, {"action", "idle"}});
+			// Advance the previous attack before starting a new one, as native shooters do.
+			if (state.shooting > 0 && --state.shooting == timing.at("duration").get<int>() - timing.at("windup").get<int>())
+			{
+				auto input = context;
+				input["targets"] = AttackTargets(attack, entity);
+				input["attack"] = timing;
+				lua_rawgeti(L, LUA_REGISTRYINDEX, attack.strike);
+				PushData(L, input);
+				ProtectedCall(L, 1, 0);
+			}
+			if (--state.launch <= 0)
+			{
+				state.launch = timing.at("interval").get<int>() - Random(0, timing.at("interval_variation").get<int>() - 1);
+				if (!AttackTargets(attack, entity).empty())
+				{
+					state.shooting = timing.at("duration");
+					state.animation = attack.options.at("animation_ticks");
+					host.gameApi("plants.play_animation", {{"entity", entity}, {"action", attack.options.at("animation")}});
+				}
+			}
 		}
 
 		int GetPlant(lua_State* state)
@@ -654,7 +745,11 @@ const std::map<std::string, Content>& Runtime::Plants() const { return mImpl->pl
 void Runtime::SetGameApi(GameApi api) { mImpl->gameApi = std::move(api); }
 void Runtime::ForgetEntity(const std::string& entity)
 {
-	for (auto& script : mImpl->scripts) script->entityStates.erase(entity);
+	for (auto& script : mImpl->scripts)
+	{
+		script->entityStates.erase(entity);
+		script->attackStates.erase(entity);
+	}
 }
 
 bool Runtime::HasGameHooks() const
@@ -712,7 +807,11 @@ void Runtime::EndBoard()
 	mImpl->timeRemainder = 0;
 	Data context = Data::object();
 	Dispatch("level.ended", context);
-	for (auto& script : mImpl->scripts) script->entityStates.clear();
+	for (auto& script : mImpl->scripts)
+	{
+		script->entityStates.clear();
+		script->attackStates.clear();
+	}
 }
 
 std::string Runtime::ConfigurationIdentity() const
@@ -738,6 +837,19 @@ void Runtime::Dispatch(const std::string& event, Data& context)
 {
 	auto& impl = *mImpl;
 	if (impl.phase != Phase::Running) return;
+	if (event == "plant.updated") for (auto& script : impl.scripts)
+	{
+		auto attack = script->attacks.find(context.at("type").get<std::string>());
+		if (attack == script->attacks.end()) continue;
+		Stack stack(script->L);
+		try { script->UpdateAttack(attack->second, context); }
+		catch (const std::exception& failure)
+		{
+			Error error(script->manifest.id, "plant.attack", failure.what());
+			impl.diagnostics.emplace_back(error.what());
+			if (impl.logger) impl.logger(script->manifest.id, error.what());
+		}
+	}
 	struct Entry { Impl::Script* script; int token; int priority; };
 	std::vector<Entry> entries;
 	for (auto& script : impl.scripts) for (const auto& hook : script->hooks)

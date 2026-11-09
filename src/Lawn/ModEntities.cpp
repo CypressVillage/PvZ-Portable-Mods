@@ -122,7 +122,8 @@ Data Entities::Call(const std::string& operation, const Data& args)
 	{
 		auto* plant = PlantFrom(args.at("source").get<std::string>());
 		if (!plant) return false;
-		mBoard.mModEffects->Lightning(plant->mX + 70, plant->mY + 32, BOARD_WIDTH, plant->mRow);
+		mBoard.mModEffects->Lightning(plant->mX + 70, plant->mY + 32, BOARD_WIDTH, plant->mRow,
+			args.value("duration", 12));
 		return true;
 	}
 	throw std::runtime_error("unsupported game operation: " + operation);
