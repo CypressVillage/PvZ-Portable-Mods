@@ -1,8 +1,0 @@
-{
-  "id": "plain-plant",
-  "name": "Plain Plant Example",
-  "version": "1.0.0",
-  "description": "A plain, plantable stump with no special abilities. Demonstrates custom plant cards, placement, health, and lifecycle hooks.",
-  "api_version": 1,
-  "entry": "main.lua"
-}
