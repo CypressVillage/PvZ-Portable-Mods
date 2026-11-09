@@ -1,7 +1,7 @@
 local button = ui.button("toggle", {
     text = "1x",
-    right = 128,
-    top = 0,
+    right = 2,
+    top = 40,
     width = 72,
     height = 36,
 }, function()
