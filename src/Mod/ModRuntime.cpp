@@ -228,6 +228,9 @@ struct Runtime::Impl
 			Bind<&Script::GetEntity>("get");
 			lua_setglobal(L, "entities");
 			lua_newtable(L);
+			Bind<&Script::CollectCollectible>("collect");
+			lua_setglobal(L, "collectibles");
+			lua_newtable(L);
 			Bind<&Script::QueryZombies>("query");
 			Bind<&Script::DamageZombie>("damage");
 			lua_setglobal(L, "zombies");
@@ -437,6 +440,7 @@ struct Runtime::Impl
 			return 1;
 		}
 		int GetEntity(lua_State* state) { return GameCall(state, "entities.get", String(state, 1)); }
+		int CollectCollectible(lua_State* state) { return GameCall(state, "collectibles.collect", String(state, 1)); }
 		int QueryZombies(lua_State* state) { return GameCall(state, "zombies.query", ReadData(state, 1)); }
 		int DamageZombie(lua_State* state) { return GameCall(state, "zombies.damage", {{"entity", String(state, 1)}, {"options", ReadData(state, 2)}}); }
 		int PlayAnimation(lua_State* state) { return GameCall(state, "plants.play_animation", {{"entity", String(state, 1)}, {"action", String(state, 2)}}); }
@@ -446,7 +450,7 @@ struct Runtime::Impl
 		{
 			RegistrationOnly();
 			auto event = String(state, 1);
-			static const std::set<std::string> events = {"plant.before_initialize", "plant.spawned", "plant.removed", "plant.can_place", "plant.updated", "level.started", "level.ended"};
+			static const std::set<std::string> events = {"plant.before_initialize", "plant.spawned", "plant.removed", "plant.can_place", "plant.updated", "collectible.spawned", "level.started", "level.ended"};
 			if (!events.count(event)) throw std::runtime_error("unsupported hook: " + event);
 			int callback = 2, priority = 0;
 			std::string type;

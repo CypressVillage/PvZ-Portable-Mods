@@ -4,6 +4,7 @@
 #include "ModPlants.h"
 #include "ModEffects.h"
 #include "Board.h"
+#include "Coin.h"
 #include "../LawnApp.h"
 #include "../GameConstants.h"
 
@@ -22,6 +23,10 @@ std::string Entities::Handle(Zombie& zombie) const
 {
 	return mPrefix + "z:" + std::to_string(mBoard.mZombies.DataArrayGetID(&zombie));
 }
+std::string Entities::Handle(Coin& coin) const
+{
+	return mPrefix + "c:" + std::to_string(mBoard.mCoins.DataArrayGetID(&coin));
+}
 Plant* Entities::PlantFrom(const std::string& handle) const
 {
 	const auto prefix = mPrefix + "p:";
@@ -36,8 +41,23 @@ Zombie* Entities::ZombieFrom(const std::string& handle) const
 	auto* zombie = mBoard.mZombies.DataArrayTryToGet(std::stoul(handle.substr(prefix.size())));
 	return zombie && !zombie->mDead ? zombie : nullptr;
 }
+Coin* Entities::CoinFrom(const std::string& handle) const
+{
+	const auto prefix = mPrefix + "c:";
+	if (!handle.starts_with(prefix)) return nullptr;
+	auto* coin = mBoard.mCoins.DataArrayTryToGet(std::stoul(handle.substr(prefix.size())));
+	return coin && !coin->mDead ? coin : nullptr;
+}
 Data Entities::Call(const std::string& operation, const Data& args)
 {
+	if (operation == "collectibles.collect")
+	{
+		auto* coin = CoinFrom(args.get<std::string>());
+		if (!coin || coin->mIsBeingCollected) return false;
+		coin->PlayCollectSound();
+		coin->Collect();
+		return true;
+	}
 	if (operation == "entities.get")
 	{
 		auto handle = args.get<std::string>();

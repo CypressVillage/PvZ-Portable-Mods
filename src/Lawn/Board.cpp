@@ -2007,6 +2007,18 @@ Coin* Board::AddCoin(int theX, int theY, CoinType theCoinType, CoinMotion theCoi
 	{
 		DisplayAdvice("[ADVICE_CLICK_ON_SUN]", MessageStyle::MESSAGE_STYLE_TUTORIAL_LEVEL1_STAY, AdviceType::ADVICE_CLICK_ON_SUN);
 	}
+#ifdef PVZ_MOD
+	if (mApp->mModRuntime)
+	{
+		std::string type = "base:coin_" + std::to_string(static_cast<int>(theCoinType));
+		if (aCoin->IsSun()) type = "base:sun";
+		else if (theCoinType == CoinType::COIN_GOLD) type = "base:gold";
+		else if (theCoinType == CoinType::COIN_SILVER) type = "base:silver";
+		else if (theCoinType == CoinType::COIN_DIAMOND) type = "base:diamond";
+		Mod::Data context = {{"entity", mModEntities->Handle(*aCoin)}, {"type", type}};
+		mApp->mModRuntime->Dispatch("collectible.spawned", context);
+	}
+#endif
 	return aCoin;
 }
 

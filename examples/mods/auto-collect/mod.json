@@ -1,0 +1,8 @@
+{
+  "id": "auto-collect",
+  "name": "Auto Collect",
+  "version": "1.0.0",
+  "api_version": 1,
+  "entry": "main.lua",
+  "description": "Automatically collects sun, gold coins and silver coins when they spawn. Leaves diamonds and other rewards untouched."
+}
